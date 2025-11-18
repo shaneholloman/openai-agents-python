@@ -614,11 +614,31 @@ class AgentRunner:
                     )
 
                     if current_turn == 1:
+                        # Separate guardrails based on execution mode.
+                        all_input_guardrails = starting_agent.input_guardrails + (
+                            run_config.input_guardrails or []
+                        )
+                        sequential_guardrails = [
+                            g for g in all_input_guardrails if not g.run_in_parallel
+                        ]
+                        parallel_guardrails = [g for g in all_input_guardrails if g.run_in_parallel]
+
+                        # Run blocking guardrails first, before agent starts.
+                        # (will raise exception if tripwire triggered).
+                        sequential_results = []
+                        if sequential_guardrails:
+                            sequential_results = await self._run_input_guardrails(
+                                starting_agent,
+                                sequential_guardrails,
+                                _copy_str_or_list(prepared_input),
+                                context_wrapper,
+                            )
+
+                        # Run parallel guardrails + agent together.
                         input_guardrail_results, turn_result = await asyncio.gather(
                             self._run_input_guardrails(
                                 starting_agent,
-                                starting_agent.input_guardrails
-                                + (run_config.input_guardrails or []),
+                                parallel_guardrails,
                                 _copy_str_or_list(prepared_input),
                                 context_wrapper,
                             ),
@@ -635,6 +655,9 @@ class AgentRunner:
                                 server_conversation_tracker=server_conversation_tracker,
                             ),
                         )
+
+                        # Combine sequential and parallel results.
+                        input_guardrail_results = sequential_results + input_guardrail_results
                     else:
                         turn_result = await self._run_single_turn(
                             agent=current_agent,
@@ -954,6 +977,11 @@ class AgentRunner:
             for done in asyncio.as_completed(guardrail_tasks):
                 result = await done
                 if result.output.tripwire_triggered:
+                    # Cancel all remaining guardrail tasks if a tripwire is triggered.
+                    for t in guardrail_tasks:
+                        t.cancel()
+                    # Wait for cancellations to propagate by awaiting the cancelled tasks.
+                    await asyncio.gather(*guardrail_tasks, return_exceptions=True)
                     _error_tracing.attach_error_to_span(
                         parent_span,
                         SpanError(
@@ -964,6 +992,9 @@ class AgentRunner:
                             },
                         ),
                     )
+                    queue.put_nowait(result)
+                    guardrail_results.append(result)
+                    break
                 queue.put_nowait(result)
                 guardrail_results.append(result)
         except Exception:
@@ -971,7 +1002,9 @@ class AgentRunner:
                 t.cancel()
             raise
 
-        streamed_result.input_guardrail_results = guardrail_results
+        streamed_result.input_guardrail_results = (
+            streamed_result.input_guardrail_results + guardrail_results
+        )
 
     @classmethod
     async def _start_streaming(
@@ -1063,11 +1096,36 @@ class AgentRunner:
                     break
 
                 if current_turn == 1:
-                    # Run the input guardrails in the background and put the results on the queue
+                    # Separate guardrails based on execution mode.
+                    all_input_guardrails = starting_agent.input_guardrails + (
+                        run_config.input_guardrails or []
+                    )
+                    sequential_guardrails = [
+                        g for g in all_input_guardrails if not g.run_in_parallel
+                    ]
+                    parallel_guardrails = [g for g in all_input_guardrails if g.run_in_parallel]
+
+                    # Run sequential guardrails first.
+                    if sequential_guardrails:
+                        await cls._run_input_guardrails_with_queue(
+                            starting_agent,
+                            sequential_guardrails,
+                            ItemHelpers.input_to_new_input_list(prepared_input),
+                            context_wrapper,
+                            streamed_result,
+                            current_span,
+                        )
+                        # Check if any blocking guardrail triggered and raise before starting agent.
+                        for result in streamed_result.input_guardrail_results:
+                            if result.output.tripwire_triggered:
+                                streamed_result._event_queue.put_nowait(QueueCompleteSentinel())
+                                raise InputGuardrailTripwireTriggered(result)
+
+                    # Run parallel guardrails in background.
                     streamed_result._input_guardrails_task = asyncio.create_task(
                         cls._run_input_guardrails_with_queue(
                             starting_agent,
-                            starting_agent.input_guardrails + (run_config.input_guardrails or []),
+                            parallel_guardrails,
                             ItemHelpers.input_to_new_input_list(prepared_input),
                             context_wrapper,
                             streamed_result,
@@ -1632,6 +1690,8 @@ class AgentRunner:
                 # Cancel all guardrail tasks if a tripwire is triggered.
                 for t in guardrail_tasks:
                     t.cancel()
+                # Wait for cancellations to propagate by awaiting the cancelled tasks.
+                await asyncio.gather(*guardrail_tasks, return_exceptions=True)
                 _error_tracing.attach_error_to_current_span(
                     SpanError(
                         message="Guardrail tripwire triggered",
