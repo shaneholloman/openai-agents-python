@@ -67,8 +67,11 @@ class OpenAIResponsesModel(Model):
         self,
         model: str | ChatModel,
         openai_client: AsyncOpenAI,
+        *,
+        model_is_explicit: bool = True,
     ) -> None:
         self.model = model
+        self._model_is_explicit = model_is_explicit
         self._client = openai_client
 
     def _non_null_or_omit(self, value: Any) -> Any:
@@ -262,6 +265,12 @@ class OpenAIResponsesModel(Model):
         converted_tools = Converter.convert_tools(tools, handoffs)
         converted_tools_payload = _to_dump_compatible(converted_tools.tools)
         response_format = Converter.get_response_format(output_schema)
+        should_omit_model = prompt is not None and not self._model_is_explicit
+        model_param: str | ChatModel | Omit = self.model if not should_omit_model else omit
+        should_omit_tools = prompt is not None and len(converted_tools_payload) == 0
+        tools_param: list[ToolParam] | Omit = (
+            converted_tools_payload if not should_omit_tools else omit
+        )
 
         include_set: set[str] = set(converted_tools.includes)
         if model_settings.response_include is not None:
@@ -309,10 +318,10 @@ class OpenAIResponsesModel(Model):
             previous_response_id=self._non_null_or_omit(previous_response_id),
             conversation=self._non_null_or_omit(conversation_id),
             instructions=self._non_null_or_omit(system_instructions),
-            model=self.model,
+            model=model_param,
             input=list_input,
             include=include,
-            tools=converted_tools_payload,
+            tools=tools_param,
             prompt=self._non_null_or_omit(prompt),
             temperature=self._non_null_or_omit(model_settings.temperature),
             top_p=self._non_null_or_omit(model_settings.top_p),
