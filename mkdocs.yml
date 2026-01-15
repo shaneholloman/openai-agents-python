@@ -102,7 +102,6 @@ plugins:
                     - ref/items.md
                     - ref/run_context.md
                     - ref/usage.md
-                    - ref/logger.md
                     - ref/exceptions.md
                     - ref/guardrail.md
                     - ref/prompts.md
