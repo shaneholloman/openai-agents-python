@@ -53,6 +53,8 @@ do_not_translate = [
     "Playground",
     "Realtime API",
     "Sora",
+    "Agents as tools",
+    "Agents-as-tools",
     # Add more terms here
 ]
 
