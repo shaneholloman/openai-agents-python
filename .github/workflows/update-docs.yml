@@ -20,6 +20,15 @@ on:
       - '!docs/ja/**'
       - '!docs/ko/**'
       - '!docs/zh/**'
+  workflow_dispatch:
+    inputs:
+      translate_mode:
+        description: "Translation mode"
+        type: choice
+        options:
+          - only-changes
+          - full
+        default: only-changes
 
 permissions:
   contents: write
@@ -30,7 +39,7 @@ jobs:
     if: "!contains(github.event.head_commit.message, 'Update all translated document pages')"
     name: Build and Push Translated Docs
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       PROD_OPENAI_API_KEY: ${{ secrets.PROD_OPENAI_API_KEY }}
     steps:
@@ -38,38 +47,6 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - name: Detect translation scope
-        id: translate-scope
-        shell: bash
-        run: |
-          set -euo pipefail
-          before="${{ github.event.before }}"
-          sha="${{ github.sha }}"
-          changed_files=$(git diff --name-only --diff-filter=ACMR "$before" "$sha" -- docs mkdocs.yml || true)
-          page_list="$(mktemp "${RUNNER_TEMP}/page-files-XXXXXX.txt")"
-          non_page_found=false
-          while IFS= read -r file; do
-            if [ -z "$file" ]; then
-              continue
-            fi
-            if [[ "$file" =~ ^docs/.*\.md$ ]] \
-              && [[ ! "$file" =~ ^docs/(ja|ko|zh)/ ]] \
-              && [[ ! "$file" =~ ^docs/ref/ ]]; then
-              if [ -f "$file" ]; then
-                echo "$file" >> "$page_list"
-              fi
-            else
-              non_page_found=true
-            fi
-          done <<< "$changed_files"
-
-          if [ -s "$page_list" ] && [ "$non_page_found" = "false" ]; then
-            echo "mode=partial" >> "$GITHUB_OUTPUT"
-            echo "page_files=$page_list" >> "$GITHUB_OUTPUT"
-          else
-            echo "mode=full" >> "$GITHUB_OUTPUT"
-            rm -f "$page_list"
-          fi
       - name: Setup uv
         uses: astral-sh/setup-uv@v5
         with:
@@ -78,26 +55,9 @@ jobs:
         run: make sync
       - name: Build translated docs
         run: |
-          if [ "${{ steps.translate-scope.outputs.mode }}" = "partial" ]; then
-            echo "Translating changed pages only."
-            while IFS= read -r file; do
-              if [ -n "$file" ]; then
-                uv run docs/scripts/translate_docs.py --file "$file"
-              fi
-            done < "${{ steps.translate-scope.outputs.page_files }}"
-            uv run mkdocs build
-          else
-            echo "Translating full docs set."
-            make build-full-docs
-          fi
-
-      - name: Cleanup temp page list
-        if: steps.translate-scope.outputs.mode == 'partial'
-        run: |
-          page_list="${{ steps.translate-scope.outputs.page_files }}"
-          if [ -n "$page_list" ] && [ -f "$page_list" ]; then
-            rm -f "$page_list"
-          fi
+          mode="${{ inputs.translate_mode || 'only-changes' }}"
+          uv run docs/scripts/translate_docs.py --mode "$mode"
+          uv run mkdocs build
 
       - name: Commit changes
         id: commit
