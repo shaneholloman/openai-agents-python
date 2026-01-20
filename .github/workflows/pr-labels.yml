@@ -7,34 +7,83 @@ on:
       - reopened
       - synchronize
       - ready_for_review
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to label."
+        required: true
+        type: number
 
 permissions:
   contents: read
+  issues: write
   pull-requests: write
 
 jobs:
   label:
     runs-on: ubuntu-latest
     steps:
+      - name: Ensure main workflow
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' }}
+        run: |
+          echo "This workflow must be dispatched from main."
+          exit 1
+
+      - name: Resolve PR context
+        id: pr
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        env:
+          MANUAL_PR_NUMBER: ${{ inputs.pr_number || '' }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const isManual = context.eventName === 'workflow_dispatch';
+            let pr;
+            if (isManual) {
+              const prNumber = Number(process.env.MANUAL_PR_NUMBER);
+              if (!prNumber) {
+                core.setFailed('workflow_dispatch requires pr_number input.');
+                return;
+              }
+              const { data } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+              });
+              pr = data;
+            } else {
+              pr = context.payload.pull_request;
+            }
+            if (!pr) {
+              core.setFailed('Missing pull request context.');
+              return;
+            }
+            const headRepo = pr.head.repo.full_name;
+            const repoFullName = `${context.repo.owner}/${context.repo.repo}`;
+            core.setOutput('pr_number', pr.number);
+            core.setOutput('base_sha', pr.base.sha);
+            core.setOutput('head_sha', pr.head.sha);
+            core.setOutput('head_repo', headRepo);
+            core.setOutput('is_fork', headRepo !== repoFullName);
+
       - name: Checkout base
-        uses: actions/checkout@v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ steps.pr.outputs.base_sha }}
       - name: Fetch PR head
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REPO: ${{ steps.pr.outputs.head_repo }}
+          PR_HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
           set -euo pipefail
-          git fetch origin "refs/pull/${PR_NUMBER}/head:pr-head"
-          git cat-file -e "${PR_BASE_SHA}^{commit}"
-          git cat-file -e "${PR_HEAD_SHA}^{commit}" || git cat-file -e "pr-head^{commit}"
+          git fetch --no-tags --prune --recurse-submodules=no \
+            "https://github.com/${PR_HEAD_REPO}.git" \
+            "${PR_HEAD_SHA}"
       - name: Collect PR diff
         env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ steps.pr.outputs.base_sha }}
+          PR_HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
         run: |
           set -euo pipefail
           mkdir -p .tmp/pr-labels
@@ -49,7 +98,8 @@ jobs:
           mkdir -p "$output_dir"
           echo "output_file=${output_file}" >> "$GITHUB_OUTPUT"
       - name: Run Codex labeling
-        uses: openai/codex-action@v1
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.pr.outputs.is_fork != 'true' }}
+        uses: openai/codex-action@f5c0ca71642badb34c1e66321d8d85685a0fa3dc
         with:
           openai-api-key: ${{ secrets.PROD_OPENAI_API_KEY }}
           prompt-file: .github/codex/prompts/pr-labels.md
@@ -59,7 +109,7 @@ jobs:
       - name: Apply labels
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
           CODEX_OUTPUT_PATH: ${{ steps.codex-output.outputs.output_file }}
         run: |
           python - <<'PY'
@@ -143,3 +193,60 @@ jobs:
 
           subprocess.check_call(cmd)
           PY
+
+      - name: Comment on manual run failure
+        if: ${{ github.event_name == 'workflow_dispatch' && always() }}
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          CODEX_CONCLUSION: ${{ steps.run_codex.conclusion }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const marker = '<!-- pr-labels-manual-run -->';
+            const jobStatus = process.env.JOB_STATUS;
+            if (jobStatus === 'success') {
+              return;
+            }
+            const prNumber = Number(process.env.PR_NUMBER);
+            if (!prNumber) {
+              core.setFailed('Missing PR number for manual run comment.');
+              return;
+            }
+            const body = [
+              marker,
+              'Manual PR labeling failed.',
+              `Job status: ${jobStatus}.`,
+              `Run: ${process.env.RUN_URL}.`,
+              `Codex labeling: ${process.env.CODEX_CONCLUSION}.`,
+            ].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              per_page: 100,
+            });
+            const existing = comments.find(
+              (comment) =>
+                comment.user?.login === 'github-actions[bot]' &&
+                comment.body?.includes(marker),
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+              core.info(`Updated existing comment ${existing.id}`);
+              return;
+            }
+            const { data: created } = await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body,
+            });
+            core.info(`Created comment ${created.id}`);

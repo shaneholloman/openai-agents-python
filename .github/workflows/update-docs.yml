@@ -44,11 +44,11 @@ jobs:
       PROD_OPENAI_API_KEY: ${{ secrets.PROD_OPENAI_API_KEY }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
         with:
           fetch-depth: 0
       - name: Setup uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@e58605a9b6da7c637471fab8847a5e5a6b8df081
         with:
           enable-cache: true
       - name: Install dependencies
@@ -75,7 +75,7 @@ jobs:
 
       - name: Create Pull Request
         if: steps.commit.outputs.committed == 'true'
-        uses: peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@98357b18bf14b5342f975ff684046ec3b2a07725
         with:
           commit-message: "Update translated document pages"
           title: "docs: update translated document pages"
