@@ -65,6 +65,7 @@ from .memory import (
     OpenAIResponsesCompactionArgs,
     Session,
     SessionInputCallback,
+    SessionSettings,
     is_openai_responses_compaction_aware_session,
 )
 from .model_settings import ModelSettings
@@ -202,6 +203,11 @@ class RunConfig:
     model_settings: ModelSettings | None = None
     """Configure global model settings. Any non-null values will override the agent-specific model
     settings.
+    """
+
+    session_settings: SessionSettings | None = None
+    """Configure session settings. Any non-null values will override the session's default
+    settings. Used to control session behavior like the number of items to retrieve.
     """
 
     handoff_input_filter: HandoffInputFilter | None = None
@@ -575,7 +581,9 @@ class AgentRunner:
         # Keep original user input separate from session-prepared input
         original_user_input = input
         prepared_input = await self._prepare_input_with_session(
-            input, session, run_config.session_input_callback
+            input,
+            session,
+            run_config,
         )
 
         tool_use_tracker = AgentToolUseTracker()
@@ -1143,7 +1151,9 @@ class AgentRunner:
         try:
             # Prepare input with session if enabled
             prepared_input = await AgentRunner._prepare_input_with_session(
-                starting_input, session, run_config.session_input_callback
+                starting_input,
+                session,
+                run_config,
             )
 
             # Update the streamed result with the prepared input
@@ -2050,14 +2060,26 @@ class AgentRunner:
         cls,
         input: str | list[TResponseInputItem],
         session: Session | None,
-        session_input_callback: SessionInputCallback | None,
+        run_config: RunConfig,
     ) -> str | list[TResponseInputItem]:
         """Prepare input by combining it with session history if enabled."""
         if session is None:
             return input
 
+        session_input_callback: SessionInputCallback | None = run_config.session_input_callback
+
         # Get previous conversation history
-        history = await session.get_items()
+        # Resolve session settings: session defaults + run config overrides
+        session_settings = getattr(session, "session_settings", None) or SessionSettings()
+        if run_config.session_settings is not None:
+            session_settings = session_settings.resolve(run_config.session_settings)
+
+        if session_settings.limit is not None:
+            history = await session.get_items(
+                limit=session_settings.limit,
+            )
+        else:
+            history = await session.get_items()
 
         # Convert input to list format
         new_input_list = ItemHelpers.input_to_new_input_list(input)

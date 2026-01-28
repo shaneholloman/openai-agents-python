@@ -69,6 +69,7 @@ from .memory import (
     OpenAIResponsesCompactionSession,
     Session,
     SessionABC,
+    SessionSettings,
     SQLiteSession,
     is_openai_responses_compaction_aware_session,
 )
@@ -294,6 +295,7 @@ __all__ = [
     "AgentHooks",
     "Session",
     "SessionABC",
+    "SessionSettings",
     "SQLiteSession",
     "OpenAIConversationsSession",
     "OpenAIResponsesCompactionSession",
