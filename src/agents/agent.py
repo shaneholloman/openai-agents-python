@@ -11,6 +11,11 @@ from openai.types.responses.response_prompt_param import ResponsePromptParam
 from typing_extensions import NotRequired, TypeAlias, TypedDict
 
 from .agent_output import AgentOutputSchemaBase
+from .agent_tool_state import (
+    consume_agent_tool_run_result,
+    peek_agent_tool_run_result,
+    record_agent_tool_run_result,
+)
 from .guardrail import InputGuardrail, OutputGuardrail
 from .handoffs import Handoff
 from .logger import logger
@@ -39,11 +44,13 @@ from .util._types import MaybeAwaitable
 if TYPE_CHECKING:
     from openai.types.responses.response_function_tool_call import ResponseFunctionToolCall
 
+    from .items import ToolApprovalItem
     from .lifecycle import AgentHooks, RunHooks
     from .mcp import MCPServer
     from .memory.session import Session
     from .result import RunResult, RunResultStreaming
     from .run import RunConfig
+    from .run_state import RunState
     from .stream_events import StreamEvent
 
 
@@ -420,6 +427,8 @@ class Agent(AgentBase, Generic[TContext]):
         conversation_id: str | None = None,
         session: Session | None = None,
         failure_error_function: ToolErrorFunction | None = default_tool_error_function,
+        needs_approval: bool
+        | Callable[[RunContextWrapper[Any], dict[str, Any], str], Awaitable[bool]] = False,
     ) -> Tool:
         """Transform this agent into a tool, callable by other agents.
 
@@ -444,99 +453,209 @@ class Agent(AgentBase, Generic[TContext]):
                 provided, the nested agent is executed in streaming mode.
             failure_error_function: If provided, generate an error message when the tool (agent) run
                 fails. The message is sent to the LLM. If None, the exception is raised instead.
+            needs_approval: Bool or callable to decide if this agent tool should pause for approval.
         """
 
         @function_tool(
             name_override=tool_name or _transforms.transform_string_function_style(self.name),
             description_override=tool_description or "",
             is_enabled=is_enabled,
+            needs_approval=needs_approval,
             failure_error_function=failure_error_function,
         )
         async def run_agent(context: ToolContext, input: str) -> Any:
             from .run import DEFAULT_MAX_TURNS, Runner
+            from .tool_context import ToolContext
 
             resolved_max_turns = max_turns if max_turns is not None else DEFAULT_MAX_TURNS
-            run_result: RunResult | RunResultStreaming
-
-            if on_stream is not None:
-                run_result = Runner.run_streamed(
-                    starting_agent=self,
-                    input=input,
+            if isinstance(context, ToolContext):
+                # Use a fresh ToolContext to avoid sharing approval state with parent runs.
+                nested_context = ToolContext(
                     context=context.context,
-                    run_config=run_config,
-                    max_turns=resolved_max_turns,
-                    hooks=hooks,
-                    previous_response_id=previous_response_id,
-                    conversation_id=conversation_id,
-                    session=session,
+                    usage=context.usage,
+                    tool_name=context.tool_name,
+                    tool_call_id=context.tool_call_id,
+                    tool_arguments=context.tool_arguments,
+                    tool_call=context.tool_call,
                 )
-                # Dispatch callbacks in the background so slow handlers do not block
-                # event consumption.
-                event_queue: asyncio.Queue[AgentToolStreamEvent | None] = asyncio.Queue()
+            elif isinstance(context, RunContextWrapper):
+                nested_context = context.context
+            else:
+                nested_context = context
+            run_result: RunResult | RunResultStreaming | None = None
+            resume_state: RunState | None = None
+            should_record_run_result = True
 
-                async def _run_handler(payload: AgentToolStreamEvent) -> None:
-                    """Execute the user callback while capturing exceptions."""
-                    try:
-                        maybe_result = on_stream(payload)
-                        if inspect.isawaitable(maybe_result):
-                            await maybe_result
-                    except Exception:
-                        logger.exception(
-                            "Error while handling on_stream event for agent tool %s.",
-                            self.name,
+            def _nested_approvals_status(
+                interruptions: list[ToolApprovalItem],
+            ) -> Literal["approved", "pending", "rejected"]:
+                has_pending = False
+                has_decision = False
+                for interruption in interruptions:
+                    call_id = interruption.call_id
+                    if not call_id:
+                        has_pending = True
+                        continue
+                    status = context.get_approval_status(
+                        interruption.tool_name or "", call_id, existing_pending=interruption
+                    )
+                    if status is False:
+                        return "rejected"
+                    if status is True:
+                        has_decision = True
+                    if status is None:
+                        has_pending = True
+                if has_decision:
+                    return "approved"
+                if has_pending:
+                    return "pending"
+                return "approved"
+
+            def _apply_nested_approvals(
+                nested_context: RunContextWrapper[Any],
+                parent_context: RunContextWrapper[Any],
+                interruptions: list[ToolApprovalItem],
+            ) -> None:
+                for interruption in interruptions:
+                    call_id = interruption.call_id
+                    if not call_id:
+                        continue
+                    tool_name = RunContextWrapper._resolve_tool_name(interruption)
+                    status = parent_context.get_approval_status(
+                        tool_name, call_id, existing_pending=interruption
+                    )
+                    if status is None:
+                        continue
+                    approval_record = parent_context._approvals.get(tool_name)
+                    if status is True:
+                        always_approve = bool(approval_record and approval_record.approved is True)
+                        nested_context.approve_tool(
+                            interruption,
+                            always_approve=always_approve,
+                        )
+                    else:
+                        always_reject = bool(approval_record and approval_record.rejected is True)
+                        nested_context.reject_tool(
+                            interruption,
+                            always_reject=always_reject,
                         )
 
-                async def dispatch_stream_events() -> None:
-                    while True:
-                        payload = await event_queue.get()
-                        is_sentinel = payload is None  # None marks the end of the stream.
+            if isinstance(context, ToolContext) and context.tool_call is not None:
+                pending_run_result = peek_agent_tool_run_result(context.tool_call)
+                if pending_run_result and getattr(pending_run_result, "interruptions", None):
+                    status = _nested_approvals_status(pending_run_result.interruptions)
+                    if status == "pending":
+                        run_result = pending_run_result
+                        should_record_run_result = False
+                    elif status in ("approved", "rejected"):
+                        resume_state = pending_run_result.to_state()
+                        if resume_state._context is not None:
+                            # Apply only explicit parent approvals to the nested resumed run.
+                            _apply_nested_approvals(
+                                resume_state._context,
+                                context,
+                                pending_run_result.interruptions,
+                            )
+                        consume_agent_tool_run_result(context.tool_call)
+
+            if run_result is None:
+                if on_stream is not None:
+                    run_result_streaming = Runner.run_streamed(
+                        starting_agent=cast(Agent[Any], self),
+                        input=resume_state or input,
+                        context=None if resume_state is not None else cast(Any, nested_context),
+                        run_config=run_config,
+                        max_turns=resolved_max_turns,
+                        hooks=hooks,
+                        previous_response_id=None
+                        if resume_state is not None
+                        else previous_response_id,
+                        conversation_id=None if resume_state is not None else conversation_id,
+                        session=session,
+                    )
+                    # Dispatch callbacks in the background so slow handlers do not block
+                    # event consumption.
+                    event_queue: asyncio.Queue[AgentToolStreamEvent | None] = asyncio.Queue()
+
+                    async def _run_handler(payload: AgentToolStreamEvent) -> None:
+                        """Execute the user callback while capturing exceptions."""
                         try:
-                            if payload is not None:
-                                await _run_handler(payload)
-                        finally:
-                            event_queue.task_done()
+                            maybe_result = on_stream(payload)
+                            if inspect.isawaitable(maybe_result):
+                                await maybe_result
+                        except Exception:
+                            logger.exception(
+                                "Error while handling on_stream event for agent tool %s.",
+                                self.name,
+                            )
 
-                        if is_sentinel:
-                            break
+                    async def dispatch_stream_events() -> None:
+                        while True:
+                            payload = await event_queue.get()
+                            is_sentinel = payload is None  # None marks the end of the stream.
+                            try:
+                                if payload is not None:
+                                    await _run_handler(payload)
+                            finally:
+                                event_queue.task_done()
 
-                dispatch_task = asyncio.create_task(dispatch_stream_events())
+                            if is_sentinel:
+                                break
 
-                try:
-                    from .stream_events import AgentUpdatedStreamEvent
+                    dispatch_task = asyncio.create_task(dispatch_stream_events())
 
-                    current_agent = run_result.current_agent
-                    async for event in run_result.stream_events():
-                        if isinstance(event, AgentUpdatedStreamEvent):
-                            current_agent = event.new_agent
+                    try:
+                        from .stream_events import AgentUpdatedStreamEvent
 
-                        payload: AgentToolStreamEvent = {
-                            "event": event,
-                            "agent": current_agent,
-                            "tool_call": context.tool_call,
-                        }
-                        await event_queue.put(payload)
-                finally:
-                    await event_queue.put(None)
-                    await event_queue.join()
-                    await dispatch_task
-            else:
-                run_result = await Runner.run(
-                    starting_agent=self,
-                    input=input,
-                    context=context.context,
-                    run_config=run_config,
-                    max_turns=resolved_max_turns,
-                    hooks=hooks,
-                    previous_response_id=previous_response_id,
-                    conversation_id=conversation_id,
-                    session=session,
-                )
+                        current_agent = run_result_streaming.current_agent
+                        async for event in run_result_streaming.stream_events():
+                            if isinstance(event, AgentUpdatedStreamEvent):
+                                current_agent = event.new_agent
+
+                            payload: AgentToolStreamEvent = {
+                                "event": event,
+                                "agent": current_agent,
+                                "tool_call": context.tool_call,
+                            }
+                            await event_queue.put(payload)
+                    finally:
+                        await event_queue.put(None)
+                        await event_queue.join()
+                        await dispatch_task
+                    run_result = run_result_streaming
+                else:
+                    run_result = await Runner.run(
+                        starting_agent=cast(Agent[Any], self),
+                        input=resume_state or input,
+                        context=None if resume_state is not None else cast(Any, nested_context),
+                        run_config=run_config,
+                        max_turns=resolved_max_turns,
+                        hooks=hooks,
+                        previous_response_id=None
+                        if resume_state is not None
+                        else previous_response_id,
+                        conversation_id=None if resume_state is not None else conversation_id,
+                        session=session,
+                    )
+            assert run_result is not None
+
+            # Store the run result by tool call identity so nested interruptions can be read later.
+            interruptions = getattr(run_result, "interruptions", None)
+            if isinstance(context, ToolContext) and context.tool_call is not None and interruptions:
+                if should_record_run_result:
+                    record_agent_tool_run_result(context.tool_call, run_result)
+
             if custom_output_extractor:
                 return await custom_output_extractor(run_result)
 
             return run_result.final_output
 
-        return run_agent
+        # Mark the function tool as an agent tool.
+        run_agent_tool = run_agent
+        run_agent_tool._is_agent_tool = True
+        run_agent_tool._agent_instance = self
+
+        return run_agent_tool
 
     async def get_system_prompt(self, run_context: RunContextWrapper[TContext]) -> str | None:
         if isinstance(self.instructions, str):

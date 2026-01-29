@@ -31,8 +31,8 @@ from agents import (
     Usage,
     handoff,
 )
-from agents._run_impl import RunImpl, ToolRunHandoff
-from agents.run import AgentRunner
+from agents.run_internal import run_loop
+from agents.run_internal.run_loop import ToolRunHandoff, get_handoffs, get_output_schema
 
 from .test_responses import (
     get_final_output_message,
@@ -48,6 +48,24 @@ def _dummy_ctx() -> RunContextWrapper[None]:
     return RunContextWrapper(context=None)
 
 
+async def process_response(
+    agent: Agent[Any],
+    response: ModelResponse,
+    *,
+    output_schema: Any = None,
+    handoffs: list[Handoff[Any, Agent[Any]]] | None = None,
+) -> Any:
+    """Process a model response using the agent's tools and optional handoffs."""
+
+    return run_loop.process_model_response(
+        agent=agent,
+        response=response,
+        output_schema=output_schema,
+        handoffs=handoffs or [],
+        all_tools=await agent.get_all_tools(_dummy_ctx()),
+    )
+
+
 def test_empty_response():
     agent = Agent(name="test")
     response = ModelResponse(
@@ -56,7 +74,7 @@ def test_empty_response():
         response_id=None,
     )
 
-    result = RunImpl.process_model_response(
+    result = run_loop.process_model_response(
         agent=agent,
         response=response,
         output_schema=None,
@@ -74,7 +92,7 @@ def test_no_tool_calls():
         usage=Usage(),
         response_id=None,
     )
-    result = RunImpl.process_model_response(
+    result = run_loop.process_model_response(
         agent=agent, response=response, output_schema=None, handoffs=[], all_tools=[]
     )
     assert not result.handoffs
@@ -92,13 +110,7 @@ async def test_single_tool_call():
         usage=Usage(),
         response_id=None,
     )
-    result = RunImpl.process_model_response(
-        agent=agent,
-        response=response,
-        output_schema=None,
-        handoffs=[],
-        all_tools=await agent.get_all_tools(_dummy_ctx()),
-    )
+    result = await process_response(agent=agent, response=response)
     assert not result.handoffs
     assert result.functions and len(result.functions) == 1
 
@@ -120,13 +132,7 @@ async def test_missing_tool_call_raises_error():
     )
 
     with pytest.raises(ModelBehaviorError):
-        RunImpl.process_model_response(
-            agent=agent,
-            response=response,
-            output_schema=None,
-            handoffs=[],
-            all_tools=await agent.get_all_tools(_dummy_ctx()),
-        )
+        await process_response(agent=agent, response=response)
 
 
 @pytest.mark.asyncio
@@ -149,13 +155,7 @@ async def test_multiple_tool_calls():
         response_id=None,
     )
 
-    result = RunImpl.process_model_response(
-        agent=agent,
-        response=response,
-        output_schema=None,
-        handoffs=[],
-        all_tools=await agent.get_all_tools(_dummy_ctx()),
-    )
+    result = await process_response(agent=agent, response=response)
     assert not result.handoffs
     assert result.functions and len(result.functions) == 2
 
@@ -178,13 +178,7 @@ async def test_handoffs_parsed_correctly():
         usage=Usage(),
         response_id=None,
     )
-    result = RunImpl.process_model_response(
-        agent=agent_3,
-        response=response,
-        output_schema=None,
-        handoffs=[],
-        all_tools=await agent_3.get_all_tools(_dummy_ctx()),
-    )
+    result = await process_response(agent=agent_3, response=response)
     assert not result.handoffs, "Shouldn't have a handoff here"
 
     response = ModelResponse(
@@ -192,12 +186,10 @@ async def test_handoffs_parsed_correctly():
         usage=Usage(),
         response_id=None,
     )
-    result = RunImpl.process_model_response(
+    result = await process_response(
         agent=agent_3,
         response=response,
-        output_schema=None,
-        handoffs=await AgentRunner._get_handoffs(agent_3, _dummy_ctx()),
-        all_tools=await agent_3.get_all_tools(_dummy_ctx()),
+        handoffs=await get_handoffs(agent_3, _dummy_ctx()),
     )
     assert len(result.handoffs) == 1, "Should have a handoff here"
     handoff = result.handoffs[0]
@@ -209,102 +201,6 @@ async def test_handoffs_parsed_correctly():
         RunContextWrapper(None), handoff.tool_call.arguments
     )
     assert handoff_agent == agent_1
-
-
-@pytest.mark.asyncio
-async def test_history_nesting_disabled_by_default(monkeypatch: pytest.MonkeyPatch):
-    source_agent = Agent(name="source")
-    target_agent = Agent(name="target")
-    default_handoff = handoff(target_agent)
-    tool_call = cast(ResponseFunctionToolCall, get_handoff_tool_call(target_agent))
-    run_handoffs = [ToolRunHandoff(handoff=default_handoff, tool_call=tool_call)]
-    run_config = RunConfig()
-    context_wrapper = RunContextWrapper(context=None)
-    hooks = RunHooks()
-    original_input = [get_text_input_item("hello")]
-    pre_step_items: list[RunItem] = []
-    new_step_items: list[RunItem] = []
-    new_response = ModelResponse(output=[tool_call], usage=Usage(), response_id=None)
-
-    def fail_if_called(
-        _handoff_input_data: HandoffInputData,
-        *,
-        history_mapper: Any,
-    ) -> HandoffInputData:
-        _ = history_mapper
-        raise AssertionError("nest_handoff_history should be opt-in.")
-
-    monkeypatch.setattr("agents._run_impl.nest_handoff_history", fail_if_called)
-
-    result = await RunImpl.execute_handoffs(
-        agent=source_agent,
-        original_input=list(original_input),
-        pre_step_items=pre_step_items,
-        new_step_items=new_step_items,
-        new_response=new_response,
-        run_handoffs=run_handoffs,
-        hooks=hooks,
-        context_wrapper=context_wrapper,
-        run_config=run_config,
-    )
-
-    assert result.original_input == original_input
-
-
-@pytest.mark.asyncio
-async def test_run_level_history_nesting_can_be_enabled(monkeypatch: pytest.MonkeyPatch):
-    source_agent = Agent(name="source")
-    target_agent = Agent(name="target")
-    default_handoff = handoff(target_agent)
-    tool_call = cast(ResponseFunctionToolCall, get_handoff_tool_call(target_agent))
-    run_handoffs = [ToolRunHandoff(handoff=default_handoff, tool_call=tool_call)]
-    run_config = RunConfig(nest_handoff_history=True)
-    context_wrapper = RunContextWrapper(context=None)
-    hooks = RunHooks()
-    original_input = [get_text_input_item("hello")]
-    pre_step_items: list[RunItem] = []
-    new_step_items: list[RunItem] = []
-    new_response = ModelResponse(output=[tool_call], usage=Usage(), response_id=None)
-
-    calls: list[HandoffInputData] = []
-
-    def fake_nest(
-        handoff_input_data: HandoffInputData,
-        *,
-        history_mapper: Any,
-    ) -> HandoffInputData:
-        _ = history_mapper
-        calls.append(handoff_input_data)
-        return handoff_input_data.clone(
-            input_history=(
-                {
-                    "role": "assistant",
-                    "content": "nested",
-                },
-            )
-        )
-
-    monkeypatch.setattr("agents._run_impl.nest_handoff_history", fake_nest)
-
-    result = await RunImpl.execute_handoffs(
-        agent=source_agent,
-        original_input=list(original_input),
-        pre_step_items=pre_step_items,
-        new_step_items=new_step_items,
-        new_response=new_response,
-        run_handoffs=run_handoffs,
-        hooks=hooks,
-        context_wrapper=context_wrapper,
-        run_config=run_config,
-    )
-
-    assert calls
-    assert result.original_input == [
-        {
-            "role": "assistant",
-            "content": "nested",
-        }
-    ]
 
 
 @pytest.mark.asyncio
@@ -333,9 +229,9 @@ async def test_handoff_can_disable_run_level_history_nesting(monkeypatch: pytest
         calls.append(handoff_input_data)
         return handoff_input_data
 
-    monkeypatch.setattr("agents._run_impl.nest_handoff_history", fake_nest)
+    monkeypatch.setattr("agents.run_internal.turn_resolution.nest_handoff_history", fake_nest)
 
-    result = await RunImpl.execute_handoffs(
+    result = await run_loop.execute_handoffs(
         agent=source_agent,
         original_input=list(original_input),
         pre_step_items=pre_step_items,
@@ -381,9 +277,9 @@ async def test_handoff_can_enable_history_nesting(monkeypatch: pytest.MonkeyPatc
             )
         )
 
-    monkeypatch.setattr("agents._run_impl.nest_handoff_history", fake_nest)
+    monkeypatch.setattr("agents.run_internal.turn_resolution.nest_handoff_history", fake_nest)
 
-    result = await RunImpl.execute_handoffs(
+    result = await run_loop.execute_handoffs(
         agent=source_agent,
         original_input=list(original_input),
         pre_step_items=pre_step_items,
@@ -414,12 +310,10 @@ async def test_missing_handoff_fails():
         response_id=None,
     )
     with pytest.raises(ModelBehaviorError):
-        RunImpl.process_model_response(
+        await process_response(
             agent=agent_3,
             response=response,
-            output_schema=None,
-            handoffs=await AgentRunner._get_handoffs(agent_3, _dummy_ctx()),
-            all_tools=await agent_3.get_all_tools(_dummy_ctx()),
+            handoffs=await get_handoffs(agent_3, _dummy_ctx()),
         )
 
 
@@ -437,12 +331,10 @@ async def test_multiple_handoffs_doesnt_error():
         usage=Usage(),
         response_id=None,
     )
-    result = RunImpl.process_model_response(
+    result = await process_response(
         agent=agent_3,
         response=response,
-        output_schema=None,
-        handoffs=await AgentRunner._get_handoffs(agent_3, _dummy_ctx()),
-        all_tools=await agent_3.get_all_tools(_dummy_ctx()),
+        handoffs=await get_handoffs(agent_3, _dummy_ctx()),
     )
     assert len(result.handoffs) == 2, "Should have multiple handoffs here"
 
@@ -463,12 +355,10 @@ async def test_final_output_parsed_correctly():
         response_id=None,
     )
 
-    RunImpl.process_model_response(
+    await process_response(
         agent=agent,
         response=response,
-        output_schema=AgentRunner._get_output_schema(agent),
-        handoffs=[],
-        all_tools=await agent.get_all_tools(_dummy_ctx()),
+        output_schema=get_output_schema(agent),
     )
 
 
@@ -489,13 +379,7 @@ async def test_file_search_tool_call_parsed_correctly():
         usage=Usage(),
         response_id=None,
     )
-    result = RunImpl.process_model_response(
-        agent=agent,
-        response=response,
-        output_schema=None,
-        handoffs=[],
-        all_tools=await agent.get_all_tools(_dummy_ctx()),
-    )
+    result = await process_response(agent=agent, response=response)
     # The final item should be a ToolCallItem for the file search call
     assert any(
         isinstance(item, ToolCallItem) and item.raw_item is file_search_call
@@ -519,13 +403,7 @@ async def test_function_web_search_tool_call_parsed_correctly():
         usage=Usage(),
         response_id=None,
     )
-    result = RunImpl.process_model_response(
-        agent=agent,
-        response=response,
-        output_schema=None,
-        handoffs=[],
-        all_tools=await agent.get_all_tools(_dummy_ctx()),
-    )
+    result = await process_response(agent=agent, response=response)
     assert any(
         isinstance(item, ToolCallItem) and item.raw_item is web_search_call
         for item in result.new_items
@@ -546,13 +424,8 @@ async def test_reasoning_item_parsed_correctly():
         usage=Usage(),
         response_id=None,
     )
-    result = RunImpl.process_model_response(
-        agent=Agent(name="test"),
-        response=response,
-        output_schema=None,
-        handoffs=[],
-        all_tools=await Agent(name="test").get_all_tools(_dummy_ctx()),
-    )
+    agent = Agent(name="test")
+    result = await process_response(agent=agent, response=response)
     assert any(
         isinstance(item, ReasoningItem) and item.raw_item is reasoning for item in result.new_items
     )
@@ -615,13 +488,7 @@ async def test_computer_tool_call_without_computer_tool_raises_error():
         response_id=None,
     )
     with pytest.raises(ModelBehaviorError):
-        RunImpl.process_model_response(
-            agent=Agent(name="test"),
-            response=response,
-            output_schema=None,
-            handoffs=[],
-            all_tools=await Agent(name="test").get_all_tools(_dummy_ctx()),
-        )
+        await process_response(agent=Agent(name="test"), response=response)
 
 
 @pytest.mark.asyncio
@@ -643,13 +510,7 @@ async def test_computer_tool_call_with_computer_tool_parsed_correctly():
         usage=Usage(),
         response_id=None,
     )
-    result = RunImpl.process_model_response(
-        agent=agent,
-        response=response,
-        output_schema=None,
-        handoffs=[],
-        all_tools=await agent.get_all_tools(_dummy_ctx()),
-    )
+    result = await process_response(agent=agent, response=response)
     assert any(
         isinstance(item, ToolCallItem) and item.raw_item is computer_call
         for item in result.new_items
@@ -674,12 +535,10 @@ async def test_tool_and_handoff_parsed_correctly():
         response_id=None,
     )
 
-    result = RunImpl.process_model_response(
+    result = await process_response(
         agent=agent_3,
         response=response,
-        output_schema=None,
-        handoffs=await AgentRunner._get_handoffs(agent_3, _dummy_ctx()),
-        all_tools=await agent_3.get_all_tools(_dummy_ctx()),
+        handoffs=await get_handoffs(agent_3, _dummy_ctx()),
     )
     assert result.functions and len(result.functions) == 1
     assert len(result.handoffs) == 1, "Should have a handoff here"
