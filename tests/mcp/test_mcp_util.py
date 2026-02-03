@@ -291,6 +291,38 @@ async def test_mcp_tool_timeout_handling():
 
 
 @pytest.mark.asyncio
+async def test_to_function_tool_legacy_call_without_agent_uses_server_policy():
+    """Legacy three-argument to_function_tool calls should honor server policy."""
+
+    server = FakeMCPServer(require_approval="always")
+    server.add_tool("legacy_tool", {})
+
+    # Backward compatibility: old call style omitted the `agent` argument.
+    function_tool = MCPUtil.to_function_tool(
+        MCPTool(name="legacy_tool", inputSchema={}),
+        server,
+        convert_schemas_to_strict=False,
+    )
+
+    # Legacy calls should still respect server-level approval settings.
+    assert function_tool.needs_approval is True
+
+    tool_context = ToolContext(
+        context=None,
+        tool_name="legacy_tool",
+        tool_call_id="legacy_call_1",
+        tool_arguments="{}",
+    )
+    result = await function_tool.on_invoke_tool(tool_context, "{}")
+    if isinstance(result, str):
+        assert "result_legacy_tool_" in result
+    elif isinstance(result, dict):
+        assert "result_legacy_tool_" in str(result.get("text", ""))
+    else:
+        pytest.fail(f"Unexpected tool result type: {type(result).__name__}")
+
+
+@pytest.mark.asyncio
 async def test_mcp_tool_failure_error_function_agent_default():
     """Agent-level failure_error_function should handle MCP tool failures."""
 
