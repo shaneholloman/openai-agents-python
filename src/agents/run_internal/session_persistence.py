@@ -26,7 +26,7 @@ from ..memory.openai_conversations_session import OpenAIConversationsSession
 from ..run_state import RunState
 from .items import (
     copy_input_items,
-    deduplicate_input_items,
+    deduplicate_input_items_preferring_latest,
     drop_orphan_function_calls,
     ensure_input_item_format,
     fingerprint_input_item,
@@ -136,7 +136,7 @@ async def prepare_input_with_session(
     prepared_as_inputs = [ensure_input_item_format(item) for item in prepared_items_raw]
     filtered = drop_orphan_function_calls(prepared_as_inputs)
     normalized = normalize_input_items_for_api(filtered)
-    deduplicated = deduplicate_input_items(normalized)
+    deduplicated = deduplicate_input_items_preferring_latest(normalized)
 
     return deduplicated, [ensure_input_item_format(item) for item in appended_items]
 
@@ -259,7 +259,7 @@ async def save_result_to_session(
         for item in new_items_for_fingerprint
     ]
 
-    items_to_save = deduplicate_input_items(input_list + new_items_as_input)
+    items_to_save = deduplicate_input_items_preferring_latest(input_list + new_items_as_input)
 
     if is_openai_conversation_session and items_to_save:
         items_to_save = [_sanitize_openai_conversation_item(item) for item in items_to_save]
