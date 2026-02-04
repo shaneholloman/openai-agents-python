@@ -52,6 +52,7 @@ from .run_internal.agent_runner_helpers import (
     resolve_resumed_context,
     resolve_trace_settings,
     save_turn_items_if_needed,
+    should_cancel_parallel_model_task_on_input_guardrail_trip,
     update_run_state_for_interruption,
     validate_session_conversation_settings,
 )
@@ -1007,6 +1008,10 @@ class AgentRunner:
                                     model_task,
                                 )
                             except InputGuardrailTripwireTriggered:
+                                if should_cancel_parallel_model_task_on_input_guardrail_trip():
+                                    if not model_task.done():
+                                        model_task.cancel()
+                                    await asyncio.gather(model_task, return_exceptions=True)
                                 session_input_items_for_persistence = (
                                     await persist_session_items_for_guardrail_trip(
                                         session,
