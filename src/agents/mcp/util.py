@@ -362,7 +362,7 @@ class MCPUtil:
         *,
         meta: dict[str, Any] | None = None,
     ) -> ToolOutput:
-        """Invoke an MCP tool and return the result as a string."""
+        """Invoke an MCP tool and return the result as ToolOutput."""
         try:
             json_data: dict[str, Any] = json.loads(input_json) if input_json else {}
         except Exception as e:
