@@ -57,7 +57,7 @@ async def main(verbose: bool, stream: bool) -> None:
                 tool_config={
                     "type": "mcp",
                     "server_label": "deepwiki",
-                    "server_url": "https://mcp.deepwiki.com/sse",
+                    "server_url": "https://mcp.deepwiki.com/mcp",
                     "require_approval": require_approval,
                 }
             )
