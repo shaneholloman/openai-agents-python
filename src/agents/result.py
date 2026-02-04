@@ -5,7 +5,7 @@ import asyncio
 import copy
 import weakref
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
+from dataclasses import InitVar, dataclass, field
 from typing import Any, Literal, TypeVar, cast
 
 from .agent import Agent
@@ -76,8 +76,9 @@ def _populate_state_from_result(
     state._previous_response_id = previous_response_id
     state._auto_previous_response_id = auto_previous_response_id
 
-    if result.interruptions:
-        state._current_step = NextStepInterruption(interruptions=result.interruptions)
+    interruptions = list(getattr(result, "interruptions", []))
+    if interruptions:
+        state._current_step = NextStepInterruption(interruptions=interruptions)
 
     trace_state = getattr(result, "_trace_state", None)
     if trace_state is None:
@@ -119,9 +120,6 @@ class RunResultBase(abc.ABC):
 
     context_wrapper: RunContextWrapper[Any]
     """The context wrapper for the agent run."""
-
-    interruptions: list[ToolApprovalItem]
-    """Pending tool approval requests (interruptions) for this run."""
 
     _trace_state: TraceState | None = field(default=None, init=False, repr=False)
     """Serialized trace metadata captured during the run."""
@@ -228,6 +226,8 @@ class RunResult(RunResultBase):
     """Whether automatic previous response tracking was enabled."""
     max_turns: int = 10
     """The maximum number of turns allowed for this run."""
+    interruptions: list[ToolApprovalItem] = field(default_factory=list)
+    """Pending tool approval requests (interruptions) for this run."""
 
     def __post_init__(self) -> None:
         self._last_agent_ref = weakref.ref(self._last_agent)
@@ -337,8 +337,6 @@ class RunResultStreaming(RunResultBase):
         repr=False,
         default=None,
     )
-    _last_processed_response: ProcessedResponse | None = field(default=None, repr=False)
-    """The last processed model response. This is needed for resuming from interruptions."""
 
     _model_input_items: list[RunItem] = field(default_factory=list, repr=False)
     """Filtered items used to build model input between streaming turns."""
@@ -356,6 +354,11 @@ class RunResultStreaming(RunResultBase):
     _input_guardrails_task: asyncio.Task[Any] | None = field(default=None, repr=False)
     _output_guardrails_task: asyncio.Task[Any] | None = field(default=None, repr=False)
     _stored_exception: Exception | None = field(default=None, repr=False)
+    _cancel_mode: Literal["none", "immediate", "after_turn"] = field(default="none", repr=False)
+    _last_processed_response: ProcessedResponse | None = field(default=None, repr=False)
+    """The last processed model response. This is needed for resuming from interruptions."""
+    interruptions: list[ToolApprovalItem] = field(default_factory=list)
+    """Pending tool approval requests (interruptions) for this run."""
     _waiting_on_event_queue: bool = field(default=False, repr=False)
 
     _current_turn_persisted_item_count: int = 0
@@ -368,9 +371,6 @@ class RunResultStreaming(RunResultBase):
     _original_input_for_persistence: list[TResponseInputItem] = field(default_factory=list)
     """Original turn input before session history was merged, used for
     persistence (matches JS sessionInputOriginalSnapshot)."""
-
-    # Soft cancel state
-    _cancel_mode: Literal["none", "immediate", "after_turn"] = field(default="none", repr=False)
 
     _max_turns_handled: bool = field(default=False, repr=False)
 
@@ -386,12 +386,16 @@ class RunResultStreaming(RunResultBase):
     """Response identifier returned by the server for the last turn."""
     _auto_previous_response_id: bool = field(default=False, repr=False)
     """Whether automatic previous response tracking was enabled."""
+    _run_impl_task: InitVar[asyncio.Task[Any] | None] = None
 
-    def __post_init__(self) -> None:
+    def __post_init__(self, _run_impl_task: asyncio.Task[Any] | None) -> None:
         self._current_agent_ref = weakref.ref(self.current_agent)
         # Store the original input at creation time (it will be set via input field)
         if self._original_input is None:
             self._original_input = self.input
+        # Compatibility shim: accept legacy `_run_impl_task` constructor keyword.
+        if self.run_loop_task is None and _run_impl_task is not None:
+            self.run_loop_task = _run_impl_task
 
     @property
     def last_agent(self) -> Agent[Any]:
