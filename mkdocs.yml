@@ -172,6 +172,7 @@ plugins:
                     - sessions/encrypted_session.md
                 - results.md
                 - streaming.md
+                - human_in_the_loop.md
                 - repl.md
                 - tools.md
                 - mcp.md
@@ -212,6 +213,7 @@ plugins:
                     - sessions/encrypted_session.md
                 - results.md
                 - streaming.md
+                - human_in_the_loop.md
                 - repl.md
                 - tools.md
                 - mcp.md
@@ -251,6 +253,7 @@ plugins:
                     - sessions/encrypted_session.md
                 - results.md
                 - streaming.md
+                - human_in_the_loop.md
                 - repl.md
                 - tools.md
                 - mcp.md
