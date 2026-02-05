@@ -60,12 +60,14 @@ async def resolve_interruptions(agent: Agent, result: Any) -> Any:
 async def main():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     samples_dir = os.path.join(current_dir, "sample_files")
+    blocked_path = os.path.join(samples_dir, "test.txt")
 
     async with MCPServerStdio(
         name="Filesystem Server",
         params={
             "command": "npx",
             "args": ["-y", "@modelcontextprotocol/server-filesystem", samples_dir],
+            "cwd": samples_dir,
         },
         require_approval={"always": {"tool_names": ["read_text_file"]}},
     ) as server:
@@ -83,10 +85,16 @@ async def main():
             # Build an agent that uses the prefetched tools instead of mcp_servers.
             prefetched_agent = Agent(
                 name="Prefetched MCP Assistant",
-                instructions="Use the prefetched tools to help with file questions.",
+                instructions=(
+                    "Use the prefetched tools to help with file questions. "
+                    "When using path arguments, prefer absolute paths in the allowed directory."
+                ),
                 tools=all_tools,
             )
-            message = "List the available files and read one of them."
+            message = (
+                f"List files in this allowed directory: {samples_dir}. "
+                "Then read one of those files."
+            )
             print(f"\nRunning: {message}\n")
             result = await Runner.run(prefetched_agent, message)
             result = await resolve_interruptions(prefetched_agent, result)
@@ -105,10 +113,17 @@ async def main():
 
             filtered_agent = Agent(
                 name="Filtered MCP Assistant",
-                instructions="Use the filtered tools to respond.",
+                instructions=(
+                    "Use the filtered tools to respond. "
+                    "If a request requires a missing tool, explain that the capability is not "
+                    "available."
+                ),
                 tools=filtered_tools,
             )
-            blocked_message = "Create a file named sample_files/test.txt with the text hello."
+            blocked_message = (
+                f'Create a file named "{blocked_path}" with the text "hello". '
+                "If the available tools cannot create files, explain that clearly."
+            )
             print(f"\nRunning: {blocked_message}\n")
             filtered_result = await Runner.run(filtered_agent, blocked_message)
             filtered_result = await resolve_interruptions(filtered_agent, filtered_result)

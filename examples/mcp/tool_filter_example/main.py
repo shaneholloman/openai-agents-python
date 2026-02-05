@@ -24,12 +24,14 @@ async def run_with_auto_approval(agent: Agent[Any], message: str) -> str | None:
 async def main():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     samples_dir = os.path.join(current_dir, "sample_files")
+    target_path = os.path.join(samples_dir, "test.txt")
 
     async with MCPServerStdio(
         name="Filesystem Server with filter",
         params={
             "command": "npx",
             "args": ["-y", "@modelcontextprotocol/server-filesystem", samples_dir],
+            "cwd": samples_dir,
         },
         require_approval="always",
         tool_filter=create_static_tool_filter(
@@ -39,19 +41,28 @@ async def main():
     ) as server:
         agent = Agent(
             name="MCP Assistant",
-            instructions="Use the filesystem tools to answer questions.",
+            instructions=(
+                "Use only the available filesystem tools. "
+                "All file paths should be absolute paths inside the allowed directory. "
+                "If a user asks for an action that requires an unavailable tool, "
+                "explicitly explain that it is blocked by the tool filter."
+            ),
             mcp_servers=[server],
         )
         trace_id = gen_trace_id()
         with trace(workflow_name="MCP Tool Filter Example", trace_id=trace_id):
             print(f"View trace: https://platform.openai.com/traces/trace?trace_id={trace_id}\n")
             result = await run_with_auto_approval(
-                agent, "List the files in the sample_files directory."
+                agent, f"List the files in this allowed directory: {samples_dir}"
             )
             print(result)
 
             blocked_result = await run_with_auto_approval(
-                agent, 'Create a file named sample_files/test.txt with the text "hello".'
+                agent,
+                (
+                    f'Create a file at "{target_path}" with the text "hello". '
+                    "If you cannot, explain that write operations are blocked by the tool filter."
+                ),
             )
             print("\nAttempting to write a file (should be blocked):")
             print(blocked_result)
