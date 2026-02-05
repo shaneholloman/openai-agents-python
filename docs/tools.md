@@ -321,7 +321,7 @@ async def main():
 
 ### Customizing tool-agents
 
-The `agent.as_tool` function is a convenience method to make it easy to turn an agent into a tool. It doesn't support all configuration though; for example, you can't set `max_turns`. For advanced use cases, use `Runner.run` directly in your tool implementation:
+The `agent.as_tool` function is a convenience method to make it easy to turn an agent into a tool. It supports common runtime options such as `max_turns`, `run_config`, `hooks`, `previous_response_id`, `conversation_id`, `session`, and `needs_approval`. It also supports structured input with `parameters`, `input_builder`, and `include_input_schema`. For advanced orchestration (for example, conditional retries, fallback behavior, or chaining multiple agent calls), use `Runner.run` directly in your tool implementation:
 
 ```python
 @function_tool
@@ -339,6 +339,40 @@ async def run_my_agent() -> str:
 
     return str(result.final_output)
 ```
+
+### Structured input for tool-agents
+
+By default, `Agent.as_tool()` expects a single string input (`{"input": "..."}`), but you can expose a structured schema by passing `parameters` (a Pydantic model or dataclass type).
+
+Additional options:
+
+- `include_input_schema=True` includes the full JSON Schema in the generated nested input.
+- `input_builder=...` lets you fully customize how structured tool arguments become nested agent input.
+- `RunContextWrapper.tool_input` contains the parsed structured payload inside the nested run context.
+
+```python
+from pydantic import BaseModel, Field
+
+
+class TranslationInput(BaseModel):
+    text: str = Field(description="Text to translate.")
+    source: str = Field(description="Source language.")
+    target: str = Field(description="Target language.")
+
+
+translator_tool = translator_agent.as_tool(
+    tool_name="translate_text",
+    tool_description="Translate text between languages.",
+    parameters=TranslationInput,
+    include_input_schema=True,
+)
+```
+
+See `examples/agent_patterns/agents_as_tools_structured.py` for a complete runnable example.
+
+### Approval gates for tool-agents
+
+`Agent.as_tool(..., needs_approval=...)` uses the same approval flow as `function_tool`. If approval is required, the run pauses and pending items appear in `result.interruptions`; then use `result.to_state()` and resume after calling `state.approve(...)` or `state.reject(...)`. See the [Human-in-the-loop guide](human_in_the_loop.md) for the full pause/resume pattern.
 
 ### Custom output extraction
 
@@ -377,7 +411,7 @@ from agents import AgentToolStreamEvent
 
 async def handle_stream(event: AgentToolStreamEvent) -> None:
     # Inspect the underlying StreamEvent along with agent metadata.
-    print(f"[stream] {event['agent']['name']} :: {event['event'].type}")
+    print(f"[stream] {event['agent'].name} :: {event['event'].type}")
 
 
 billing_agent_tool = billing_agent.as_tool(
@@ -392,7 +426,7 @@ What to expect:
 - Event types mirror `StreamEvent["type"]`: `raw_response_event`, `run_item_stream_event`, `agent_updated_stream_event`.
 - Providing `on_stream` automatically runs the nested agent in streaming mode and drains the stream before returning the final output.
 - The handler may be synchronous or asynchronous; each event is delivered in order as it arrives.
-- `tool_call_id` is present when the tool is invoked via a model tool call; direct calls may leave it `None`.
+- `tool_call` is present when the tool is invoked via a model tool call; direct calls may leave it `None`.
 - See `examples/agent_patterns/agents_as_tools_streaming.py` for a complete runnable sample.
 
 ### Conditional tool enabling
@@ -472,7 +506,7 @@ during a tool call. This surface is experimental and may change.
 
 ```python
 from agents import Agent
-from agents.extensions.experimental.codex import ThreadOptions, codex_tool
+from agents.extensions.experimental.codex import ThreadOptions, TurnOptions, codex_tool
 
 agent = Agent(
     name="Codex Agent",
@@ -483,8 +517,13 @@ agent = Agent(
             working_directory="/path/to/repo",
             default_thread_options=ThreadOptions(
                 model="gpt-5.2-codex",
+                model_reasoning_effort="low",
                 network_access_enabled=True,
-                web_search_enabled=False,
+                web_search_mode="disabled",
+                approval_policy="never",
+            ),
+            default_turn_options=TurnOptions(
+                idle_timeout_seconds=60,
             ),
             persist_session=True,
         )
@@ -495,9 +534,13 @@ agent = Agent(
 What to know:
 
 -   Auth: set `CODEX_API_KEY` (preferred) or `OPENAI_API_KEY`, or pass `codex_options={"api_key": "..."}`.
--   Runtime: `codex_options.base_url` overrides the CLI base URL, and `codex_options.codex_path_override` (or `CODEX_PATH`) selects the binary.
+-   Runtime: `codex_options.base_url` overrides the CLI base URL.
+-   Binary resolution: set `codex_options.codex_path_override` (or `CODEX_PATH`) to pin the CLI path. Otherwise the SDK resolves `codex` from `PATH`, then falls back to the bundled vendor binary.
 -   Environment: `codex_options.env` fully controls the subprocess environment. When it is provided, the subprocess does not inherit `os.environ`.
+-   Stream limits: `codex_options.codex_subprocess_stream_limit_bytes` (or `OPENAI_AGENTS_CODEX_SUBPROCESS_STREAM_LIMIT_BYTES`) controls stdout/stderr reader limits. Valid range is `65536` to `67108864`; default is `8388608`.
 -   Inputs: tool calls must include at least one item in `inputs` with `{ "type": "text", "text": ... }` or `{ "type": "local_image", "path": ... }`.
+-   Thread defaults: configure `default_thread_options` for `model_reasoning_effort`, `web_search_mode` (preferred over legacy `web_search_enabled`), `approval_policy`, and `additional_directories`.
+-   Turn defaults: configure `default_turn_options` for `idle_timeout_seconds` and cancellation `signal`.
 -   Safety: pair `sandbox_mode` with `working_directory`; set `skip_git_repo_check=True` outside Git repos.
 -   Behavior: `persist_session=True` reuses a single Codex thread and returns its `thread_id`.
 -   Streaming: `on_stream` receives Codex events (reasoning, command execution, MCP tool calls, file changes, web search).
