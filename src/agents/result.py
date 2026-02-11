@@ -493,7 +493,10 @@ class RunResultStreaming(RunResultBase):
         try:
             while True:
                 self._check_errors()
-                if self._stored_exception:
+                should_drain_queued_events = isinstance(self._stored_exception, MaxTurnsExceeded)
+                if self._stored_exception and (
+                    not should_drain_queued_events or self._event_queue.empty()
+                ):
                     logger.debug("Breaking due to stored exception")
                     self.is_complete = True
                     break
