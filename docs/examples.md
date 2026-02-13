@@ -82,6 +82,8 @@ Check out a variety of sample implementations of the SDK in the examples section
     -   Web search and web search with filters
     -   File search
     -   Code interpreter
+    -   Hosted container shell with inline skills (`examples/tools/container_shell_inline_skill.py`)
+    -   Hosted container shell with skill references (`examples/tools/container_shell_skill_reference.py`)
     -   Computer use
     -   Image generation
     -   Experimental Codex tool workflows (`examples/tools/codex.py`)
