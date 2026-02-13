@@ -37,6 +37,53 @@ async def main():
     print(result.final_output)
 ```
 
+### Hosted container shell + skills
+
+`ShellTool` also supports OpenAI-hosted container execution. Use this mode when you want the model to run shell commands in a managed container instead of your local runtime.
+
+```python
+from agents import Agent, Runner, ShellTool, ShellToolSkillReference
+
+csv_skill: ShellToolSkillReference = {
+    "type": "skill_reference",
+    "skill_id": "skill_698bbe879adc81918725cbc69dcae7960bc5613dadaed377",
+    "version": "1",
+}
+
+agent = Agent(
+    name="Container shell agent",
+    model="gpt-5.2",
+    instructions="Use the mounted skill when helpful.",
+    tools=[
+        ShellTool(
+            environment={
+                "type": "container_auto",
+                "network_policy": {"type": "disabled"},
+                "skills": [csv_skill],
+            }
+        )
+    ],
+)
+
+result = await Runner.run(
+    agent,
+    "Use the configured skill to analyze CSV files in /mnt/data and summarize totals by region.",
+)
+print(result.final_output)
+```
+
+To reuse an existing container in later runs, set `environment={"type": "container_reference", "container_id": "cntr_..."}`.
+
+What to know:
+
+-   Hosted shell is available through the Responses API shell tool.
+-   `container_auto` provisions a container for the request; `container_reference` reuses an existing one.
+-   `environment.skills` accepts skill references and inline skill bundles.
+-   With hosted environments, do not set `executor`, `needs_approval`, or `on_approval` on `ShellTool`.
+-   `network_policy` supports `disabled` and `allowlist` modes.
+-   See `examples/tools/container_shell_skill_reference.py` and `examples/tools/container_shell_inline_skill.py` for complete examples.
+-   OpenAI platform guides: [Shell](https://platform.openai.com/docs/guides/tools-shell) and [Skills](https://platform.openai.com/docs/guides/tools-skills).
+
 ## Local runtime tools
 
 Local runtime tools execute in your environment and require you to supply implementations:
@@ -85,53 +132,6 @@ agent = Agent(
     ],
 )
 ```
-
-### Hosted container shell + skills
-
-`ShellTool` also supports OpenAI-hosted container execution. Use this mode when you want the model to run shell commands in a managed container instead of your local runtime.
-
-```python
-from agents import Agent, Runner, ShellTool, ShellToolSkillReference
-
-csv_skill: ShellToolSkillReference = {
-    "type": "skill_reference",
-    "skill_id": "skill_698bbe879adc81918725cbc69dcae7960bc5613dadaed377",
-    "version": "1",
-}
-
-agent = Agent(
-    name="Container shell agent",
-    model="gpt-5.2",
-    instructions="Use the mounted skill when helpful.",
-    tools=[
-        ShellTool(
-            environment={
-                "type": "container_auto",
-                "network_policy": {"type": "disabled"},
-                "skills": [csv_skill],
-            }
-        )
-    ],
-)
-
-result = await Runner.run(
-    agent,
-    "Use the configured skill to analyze CSV files in /mnt/data and summarize totals by region.",
-)
-print(result.final_output)
-```
-
-To reuse an existing container in later runs, set `environment={"type": "container_reference", "container_id": "cntr_..."}`.
-
-What to know:
-
--   Hosted shell is available through the Responses API shell tool.
--   `container_auto` provisions a container for the request; `container_reference` reuses an existing one.
--   `environment.skills` accepts skill references and inline skill bundles.
--   With hosted environments, do not set `executor`, `needs_approval`, or `on_approval` on `ShellTool`.
--   `network_policy` supports `disabled` and `allowlist` modes.
--   See `examples/tools/container_shell_skill_reference.py` and `examples/tools/container_shell_inline_skill.py` for complete examples.
--   OpenAI platform guides: [Shell](https://platform.openai.com/docs/guides/tools-shell) and [Skills](https://platform.openai.com/docs/guides/tools-skills).
 
 ## Function tools
 
