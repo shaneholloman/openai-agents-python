@@ -21,7 +21,9 @@ We will increment `Z` for non-breaking changes:
 
 ### 0.9.0
 
-In this version, Python 3.9 is no longer supported as the major version is already EOLed three months ago. Please ugprade to a newer runtime version.
+In this version, Python 3.9 is no longer supported, as this major version reached EOL three months ago. Please upgrade to a newer runtime version.
+
+Additionally, the type hint for the value returned from the `Agent#as_tool()` method has been narrowed from `Tool` to `FunctionTool`. This change should not usually cause breaking issues, but if your code relies on the broader union type, you may need to make some adjustments on your side.
 
 ### 0.8.0
 
