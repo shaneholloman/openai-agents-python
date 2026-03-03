@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import inspect
-import json
 from collections.abc import Awaitable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Generic, Literal, cast
@@ -12,7 +11,6 @@ from openai.types.responses.response_prompt_param import ResponsePromptParam
 from pydantic import BaseModel, TypeAdapter, ValidationError
 from typing_extensions import NotRequired, TypeAlias, TypedDict
 
-from . import _debug
 from .agent_output import AgentOutputSchemaBase
 from .agent_tool_input import (
     AgentAsToolInput,
@@ -47,12 +45,14 @@ from .tool import (
     FunctionToolResult,
     Tool,
     ToolErrorFunction,
-    _extract_tool_argument_json_error,
+    _build_handled_function_tool_error_handler,
+    _build_wrapped_function_tool,
+    _log_function_tool_invocation,
+    _parse_function_tool_json_input,
     default_tool_error_function,
 )
 from .tool_context import ToolContext
-from .tracing import SpanError
-from .util import _error_tracing, _transforms
+from .util import _transforms
 from .util._types import MaybeAwaitable
 
 if TYPE_CHECKING:
@@ -547,43 +547,34 @@ class Agent(AgentBase, Generic[TContext]):
             include_json_schema=include_schema,
         )
 
-        def _normalize_tool_input(parsed: Any) -> Any:
+        def _normalize_tool_input(parsed: Any, tool_name: str) -> Any:
             # Prefer JSON mode so structured params (datetime/UUID/Decimal, etc.) serialize cleanly.
             try:
                 return params_adapter.dump_python(parsed, mode="json")
             except Exception as exc:
                 raise ModelBehaviorError(
-                    f"Failed to serialize structured tool input for {tool_name_resolved}: {exc}"
+                    f"Failed to serialize structured tool input for {tool_name}: {exc}"
                 ) from exc
 
         async def _run_agent_impl(context: ToolContext, input_json: str) -> Any:
             from .run import DEFAULT_MAX_TURNS, Runner
             from .tool_context import ToolContext
 
-            try:
-                json_data = json.loads(input_json) if input_json else {}
-            except Exception as exc:
-                if _debug.DONT_LOG_TOOL_DATA:
-                    logger.debug(f"Invalid JSON input for tool {tool_name_resolved}")
-                else:
-                    logger.debug(f"Invalid JSON input for tool {tool_name_resolved}: {input_json}")
-                raise ModelBehaviorError(
-                    f"Invalid JSON input for tool {tool_name_resolved}: {input_json}"
-                ) from exc
-
-            if _debug.DONT_LOG_TOOL_DATA:
-                logger.debug(f"Invoking tool {tool_name_resolved}")
-            else:
-                logger.debug(f"Invoking tool {tool_name_resolved} with input {input_json}")
+            tool_name = (
+                context.tool_name if isinstance(context, ToolContext) else tool_name_resolved
+            )
+            json_data = _parse_function_tool_json_input(
+                tool_name=tool_name,
+                input_json=input_json,
+            )
+            _log_function_tool_invocation(tool_name=tool_name, input_json=input_json)
 
             try:
                 parsed_params = params_adapter.validate_python(json_data)
             except ValidationError as exc:
-                raise ModelBehaviorError(
-                    f"Invalid JSON input for tool {tool_name_resolved}: {exc}"
-                ) from exc
+                raise ModelBehaviorError(f"Invalid JSON input for tool {tool_name}: {exc}") from exc
 
-            params_data = _normalize_tool_input(parsed_params)
+            params_data = _normalize_tool_input(parsed_params, tool_name)
             resolved_input = await resolve_agent_tool_input(
                 params=params_data,
                 schema_info=schema_info if should_capture_tool_input else None,
@@ -804,48 +795,17 @@ class Agent(AgentBase, Generic[TContext]):
 
             return run_result.final_output
 
-        async def _run_agent_tool(context: ToolContext, input_json: str) -> Any:
-            try:
-                return await _run_agent_impl(context, input_json)
-            except Exception as exc:
-                if failure_error_function is None:
-                    raise
-
-                result = failure_error_function(context, exc)
-                if inspect.isawaitable(result):
-                    result = await result
-
-                json_decode_error = _extract_tool_argument_json_error(exc)
-                if json_decode_error is not None:
-                    span_error_message = "Error running tool"
-                    span_error_detail = str(json_decode_error)
-                else:
-                    span_error_message = "Error running tool (non-fatal)"
-                    span_error_detail = str(exc)
-
-                _error_tracing.attach_error_to_current_span(
-                    SpanError(
-                        message=span_error_message,
-                        data={
-                            "tool_name": tool_name_resolved,
-                            "error": span_error_detail,
-                        },
-                    )
-                )
-                if _debug.DONT_LOG_TOOL_DATA:
-                    logger.debug(f"Tool {tool_name_resolved} failed")
-                else:
-                    logger.error(
-                        f"Tool {tool_name_resolved} failed: {input_json} {exc}",
-                        exc_info=exc,
-                    )
-                return result
-
-        run_agent_tool = FunctionTool(
+        run_agent_tool = _build_wrapped_function_tool(
             name=tool_name_resolved,
             description=tool_description_resolved,
             params_json_schema=params_schema,
-            on_invoke_tool=_run_agent_tool,
+            invoke_tool_impl=_run_agent_impl,
+            on_handled_error=_build_handled_function_tool_error_handler(
+                span_message="Error running tool (non-fatal)",
+                span_message_for_json_decode_error="Error running tool",
+                log_label="Tool",
+            ),
+            failure_error_function=failure_error_function,
             strict_json_schema=True,
             is_enabled=is_enabled,
             needs_approval=needs_approval,

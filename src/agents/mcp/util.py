@@ -22,11 +22,11 @@ from ..tool import (
     ToolErrorFunction,
     ToolOutputImageDict,
     ToolOutputTextDict,
+    _build_handled_function_tool_error_handler,
+    _build_wrapped_function_tool,
     default_tool_error_function,
 )
-from ..tool_context import ToolContext
-from ..tracing import FunctionSpanData, SpanError, get_current_span, mcp_tools_span
-from ..util import _error_tracing
+from ..tracing import FunctionSpanData, get_current_span, mcp_tools_span
 from ..util._types import MaybeAwaitable
 
 if TYPE_CHECKING:
@@ -261,55 +261,24 @@ class MCPUtil:
             except Exception as e:
                 logger.info(f"Error converting MCP schema to strict mode: {e}")
 
-        # Wrap the invoke function with error handling, similar to regular function tools.
-        # This ensures that MCP tool errors (like timeouts) are handled gracefully instead
-        # of halting the entire agent flow.
-        async def invoke_func(ctx: ToolContext[Any], input_json: str) -> ToolOutput:
-            try:
-                return await invoke_func_impl(ctx, input_json)
-            except Exception as e:
-                if effective_failure_error_function is None:
-                    raise
-
-                # Use configured error handling function to convert exception to error message.
-                result = effective_failure_error_function(ctx, e)
-                if inspect.isawaitable(result):
-                    result = await result
-
-                # Attach error to tracing span.
-                _error_tracing.attach_error_to_current_span(
-                    SpanError(
-                        message="Error running tool (non-fatal)",
-                        data={
-                            "tool_name": tool.name,
-                            "error": str(e),
-                        },
-                    )
-                )
-
-                # Log the error.
-                if _debug.DONT_LOG_TOOL_DATA:
-                    logger.debug(f"MCP tool {tool.name} failed")
-                else:
-                    logger.error(
-                        f"MCP tool {tool.name} failed: {input_json} {e}",
-                        exc_info=e,
-                    )
-
-                return result
-
         needs_approval: (
             bool | Callable[[RunContextWrapper[Any], dict[str, Any], str], Awaitable[bool]]
         ) = server._get_needs_approval_for_tool(tool, agent)
 
-        return FunctionTool(
+        function_tool = _build_wrapped_function_tool(
             name=tool.name,
             description=tool.description or "",
             params_json_schema=schema,
-            on_invoke_tool=invoke_func,
+            invoke_tool_impl=invoke_func_impl,
+            on_handled_error=_build_handled_function_tool_error_handler(
+                span_message="Error running tool (non-fatal)",
+                log_label="MCP tool",
+            ),
+            failure_error_function=effective_failure_error_function,
             strict_json_schema=is_strict,
             needs_approval=needs_approval,
         )
+        return function_tool
 
     @staticmethod
     def _merge_mcp_meta(
