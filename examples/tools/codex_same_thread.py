@@ -63,10 +63,8 @@ async def main() -> None:
     agent = Agent(
         name="Codex Agent (same thread)",
         instructions=(
-            "Always use the Codex tool answer the user's question. "
-            "Even when you don't have enough context, the Codex tool may know. "
-            "In that case, you can simply forward the question to the Codex tool. "
-            "Treat the workspace as read-only and respond with code snippets in chat."
+            "Always use the Codex tool to inspect the local workspace and answer the user's "
+            "question. Treat the workspace as read-only and answer concisely."
         ),
         tools=[
             codex_tool(
@@ -103,15 +101,23 @@ async def main() -> None:
     log(f"View trace: https://platform.openai.com/traces/trace?trace_id={trace_id}")
 
     with trace("Codex same thread example", trace_id=trace_id):
-        log("Turn 1: ask writing python code")
-        first_prompt = "Write working python code example demonstrating how to call OpenAI's Responses API with web search tool."
+        log("Turn 1: inspect AGENTS.md with the Codex tool.")
+        first_prompt = (
+            "Use the Codex tool to inspect AGENTS.md in this repository and list the mandatory "
+            "local verification commands. Do not modify any files."
+        )
         first_result = await Runner.run(agent, first_prompt, context=context)
         first_thread_id = read_context_value(context, THREAD_ID_KEY)
         log(first_result.final_output)
         log(f"thread id after turn 1: {first_thread_id}")
+        if first_thread_id is None:
+            log("thread id after turn 1 is unavailable; turn 2 may start a new Codex thread.")
 
         log("Turn 2: continue with the same Codex thread.")
-        second_prompt = "Write the same code in TypeScript."
+        second_prompt = (
+            "Continue from the same Codex thread. Rewrite that verification workflow as a single "
+            "short sentence. Do not modify any files."
+        )
         second_result = await Runner.run(agent, second_prompt, context=context)
         second_thread_id = read_context_value(context, THREAD_ID_KEY)
         log(second_result.final_output)

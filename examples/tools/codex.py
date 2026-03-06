@@ -26,13 +26,11 @@ from agents.extensions.experimental.codex import (
     codex_tool,
 )
 
+
 # This example runs the Codex CLI via the Codex tool wrapper.
 # You can configure the CLI path with CODEX_PATH or CodexOptions(codex_path_override="...").
 # codex_tool accepts options as keyword arguments or a plain dict.
 # For example: codex_tool(sandbox_mode="read-only") or codex_tool({"sandbox_mode": "read-only"}).
-# The prompt below asks Codex to use the $openai-knowledge skill (Docs MCP) for API lookups.
-
-
 async def on_codex_stream(payload: CodexToolStreamEvent) -> None:
     event = payload.event
 
@@ -138,14 +136,15 @@ async def main() -> None:
     log(f"View trace: https://platform.openai.com/traces/trace?trace_id={trace_id}")
 
     with trace("Codex tool example", trace_id=trace_id):
-        # Use a skill that requires network access and MCP server settings
-        log("Using $openai-knowledge skill to fetch the latest realtime model name...")
+        log("Using the Codex tool to inspect pyproject.toml and summarize Python requirements...")
         result = await Runner.run(
             agent,
-            "You must use `$openai-knowledge` skill to fetch the latest realtime model name.",
+            (
+                "Inspect pyproject.toml in this repository and summarize the supported Python "
+                "version plus the main local test command. Do not modify any files."
+            ),
         )
         log(result.final_output)
-        # The exact model name may change over time.
 
         # Use local inspection in read-only mode.
         log(
