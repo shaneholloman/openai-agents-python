@@ -65,14 +65,15 @@ async def main() -> None:
         instructions=(
             "Always use the Codex tool answer the user's question. "
             "Even when you don't have enough context, the Codex tool may know. "
-            "In that case, you can simply forward the question to the Codex tool."
+            "In that case, you can simply forward the question to the Codex tool. "
+            "Treat the workspace as read-only and respond with code snippets in chat."
         ),
         tools=[
             codex_tool(
                 # Give each Codex tool a unique `codex_` name when you run multiple tools in one agent.
                 # Name-based defaults keep their run-context thread IDs separated.
                 name="codex_engineer",
-                sandbox_mode="workspace-write",
+                sandbox_mode="read-only",
                 default_thread_options=ThreadOptions(
                     model="gpt-5.2-codex",
                     model_reasoning_effort="low",

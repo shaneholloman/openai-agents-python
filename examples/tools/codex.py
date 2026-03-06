@@ -107,7 +107,7 @@ async def main() -> None:
     agent = Agent(
         name="Codex Agent",
         instructions=(
-            "Use the codex tool to inspect the workspace and answer the question. "
+            "Use the codex tool to inspect the workspace in read-only mode and answer the question. "
             "When skill names, which usually starts with `$`, are mentioned, "
             "you must rely on the codex tool to use the skill and answer the question.\n\n"
             "When you send the final answer, you must include the following info at the end:\n\n"
@@ -116,7 +116,7 @@ async def main() -> None:
         tools=[
             # Run local Codex CLI as a sub process
             codex_tool(
-                sandbox_mode="workspace-write",
+                sandbox_mode="read-only",
                 default_thread_options=ThreadOptions(
                     # You can pass a Codex instance to customize CLI details
                     # codex=Codex(executable_path="/path/to/codex", base_url="..."),
@@ -145,18 +145,21 @@ async def main() -> None:
             "You must use `$openai-knowledge` skill to fetch the latest realtime model name.",
         )
         log(result.final_output)
-        # The latest realtime model name, according to the $openai-knowledge skill, is gpt-realtime.
+        # The exact model name may change over time.
 
-        # Use a skill that runs local command and analyzes the output
+        # Use local inspection in read-only mode.
         log(
-            "Using $test-coverage-improver skill to analyze the test coverage of the project and improve it..."
+            "Using the Codex tool to inspect AGENTS.md and summarize the local verification workflow..."
         )
         result = await Runner.run(
             agent,
-            "You must use `$test-coverage-improver` skill to analyze the test coverage of the project and improve it.",
+            (
+                "Inspect AGENTS.md and summarize the mandatory local verification commands for this "
+                "repository. Do not modify any files or suggest code changes."
+            ),
         )
         log(result.final_output)
-        # (Aa few suggestions for improving the test coverage will be displayed.)
+        # (A read-only summary of the local verification workflow will be displayed.)
 
 
 if __name__ == "__main__":
