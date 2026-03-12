@@ -19,6 +19,14 @@ We will increment `Z` for non-breaking changes:
 
 ## Breaking change changelog
 
+### 0.12.0
+
+This minor release does **not** introduce a breaking change. Check [the release notes](https://github.com/openai/openai-agents-python/releases/tag/v0.12.0) for major feature additions.
+
+### 0.11.0
+
+This minor release does **not** introduce a breaking change. Check [the release notes](https://github.com/openai/openai-agents-python/releases/tag/v0.11.0) for major feature additions.
+
 ### 0.10.0
 
 This minor release does **not** introduce a breaking change, but it includes a significant new feature area for OpenAI Responses users: websocket transport support for the Responses API.
