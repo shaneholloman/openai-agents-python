@@ -265,6 +265,7 @@ When you are using the OpenAI Responses API, several request fields already have
 | --- | --- |
 | `parallel_tool_calls` | Allow or forbid multiple tool calls in the same turn. |
 | `truncation` | Set `"auto"` to let the Responses API drop the oldest conversation items instead of failing when context would overflow. |
+| `store` | Control whether the generated response is stored server-side for later retrieval. This matters for follow-up workflows that rely on response IDs, and for session compaction flows that may need to fall back to local input when `store=False`. |
 | `prompt_cache_retention` | Keep cached prompt prefixes around longer, for example with `"24h"`. |
 | `response_include` | Request richer response payloads such as `web_search_call.action.sources`, `file_search_call.results`, or `reasoning.encrypted_content`. |
 | `top_logprobs` | Request top-token logprobs for output text. The SDK also adds `message.output_text.logprobs` automatically. |
@@ -279,12 +280,15 @@ research_agent = Agent(
     model_settings=ModelSettings(
         parallel_tool_calls=False,
         truncation="auto",
+        store=True,
         prompt_cache_retention="24h",
         response_include=["web_search_call.action.sources"],
         top_logprobs=5,
     ),
 )
 ```
+
+When you set `store=False`, the Responses API does not keep that response available for later server-side retrieval. This is useful for stateless or zero-data-retention style flows, but it also means features that would otherwise reuse response IDs need to rely on locally managed state instead. For example, [`OpenAIResponsesCompactionSession`][agents.memory.openai_responses_compaction_session.OpenAIResponsesCompactionSession] switches its default `"auto"` compaction path to input-based compaction when the last response was not stored. See the [Sessions guide](../sessions/index.md#openai-responses-compaction-sessions).
 
 #### Runner-managed retries
 

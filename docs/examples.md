@@ -15,6 +15,7 @@ Check out a variety of sample implementations of the SDK in the examples section
     -   LLM as a judge
     -   Routing
     -   Streaming guardrails
+    -   Custom rejection messages for approval flows (`examples/agent_patterns/human_in_the_loop_custom_rejection.py`)
 
 -   **[basic](https://github.com/openai/openai-agents-python/tree/main/examples/basic):**
     These examples showcase foundational capabilities of the SDK, such as
@@ -64,6 +65,7 @@ Check out a variety of sample implementations of the SDK in the examples section
     -   Encrypted session storage
     -   OpenAI Conversations session storage
     -   Responses compaction session storage
+    -   Stateless Responses compaction with `ModelSettings(store=False)` (`examples/memory/compaction_session_stateless_example.py`)
 
 -   **[model_providers](https://github.com/openai/openai-agents-python/tree/main/examples/model_providers):**
     Explore how to use non-OpenAI models with the SDK, including custom providers and LiteLLM integration.
