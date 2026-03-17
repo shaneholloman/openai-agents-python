@@ -10,8 +10,6 @@ theme:
     - navigation.path
     # Shows sections in the sidebar
     - navigation.sections
-    # Shows sections expanded by default
-    - navigation.expand
     # Enables annotations in code blocks
     - content.code.annotate
   palette:
