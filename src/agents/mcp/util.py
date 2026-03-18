@@ -14,7 +14,7 @@ from typing_extensions import NotRequired, TypedDict
 
 from .. import _debug
 from .._mcp_tool_metadata import resolve_mcp_tool_description_for_model, resolve_mcp_tool_title
-from ..exceptions import AgentsException, ModelBehaviorError, UserError
+from ..exceptions import AgentsException, MCPToolCancellationError, ModelBehaviorError, UserError
 
 try:
     from mcp.shared.exceptions import McpError as _McpError
@@ -369,7 +369,7 @@ class MCPUtil:
                 done, _ = await asyncio.wait({call_task}, return_when=asyncio.FIRST_COMPLETED)
                 finished_task = done.pop()
                 if finished_task.cancelled():
-                    raise UserError(
+                    raise MCPToolCancellationError(
                         f"Failed to call tool '{tool.name}' on MCP server '{server.name}': "
                         "tool execution was cancelled."
                     )
@@ -382,8 +382,9 @@ class MCPUtil:
                 except (asyncio.CancelledError, Exception):
                     pass
                 raise
-        except UserError:
-            # Re-raise UserError as-is (it already has a good message)
+        except (UserError, MCPToolCancellationError):
+            # Re-raise handled tool-call errors as-is; the FunctionTool failure pipeline
+            # will format them into model-visible tool errors when appropriate.
             raise
         except Exception as e:
             if _McpError is not None and isinstance(e, _McpError):

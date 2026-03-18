@@ -10,7 +10,7 @@ from mcp.types import CallToolResult, ImageContent, TextContent, Tool as MCPTool
 from pydantic import BaseModel, TypeAdapter
 
 from agents import Agent, FunctionTool, RunContextWrapper, default_tool_error_function
-from agents.exceptions import AgentsException, ModelBehaviorError, UserError
+from agents.exceptions import AgentsException, MCPToolCancellationError, ModelBehaviorError
 from agents.mcp import MCPServer, MCPUtil
 from agents.tool_context import ToolContext
 
@@ -241,7 +241,7 @@ async def test_mcp_tool_inner_cancellation_becomes_tool_error():
     ctx = RunContextWrapper(context=None)
     tool = MCPTool(name="cancel_tool", inputSchema={})
 
-    with pytest.raises(UserError, match="tool execution was cancelled"):
+    with pytest.raises(MCPToolCancellationError, match="tool execution was cancelled"):
         await MCPUtil.invoke_mcp_tool(server, tool, ctx, "{}")
 
     agent = Agent(name="test-agent")
@@ -275,7 +275,7 @@ async def test_mcp_tool_inner_cancellation_still_becomes_tool_error_with_prior_c
     ctx = RunContextWrapper(context=None)
     tool = MCPTool(name="cancel_tool", inputSchema={})
 
-    with pytest.raises(UserError, match="tool execution was cancelled"):
+    with pytest.raises(MCPToolCancellationError, match="tool execution was cancelled"):
         await MCPUtil.invoke_mcp_tool(server, tool, ctx, "{}")
 
 
@@ -537,6 +537,30 @@ async def test_mcp_tool_timeout_handling():
     assert isinstance(result, str)
     assert "error" in result.lower() or "occurred" in result.lower()
     assert "Timed out" in result
+
+
+@pytest.mark.asyncio
+async def test_mcp_tool_cancellation_returns_error_message():
+    server = CancelledFakeMCPServer()
+    server.add_tool("cancelled_tool", {})
+
+    mcp_tool = MCPTool(name="cancelled_tool", inputSchema={})
+    agent = Agent(name="test-agent")
+    function_tool = MCPUtil.to_function_tool(
+        mcp_tool, server, convert_schemas_to_strict=False, agent=agent
+    )
+
+    tool_context = ToolContext(
+        context=None,
+        tool_name="cancelled_tool",
+        tool_call_id="test_call_cancelled",
+        tool_arguments="{}",
+    )
+
+    result = await function_tool.on_invoke_tool(tool_context, "{}")
+
+    assert isinstance(result, str)
+    assert "cancelled" in result.lower()
 
 
 @pytest.mark.asyncio
