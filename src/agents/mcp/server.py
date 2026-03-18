@@ -5,7 +5,7 @@ import asyncio
 import inspect
 import sys
 from collections.abc import Awaitable
-from contextlib import AbstractAsyncContextManager, AsyncExitStack
+from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, TypeVar, Union, cast
@@ -59,6 +59,14 @@ else:
 
 
 T = TypeVar("T")
+
+
+class _SharedSessionRequestNeedsIsolation(Exception):
+    """Raised when a shared-session request should be retried on an isolated session."""
+
+
+class _IsolatedSessionRetryFailed(Exception):
+    """Raised when an isolated-session retry fails after consuming retry budget."""
 
 
 class _UnsetType:
@@ -456,7 +464,7 @@ class _MCPServerWithClientSession(MCPServer, abc.ABC):
         """Invalidate the tools cache."""
         self._cache_dirty = True
 
-    def _extract_http_error_from_exception(self, e: Exception) -> Exception | None:
+    def _extract_http_error_from_exception(self, e: BaseException) -> Exception | None:
         """Extract HTTP error from exception or ExceptionGroup."""
         if isinstance(e, (httpx.HTTPStatusError, httpx.ConnectError, httpx.TimeoutException)):
             return e
@@ -1126,6 +1134,186 @@ class MCPServerStreamableHttp(_MCPServerWithClientSession):
                 sse_read_timeout=self.params.get("sse_read_timeout", 60 * 5),
                 terminate_on_close=self.params.get("terminate_on_close", True),
             )
+
+    @asynccontextmanager
+    async def _isolated_client_session(self):
+        async with AsyncExitStack() as exit_stack:
+            transport = await exit_stack.enter_async_context(self.create_streams())
+            read, write, *_ = transport
+            session = await exit_stack.enter_async_context(
+                ClientSession(
+                    read,
+                    write,
+                    timedelta(seconds=self.client_session_timeout_seconds)
+                    if self.client_session_timeout_seconds
+                    else None,
+                    message_handler=self.message_handler,
+                )
+            )
+            await session.initialize()
+            yield session
+
+    async def _call_tool_with_session(
+        self,
+        session: ClientSession,
+        tool_name: str,
+        arguments: dict[str, Any] | None,
+        meta: dict[str, Any] | None = None,
+    ) -> CallToolResult:
+        if meta is None:
+            return await session.call_tool(tool_name, arguments)
+        return await session.call_tool(tool_name, arguments, meta=meta)
+
+    def _should_retry_in_isolated_session(self, exc: BaseException) -> bool:
+        if isinstance(exc, (asyncio.CancelledError, httpx.ConnectError, httpx.TimeoutException)):
+            return True
+        if isinstance(exc, httpx.HTTPStatusError):
+            return exc.response.status_code >= 500
+        if isinstance(exc, BaseExceptionGroup):
+            return bool(exc.exceptions) and all(
+                self._should_retry_in_isolated_session(inner) for inner in exc.exceptions
+            )
+        return False
+
+    async def _call_tool_with_shared_session(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any] | None,
+        meta: dict[str, Any] | None = None,
+        *,
+        allow_isolated_retry: bool,
+    ) -> CallToolResult:
+        session = self.session
+        assert session is not None
+        try:
+            return await self._maybe_serialize_request(
+                lambda: self._call_tool_with_session(session, tool_name, arguments, meta)
+            )
+        except BaseException as exc:
+            if allow_isolated_retry and self._should_retry_in_isolated_session(exc):
+                raise _SharedSessionRequestNeedsIsolation from exc
+            raise
+
+    async def _call_tool_with_isolated_retry(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any] | None,
+        meta: dict[str, Any] | None = None,
+        *,
+        allow_isolated_retry: bool,
+    ) -> tuple[CallToolResult, bool]:
+        request_task = asyncio.create_task(
+            self._call_tool_with_shared_session(
+                tool_name,
+                arguments,
+                meta,
+                allow_isolated_retry=allow_isolated_retry,
+            )
+        )
+        try:
+            return await asyncio.shield(request_task), False
+        except _SharedSessionRequestNeedsIsolation:
+            exit_stack = AsyncExitStack()
+            try:
+                session = await exit_stack.enter_async_context(self._isolated_client_session())
+            except asyncio.CancelledError:
+                await exit_stack.aclose()
+                raise
+            except BaseException as exc:
+                await exit_stack.aclose()
+                raise _IsolatedSessionRetryFailed() from exc
+            try:
+                try:
+                    result = await self._call_tool_with_session(session, tool_name, arguments, meta)
+                    return result, True
+                except asyncio.CancelledError:
+                    raise
+                except BaseException as exc:
+                    raise _IsolatedSessionRetryFailed() from exc
+            finally:
+                await exit_stack.aclose()
+        except asyncio.CancelledError:
+            if not request_task.done():
+                request_task.cancel()
+            try:
+                await request_task
+            except BaseException:
+                pass
+            raise
+
+    async def call_tool(
+        self,
+        tool_name: str,
+        arguments: dict[str, Any] | None,
+        meta: dict[str, Any] | None = None,
+    ) -> CallToolResult:
+        if not self.session:
+            raise UserError("Server not initialized. Make sure you call `connect()` first.")
+
+        try:
+            self._validate_required_parameters(tool_name=tool_name, arguments=arguments)
+            retries_used = 0
+            first_attempt = True
+            while True:
+                if not first_attempt and self.max_retry_attempts != -1:
+                    retries_used += 1
+                allow_isolated_retry = (
+                    self.max_retry_attempts == -1 or retries_used < self.max_retry_attempts
+                )
+                try:
+                    result, used_isolated_retry = await self._call_tool_with_isolated_retry(
+                        tool_name,
+                        arguments,
+                        meta,
+                        allow_isolated_retry=allow_isolated_retry,
+                    )
+                    if used_isolated_retry and self.max_retry_attempts != -1:
+                        retries_used += 1
+                    return result
+                except _IsolatedSessionRetryFailed as exc:
+                    retries_used += 1
+                    if self.max_retry_attempts != -1 and retries_used >= self.max_retry_attempts:
+                        if exc.__cause__ is not None:
+                            raise exc.__cause__ from exc
+                        raise exc
+                    backoff = self.retry_backoff_seconds_base * (2 ** (retries_used - 1))
+                    await asyncio.sleep(backoff)
+                except Exception:
+                    if self.max_retry_attempts != -1 and retries_used >= self.max_retry_attempts:
+                        raise
+                    backoff = self.retry_backoff_seconds_base * (2**retries_used)
+                    await asyncio.sleep(backoff)
+                first_attempt = False
+        except httpx.HTTPStatusError as e:
+            status_code = e.response.status_code
+            raise UserError(
+                f"Failed to call tool '{tool_name}' on MCP server '{self.name}': "
+                f"HTTP error {status_code}"
+            ) from e
+        except httpx.ConnectError as e:
+            raise UserError(
+                f"Failed to call tool '{tool_name}' on MCP server '{self.name}': Connection lost. "
+                f"The server may have disconnected."
+            ) from e
+        except BaseExceptionGroup as e:
+            http_error = self._extract_http_error_from_exception(e)
+            if isinstance(http_error, httpx.HTTPStatusError):
+                status_code = http_error.response.status_code
+                raise UserError(
+                    f"Failed to call tool '{tool_name}' on MCP server '{self.name}': "
+                    f"HTTP error {status_code}"
+                ) from http_error
+            if isinstance(http_error, httpx.ConnectError):
+                raise UserError(
+                    f"Failed to call tool '{tool_name}' on MCP server '{self.name}': "
+                    "Connection lost. The server may have disconnected."
+                ) from http_error
+            if isinstance(http_error, httpx.TimeoutException):
+                raise UserError(
+                    f"Failed to call tool '{tool_name}' on MCP server '{self.name}': "
+                    "Connection timeout."
+                ) from http_error
+            raise
 
     @property
     def name(self) -> str:
