@@ -130,6 +130,9 @@ jobs:
           prompt-file: .github/codex/prompts/pr-labels.md
           output-file: ${{ steps.codex-output.outputs.output_file }}
           output-schema-file: .github/codex/schemas/pr-labels.json
+          # Keep the legacy Linux sandbox path until the default bubblewrap path
+          # works reliably on GitHub-hosted Ubuntu runners.
+          codex-args: '["--enable","use_legacy_landlock"]'
           safety-strategy: drop-sudo
           sandbox: read-only
       - name: Apply labels
