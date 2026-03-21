@@ -12,11 +12,8 @@ If you want structured artifacts for repeat-heavy or benchmark probes:
 
 from __future__ import annotations
 
-from collections import Counter, defaultdict
-from importlib import metadata
 import json
 import os
-from pathlib import Path
 import platform
 import shutil
 import statistics
@@ -24,6 +21,9 @@ import subprocess
 import sys
 import time
 import uuid
+from collections import Counter, defaultdict
+from importlib import metadata
+from pathlib import Path
 
 SCENARIO = "replace-me"
 RUN_LABEL = "replace-me"
@@ -79,9 +79,7 @@ def emit(kind: str, **payload: object) -> None:
 
 
 def runtime_context() -> dict[str, object]:
-    approved = {
-        name: ("set" if os.getenv(name) else "unset") for name in APPROVED_ENV_VARS
-    }
+    approved = {name: ("set" if os.getenv(name) else "unset") for name in APPROVED_ENV_VARS}
     package_versions = {
         name: version
         for name in ("openai", "agents")
@@ -157,22 +155,16 @@ def summarize_results() -> dict[str, object]:
             if item.get("first_token_latency_s") is not None
         ]
         result_flags = Counter(str(item["result_flag"]) for item in measured or items)
-        observations = [
-            str(item["observation_summary"]) for item in (measured or items)[:3]
-        ]
+        observations = [str(item["observation_summary"]) for item in (measured or items)[:3]]
         summary_cases[case_id] = {
             "mode": str(items[-1]["mode"]),
             "runs": len(measured),
             "warmups": len(items) - len(measured),
             "result_flags": dict(result_flags),
-            "median_total_latency_s": (
-                statistics.median(latencies) if latencies else None
-            ),
+            "median_total_latency_s": (statistics.median(latencies) if latencies else None),
             "mean_total_latency_s": statistics.mean(latencies) if latencies else None,
             "median_first_token_latency_s": (
-                statistics.median(first_token_latencies)
-                if first_token_latencies
-                else None
+                statistics.median(first_token_latencies) if first_token_latencies else None
             ),
             "observations": observations,
         }
