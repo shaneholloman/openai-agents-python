@@ -22,7 +22,15 @@ from mcp.client.sse import sse_client
 from mcp.client.streamable_http import GetSessionIdCallback, streamablehttp_client
 from mcp.shared.exceptions import McpError
 from mcp.shared.message import SessionMessage
-from mcp.types import CallToolResult, GetPromptResult, InitializeResult, ListPromptsResult
+from mcp.types import (
+    CallToolResult,
+    GetPromptResult,
+    InitializeResult,
+    ListPromptsResult,
+    ListResourcesResult,
+    ListResourceTemplatesResult,
+    ReadResourceResult,
+)
 from typing_extensions import NotRequired, TypedDict
 
 from ..exceptions import UserError
@@ -191,6 +199,63 @@ class MCPServer(abc.ABC):
     ) -> GetPromptResult:
         """Get a specific prompt from the server."""
         pass
+
+    async def list_resources(self, cursor: str | None = None) -> ListResourcesResult:
+        """List the resources available on the server.
+
+        Args:
+            cursor: An opaque pagination cursor returned in a previous
+                :class:`~mcp.types.ListResourcesResult` as ``nextCursor``.  Pass it
+                here to fetch the next page of results.  ``None`` fetches the first
+                page.
+
+        Returns a :class:`~mcp.types.ListResourcesResult`.  When the result contains
+        a ``nextCursor`` field, call this method again with that cursor to retrieve
+        the next page.  Subclasses that do not support resources may leave this
+        unimplemented; it will raise :exc:`NotImplementedError` at call time.
+        """
+        raise NotImplementedError(
+            f"MCP server '{self.name}' does not support list_resources. "
+            "Override this method in your server implementation."
+        )
+
+    async def list_resource_templates(
+        self, cursor: str | None = None
+    ) -> ListResourceTemplatesResult:
+        """List the resource templates available on the server.
+
+        Args:
+            cursor: An opaque pagination cursor returned in a previous
+                :class:`~mcp.types.ListResourceTemplatesResult` as ``nextCursor``.
+                Pass it here to fetch the next page of results.  ``None`` fetches
+                the first page.
+
+        Returns a :class:`~mcp.types.ListResourceTemplatesResult`.  When the result
+        contains a ``nextCursor`` field, call this method again with that cursor to
+        retrieve the next page.  Subclasses that do not support resource templates
+        may leave this unimplemented; it will raise :exc:`NotImplementedError` at
+        call time.
+        """
+        raise NotImplementedError(
+            f"MCP server '{self.name}' does not support list_resource_templates. "
+            "Override this method in your server implementation."
+        )
+
+    async def read_resource(self, uri: str) -> ReadResourceResult:
+        """Read the contents of a specific resource by URI.
+
+        Args:
+            uri: The URI of the resource to read. See :class:`~pydantic.networks.AnyUrl`
+                for the supported URI formats.
+
+        Returns a :class:`~mcp.types.ReadResourceResult`.  Subclasses that do not
+        support resources may leave this unimplemented; it will raise
+        :exc:`NotImplementedError` at call time.
+        """
+        raise NotImplementedError(
+            f"MCP server '{self.name}' does not support read_resource. "
+            "Override this method in your server implementation."
+        )
 
     @staticmethod
     def _normalize_needs_approval(
@@ -707,6 +772,39 @@ class _MCPServerWithClientSession(MCPServer, abc.ABC):
         session = self.session
         assert session is not None
         return await self._maybe_serialize_request(lambda: session.get_prompt(name, arguments))
+
+    async def list_resources(self, cursor: str | None = None) -> ListResourcesResult:
+        """List the resources available on the server."""
+        if not self.session:
+            raise UserError("Server not initialized. Make sure you call `connect()` first.")
+        session = self.session
+        assert session is not None
+        return await self._maybe_serialize_request(lambda: session.list_resources(cursor))
+
+    async def list_resource_templates(
+        self, cursor: str | None = None
+    ) -> ListResourceTemplatesResult:
+        """List the resource templates available on the server."""
+        if not self.session:
+            raise UserError("Server not initialized. Make sure you call `connect()` first.")
+        session = self.session
+        assert session is not None
+        return await self._maybe_serialize_request(lambda: session.list_resource_templates(cursor))
+
+    async def read_resource(self, uri: str) -> ReadResourceResult:
+        """Read the contents of a specific resource by URI.
+
+        Args:
+            uri: The URI of the resource to read. See :class:`~pydantic.networks.AnyUrl`
+                for the supported URI formats.
+        """
+        if not self.session:
+            raise UserError("Server not initialized. Make sure you call `connect()` first.")
+        session = self.session
+        assert session is not None
+        from pydantic import AnyUrl
+
+        return await self._maybe_serialize_request(lambda: session.read_resource(AnyUrl(uri)))
 
     async def cleanup(self):
         """Cleanup the server."""
