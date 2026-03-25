@@ -4,12 +4,13 @@ import abc
 import asyncio
 import inspect
 import sys
-from collections.abc import Awaitable
+from collections.abc import AsyncGenerator, Awaitable
 from contextlib import AbstractAsyncContextManager, AsyncExitStack, asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, TypeVar, Union, cast
 
+import anyio
 import httpx
 
 if sys.version_info < (3, 11):
@@ -19,7 +20,11 @@ from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStre
 from mcp import ClientSession, StdioServerParameters, Tool as MCPTool, stdio_client
 from mcp.client.session import MessageHandlerFnT
 from mcp.client.sse import sse_client
-from mcp.client.streamable_http import GetSessionIdCallback, streamablehttp_client
+from mcp.client.streamable_http import (
+    GetSessionIdCallback,
+    StreamableHTTPTransport,
+    streamablehttp_client,
+)
 from mcp.shared.exceptions import McpError
 from mcp.shared.message import SessionMessage
 from mcp.types import (
@@ -69,6 +74,101 @@ else:
 
 
 T = TypeVar("T")
+
+
+def _create_default_streamable_http_client(
+    headers: dict[str, str] | None = None,
+    timeout: httpx.Timeout | None = None,
+    auth: httpx.Auth | None = None,
+) -> httpx.AsyncClient:
+    kwargs: dict[str, Any] = {"follow_redirects": True}
+    if timeout is not None:
+        kwargs["timeout"] = timeout
+    if headers is not None:
+        kwargs["headers"] = headers
+    if auth is not None:
+        kwargs["auth"] = auth
+    return httpx.AsyncClient(**kwargs)
+
+
+class _InitializedNotificationTolerantStreamableHTTPTransport(StreamableHTTPTransport):
+    async def _handle_post_request(self, ctx: Any) -> None:
+        message = ctx.session_message.message
+        if not self._is_initialized_notification(message):
+            await super()._handle_post_request(ctx)
+            return
+
+        try:
+            await super()._handle_post_request(ctx)
+        except httpx.HTTPError:
+            logger.warning(
+                "Ignoring initialized notification HTTP failure",
+                exc_info=True,
+            )
+            return
+
+
+@asynccontextmanager
+async def _streamablehttp_client_with_transport(
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    timeout: float | timedelta = 30,
+    sse_read_timeout: float | timedelta = 60 * 5,
+    terminate_on_close: bool = True,
+    httpx_client_factory: HttpClientFactory = _create_default_streamable_http_client,
+    auth: httpx.Auth | None = None,
+    transport_factory: Callable[[str], StreamableHTTPTransport] = StreamableHTTPTransport,
+) -> AsyncGenerator[MCPStreamTransport, None]:
+    timeout_seconds = timeout.total_seconds() if isinstance(timeout, timedelta) else timeout
+    sse_read_timeout_seconds = (
+        sse_read_timeout.total_seconds()
+        if isinstance(sse_read_timeout, timedelta)
+        else sse_read_timeout
+    )
+
+    client = httpx_client_factory(
+        headers=headers,
+        timeout=httpx.Timeout(timeout_seconds, read=sse_read_timeout_seconds),
+        auth=auth,
+    )
+    transport = transport_factory(url)
+    read_stream_writer, read_stream = anyio.create_memory_object_stream[SessionMessage | Exception](
+        0
+    )
+    write_stream, write_stream_reader = anyio.create_memory_object_stream[SessionMessage](0)
+
+    async with client:
+        async with anyio.create_task_group() as tg:
+            try:
+                logger.debug(f"Connecting to StreamableHTTP endpoint: {url}")
+
+                def start_get_stream() -> None:
+                    tg.start_soon(transport.handle_get_stream, client, read_stream_writer)
+
+                tg.start_soon(
+                    transport.post_writer,
+                    client,
+                    write_stream_reader,
+                    read_stream_writer,
+                    write_stream,
+                    start_get_stream,
+                    tg,
+                )
+
+                try:
+                    yield (
+                        read_stream,
+                        write_stream,
+                        transport.get_session_id,
+                    )
+                finally:
+                    if transport.session_id and terminate_on_close:
+                        await transport.terminate_session(client)
+                    tg.cancel_scope.cancel()
+            finally:
+                await read_stream_writer.aclose()
+                await write_stream.aclose()
 
 
 class _SharedSessionRequestNeedsIsolation(Exception):
@@ -1160,6 +1260,14 @@ class MCPServerStreamableHttpParams(TypedDict):
     transport.
     """
 
+    ignore_initialized_notification_failure: NotRequired[bool]
+    """Whether to ignore failures when sending the best-effort
+    ``notifications/initialized`` POST.
+
+    Defaults to ``False``. When set to ``True``, initialized-notification failures are
+    logged and ignored so subsequent requests on the same transport can continue.
+    """
+
 
 class MCPServerStreamableHttp(_MCPServerWithClientSession):
     """MCP server implementation that uses the Streamable HTTP transport. See the [spec]
@@ -1250,8 +1358,16 @@ class MCPServerStreamableHttp(_MCPServerWithClientSession):
             "sse_read_timeout": self.params.get("sse_read_timeout", 60 * 5),
             "terminate_on_close": self.params.get("terminate_on_close", True),
         }
-        if "httpx_client_factory" in self.params:
-            kwargs["httpx_client_factory"] = self.params["httpx_client_factory"]
+        httpx_client_factory = self.params.get("httpx_client_factory")
+        if self.params.get("ignore_initialized_notification_failure", False):
+            return _streamablehttp_client_with_transport(
+                **kwargs,
+                httpx_client_factory=httpx_client_factory or _create_default_streamable_http_client,
+                auth=self.params.get("auth"),
+                transport_factory=_InitializedNotificationTolerantStreamableHTTPTransport,
+            )
+        if httpx_client_factory is not None:
+            kwargs["httpx_client_factory"] = httpx_client_factory
         if "auth" in self.params:
             kwargs["auth"] = self.params["auth"]
         return streamablehttp_client(**kwargs)
