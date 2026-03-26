@@ -33,6 +33,7 @@ from .items import (
     fingerprint_input_item,
     normalize_input_items_for_api,
     run_item_to_input_item,
+    strip_internal_input_item_metadata,
 )
 from .oai_conversation import OpenAIServerConversationTracker
 from .run_steps import SingleStepResult
@@ -85,7 +86,9 @@ async def prepare_input_with_session(
         history = await session.get_items(limit=resolved_settings.limit)
     else:
         history = await session.get_items()
-    converted_history = [ensure_input_item_format(item) for item in history]
+    converted_history = [
+        strip_internal_input_item_metadata(ensure_input_item_format(item)) for item in history
+    ]
 
     new_input_list = [
         ensure_input_item_format(item) for item in ItemHelpers.input_to_new_input_list(input)
@@ -164,7 +167,8 @@ async def prepare_input_with_session(
     normalized = normalize_input_items_for_api(filtered)
     deduplicated = deduplicate_input_items_preferring_latest(normalized)
 
-    return deduplicated, [ensure_input_item_format(item) for item in appended_items]
+    appended_as_inputs = [ensure_input_item_format(item) for item in appended_items]
+    return deduplicated, normalize_input_items_for_api(appended_as_inputs)
 
 
 async def persist_session_items_for_guardrail_trip(
@@ -262,10 +266,12 @@ async def save_result_to_session(
 
     input_list: list[TResponseInputItem] = []
     if original_input:
-        input_list = [
-            ensure_input_item_format(item)
-            for item in ItemHelpers.input_to_new_input_list(original_input)
-        ]
+        input_list = normalize_input_items_for_api(
+            [
+                ensure_input_item_format(item)
+                for item in ItemHelpers.input_to_new_input_list(original_input)
+            ]
+        )
 
     resolved_reasoning_item_id_policy = (
         reasoning_item_id_policy
@@ -562,7 +568,7 @@ def _ignore_ids_for_matching(session: Session) -> bool:
 def _sanitize_openai_conversation_item(item: TResponseInputItem) -> TResponseInputItem:
     """Remove provider-specific fields before fingerprinting or persistence."""
     if isinstance(item, dict):
-        clean_item = dict(item)
+        clean_item = cast(dict[str, Any], strip_internal_input_item_metadata(item))
         clean_item.pop("id", None)
         clean_item.pop("provider_data", None)
         return cast(TResponseInputItem, clean_item)
@@ -585,6 +591,11 @@ def _session_item_key(item: Any) -> str:
             payload = item
         else:
             payload = ensure_input_item_format(item)
+        if isinstance(payload, dict):
+            payload = cast(
+                dict[str, Any],
+                strip_internal_input_item_metadata(cast(TResponseInputItem, payload)),
+            )
         return json.dumps(payload, sort_keys=True, default=str)
     except Exception:
         return repr(item)
