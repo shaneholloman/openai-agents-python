@@ -204,8 +204,8 @@ from agents import Agent, AsyncOpenAI, OpenAIChatCompletionsModel, set_tracing_d
 
 set_tracing_disabled(disabled=True)
 
-provider = AsyncOpenAI(api_key="Api_Key", base_url="Base URL of Provider")
-model = OpenAIChatCompletionsModel(model="Model_Name", openai_client=provider)
+client = AsyncOpenAI(api_key="Api_Key", base_url="Base URL of Provider")
+model = OpenAIChatCompletionsModel(model="Model_Name", openai_client=client)
 
 agent= Agent(name="Helping Agent", instructions="You are a Helping Agent", model=model)
 ```
