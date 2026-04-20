@@ -63,6 +63,7 @@ from ....sandbox.util.retry import (
     retry_async,
 )
 from ....sandbox.util.tar_utils import UnsafeTarMemberError, validate_tar_bytes
+from ....sandbox.workspace_paths import coerce_posix_path, posix_path_as_path, sandbox_path_str
 
 DEFAULT_DAYTONA_WORKSPACE_ROOT = "/home/daytona/workspace"
 logger = logging.getLogger(__name__)
@@ -375,7 +376,7 @@ class DaytonaSandboxSession(BaseSandboxSession):
         if path == Path("/"):
             return
         try:
-            await self._sandbox.fs.create_folder(str(path), "755")
+            await self._sandbox.fs.create_folder(sandbox_path_str(path), "755")
         except Exception as e:
             raise WorkspaceArchiveWriteError(
                 path=path,
@@ -401,7 +402,7 @@ class DaytonaSandboxSession(BaseSandboxSession):
     ) -> ExecResult:
         cmd_str = shlex.join(str(c) for c in command)
         envs = await self._resolved_envs()
-        cwd = self.state.manifest.root
+        cwd = sandbox_path_str(self.state.manifest.root)
         env_args = (
             " ".join(shlex.quote(f"{key}={value}") for key, value in envs.items()) if envs else ""
         )
@@ -481,7 +482,7 @@ class DaytonaSandboxSession(BaseSandboxSession):
         sanitized = self._prepare_exec_command(*command, shell=shell, user=user)
         cmd_str = shlex.join(str(part) for part in sanitized)
         envs = await self._resolved_envs()
-        cwd = self.state.manifest.root
+        cwd = sandbox_path_str(self.state.manifest.root)
         exec_timeout = self._coerce_exec_timeout(timeout)
         daytona_exc = _import_daytona_exceptions()
         timeout_exc = daytona_exc.get("timeout")
@@ -782,7 +783,7 @@ class DaytonaSandboxSession(BaseSandboxSession):
             pass
 
     async def read(self, path: Path | str, *, user: str | User | None = None) -> io.IOBase:
-        path = Path(path)
+        error_path = posix_path_as_path(coerce_posix_path(path))
         if user is not None:
             workspace_path = await self._check_read_with_exec(path, user=user)
         else:
@@ -793,14 +794,14 @@ class DaytonaSandboxSession(BaseSandboxSession):
 
         try:
             data: bytes = await self._sandbox.fs.download_file(
-                str(workspace_path),
+                sandbox_path_str(workspace_path),
                 self.state.timeouts.file_download_s,
             )
             return io.BytesIO(data)
         except Exception as e:
             if not_found_exc is not None and isinstance(e, not_found_exc):
-                raise WorkspaceReadNotFoundError(path=path, cause=e) from e
-            raise WorkspaceArchiveReadError(path=path, cause=e) from e
+                raise WorkspaceReadNotFoundError(path=error_path, cause=e) from e
+            raise WorkspaceArchiveReadError(path=error_path, cause=e) from e
 
     async def write(
         self,
@@ -809,7 +810,7 @@ class DaytonaSandboxSession(BaseSandboxSession):
         *,
         user: str | User | None = None,
     ) -> None:
-        path = Path(path)
+        error_path = posix_path_as_path(coerce_posix_path(path))
         if user is not None:
             await self._check_write_with_exec(path, user=user)
 
@@ -817,13 +818,13 @@ class DaytonaSandboxSession(BaseSandboxSession):
         if isinstance(payload, str):
             payload = payload.encode("utf-8")
         if not isinstance(payload, bytes | bytearray):
-            raise WorkspaceWriteTypeError(path=path, actual_type=type(payload).__name__)
+            raise WorkspaceWriteTypeError(path=error_path, actual_type=type(payload).__name__)
 
         workspace_path = await self._validate_path_access(path, for_write=True)
         try:
             await self._sandbox.fs.upload_file(
                 bytes(payload),
-                str(workspace_path),
+                sandbox_path_str(workspace_path),
                 timeout=self.state.timeouts.file_upload_s,
             )
         except Exception as e:
@@ -859,7 +860,6 @@ class DaytonaSandboxSession(BaseSandboxSession):
         )
     )
     async def _run_persist_workspace_command(self, tar_cmd: str, tar_path: str) -> bytes:
-        root = self.state.manifest.root
         try:
             envs = await self._resolved_envs()
             result = await self._sandbox.process.exec(
@@ -869,7 +869,7 @@ class DaytonaSandboxSession(BaseSandboxSession):
             )
             if result.exit_code != 0:
                 raise WorkspaceArchiveReadError(
-                    path=Path(root),
+                    path=self._workspace_root_path(),
                     context={"reason": "tar_failed", "output": result.result or ""},
                 )
             return cast(
@@ -882,7 +882,7 @@ class DaytonaSandboxSession(BaseSandboxSession):
         except WorkspaceArchiveReadError:
             raise
         except Exception as e:
-            raise WorkspaceArchiveReadError(path=Path(root), cause=e) from e
+            raise WorkspaceArchiveReadError(path=self._workspace_root_path(), cause=e) from e
 
     async def persist_workspace(self) -> io.IOBase:
         def _error_context_summary(error: WorkspaceArchiveReadError) -> dict[str, str]:
@@ -892,11 +892,11 @@ class DaytonaSandboxSession(BaseSandboxSession):
                 summary["cause"] = str(error.cause)
             return summary
 
-        root = Path(self.state.manifest.root)
+        root = self._workspace_root_path()
         tar_path = f"/tmp/sandbox-persist-{self.state.session_id.hex}.tar"
         excludes = " ".join(self._tar_exclude_args())
         tar_cmd = (
-            f"tar {excludes} -C {shlex.quote(str(root))} -cf {shlex.quote(tar_path)} ."
+            f"tar {excludes} -C {shlex.quote(root.as_posix())} -cf {shlex.quote(tar_path)} ."
         ).strip()
 
         unmounted_mounts: list[tuple[Mount, Path]] = []
@@ -964,7 +964,7 @@ class DaytonaSandboxSession(BaseSandboxSession):
         return io.BytesIO(raw)
 
     async def hydrate_workspace(self, data: io.IOBase) -> None:
-        root = self.state.manifest.root
+        root = self._workspace_root_path()
         tar_path = f"/tmp/sandbox-hydrate-{self.state.session_id.hex}.tar"
         payload = data.read()
         if isinstance(payload, str):
@@ -976,7 +976,7 @@ class DaytonaSandboxSession(BaseSandboxSession):
             validate_tar_bytes(bytes(payload))
         except UnsafeTarMemberError as e:
             raise WorkspaceArchiveWriteError(
-                path=Path(root),
+                path=root,
                 context={
                     "reason": "unsafe_or_invalid_tar",
                     "member": e.member,
@@ -994,19 +994,19 @@ class DaytonaSandboxSession(BaseSandboxSession):
                 timeout=self.state.timeouts.file_upload_s,
             )
             result = await self._sandbox.process.exec(
-                f"tar -C {shlex.quote(root)} -xf {shlex.quote(tar_path)}",
+                f"tar -C {shlex.quote(root.as_posix())} -xf {shlex.quote(tar_path)}",
                 env=envs or None,
                 timeout=self.state.timeouts.workspace_tar_s,
             )
             if result.exit_code != 0:
                 raise WorkspaceArchiveWriteError(
-                    path=Path(root),
+                    path=root,
                     context={"reason": "tar_extract_failed", "output": result.result or ""},
                 )
         except WorkspaceArchiveWriteError:
             raise
         except Exception as e:
-            raise WorkspaceArchiveWriteError(path=Path(root), cause=e) from e
+            raise WorkspaceArchiveWriteError(path=root, cause=e) from e
         finally:
             try:
                 envs = await self._resolved_envs()
