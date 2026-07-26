@@ -396,6 +396,25 @@ async def test_async_callable_object_works_with_configured_function_tool() -> No
 
 
 @pytest.mark.asyncio
+async def test_configured_async_callable_ignores_annotated_class_state() -> None:
+    class AsyncCallable:
+        value: str
+        factor: int
+
+        def __init__(self, factor: int) -> None:
+            self.factor = factor
+
+        async def __call__(self, value: int) -> int:
+            return value * self.factor
+
+    tool = function_tool(AsyncCallable(3), name_override="multiply")
+
+    assert list(tool.params_json_schema["properties"]) == ["value"]
+    assert tool.params_json_schema["properties"]["value"]["type"] == "integer"
+    assert await tool.on_invoke_tool(ctx_wrapper(), '{"value": 4}') == 12
+
+
+@pytest.mark.asyncio
 async def test_callable_object_invokes_the_resolved_call_method(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -454,6 +473,40 @@ async def test_sync_function_preserves_awaitable_result() -> None:
     assert await returned == 12
 
 
+@pytest.mark.asyncio
+async def test_async_callable_object_preserves_positional_context() -> None:
+    class Handler:
+        async def __call__(self, ctx: ToolContext[Any], value: int) -> str:
+            return f"{ctx.tool_name}:{value}"
+
+    tool = function_tool(Handler(), name_override="handler")
+
+    assert list(tool.params_json_schema["properties"]) == ["value"]
+    assert await tool.on_invoke_tool(ctx_wrapper(), '{"value": 4}') == "dummy:4"
+
+
+@pytest.mark.asyncio
+async def test_callable_docstring_opt_out_does_not_read_dynamic_doc() -> None:
+    class RaisingDoc:
+        def __get__(self, instance: Any, owner: type[Any] | None = None) -> str:
+            raise AssertionError("The callable docstring should not be read.")
+
+    class Handler:
+        def __call__(self, value: int) -> int:
+            return value * 2
+
+    cast(Any, Handler).__doc__ = RaisingDoc()
+    tool = function_tool(
+        Handler(),
+        name_override="handler",
+        use_docstring_info=False,
+    )
+
+    assert tool.description == ""
+    assert tool.params_json_schema["properties"]["value"]["type"] == "integer"
+    assert await tool.on_invoke_tool(ctx_wrapper(), '{"value": 4}') == 8
+
+
 def test_callable_contract_rejects_unknown_call_descriptor() -> None:
     class CustomDescriptor:
         def __get__(self, instance: Any, owner: type[Any]) -> Callable[..., Any]:
@@ -483,10 +536,9 @@ def test_callable_contract_rejects_unknown_call_descriptor() -> None:
         "singledispatchmethod",
         "builtin",
         "nested-wrapper",
-        "context",
         "keyword-only-context",
         "variadic-context",
-        "context-with-kwargs",
+        "non-first-context",
         "generic",
         "generic-signature",
         "self",
@@ -511,8 +563,9 @@ def test_unsupported_callable_shapes_require_explicit_wrappers(shape: str) -> No
     async def target(value: int) -> int:
         return value
 
+    handler: Any
     if shape == "partial":
-        handler: Any = functools.partial(target, 1)
+        handler = functools.partial(target, 1)
     elif shape == "partialmethod":
 
         class PartialMethodHandler:
@@ -636,13 +689,6 @@ def test_unsupported_callable_shapes_require_explicit_wrappers(shape: str) -> No
                 return self.wrapped(*args, **kwargs)
 
         handler = NestedWrapper(NestedHandler())
-    elif shape == "context":
-
-        class ContextHandler:
-            async def __call__(self, ctx: ToolContext[Any], value: int) -> int:
-                return value
-
-        handler = ContextHandler()
     elif shape == "keyword-only-context":
 
         class KeywordOnlyContextHandler:
@@ -657,13 +703,13 @@ def test_unsupported_callable_shapes_require_explicit_wrappers(shape: str) -> No
                 return len(ctx)
 
         handler = VariadicContextHandler()
-    elif shape == "context-with-kwargs":
+    elif shape == "non-first-context":
 
-        class ContextWithKwargsHandler:
-            async def __call__(self, ctx: ToolContext[Any], **kwargs: Any) -> int:
-                return len(kwargs)
+        class NonFirstContextHandler:
+            async def __call__(self, value: int, ctx: ToolContext[Any]) -> int:
+                return value
 
-        handler = ContextWithKwargsHandler()
+        handler = NonFirstContextHandler()
     elif shape == "generic":
 
         class GenericHandler(Generic[CallableValueT]):
