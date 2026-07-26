@@ -230,7 +230,7 @@ def test_run_result_release_agents_is_idempotent() -> None:
         _ = result.last_agent
 
 
-def test_run_result_streaming_release_agents_releases_current_agent() -> None:
+def test_run_result_streaming_release_agents_uses_weakref_until_agent_is_collected() -> None:
     agent = Agent(name="streaming-agent")
     streaming_result = RunResultStreaming(
         input="stream",
@@ -251,6 +251,8 @@ def test_run_result_streaming_release_agents_releases_current_agent() -> None:
     )
 
     streaming_result.release_agents(release_new_items=False)
+
+    assert 'Current agent: Agent(name="streaming-agent", ...)' in str(streaming_result)
 
     agent_ref = weakref.ref(agent)
     del agent
