@@ -642,13 +642,13 @@ class BatchTraceProcessor(TracingProcessor):
                 )
         else:
             # No background thread: process any remaining items synchronously.
-            self._export_batches(force=True, deadline=deadline)
+            self._export_batches(deadline=deadline)
 
     def force_flush(self):
         """
         Forces an immediate flush of all queued spans.
         """
-        self._export_batches(force=True)
+        self._export_batches()
 
     def _run(self):
         while not self._shutdown_event.is_set():
@@ -657,7 +657,7 @@ class BatchTraceProcessor(TracingProcessor):
 
             # If it's time for a scheduled flush or queue is above the trigger threshold
             if current_time >= self._next_export_time or queue_size >= self._export_trigger_size:
-                self._export_batches(force=False)
+                self._export_batches()
                 # Reset the next scheduled flush time
                 self._next_export_time = time.time() + self._schedule_delay
             else:
@@ -665,11 +665,11 @@ class BatchTraceProcessor(TracingProcessor):
                 time.sleep(0.2)
 
         # Final drain after shutdown
-        self._export_batches(force=True, deadline=self._shutdown_deadline)
+        self._export_batches(deadline=self._shutdown_deadline)
 
-    def _export_batches(self, force: bool = False, deadline: float | None = None):
-        """Drains the queue and exports in batches. If force=True, export everything.
-        Otherwise, export up to `max_batch_size` repeatedly until the queue is completely empty.
+    def _export_batches(self, deadline: float | None = None):
+        """Drains the queue and exports in batches of up to `max_batch_size` until the queue
+        is completely empty.
         """
         with self._export_lock:
             while True:
@@ -682,9 +682,7 @@ class BatchTraceProcessor(TracingProcessor):
                 items_to_export: list[Span[Any] | Trace] = []
 
                 # Gather a batch of spans up to max_batch_size
-                while not self._queue.empty() and (
-                    force or len(items_to_export) < self._max_batch_size
-                ):
+                while not self._queue.empty() and len(items_to_export) < self._max_batch_size:
                     try:
                         items_to_export.append(self._queue.get_nowait())
                     except queue.Empty:
