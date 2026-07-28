@@ -232,6 +232,8 @@ If you use a custom OpenAI-compatible endpoint or proxy, websocket transport als
 -   You can use [`Runner.run_streamed()`][agents.run.Runner.run_streamed] directly after enabling websocket transport. For multi-turn workflows where you want to reuse the same websocket connection across turns (and nested agent-as-tool calls), the [`responses_websocket_session()`][agents.responses_websocket_session] helper is recommended. See the [Running agents](../running_agents.md) guide and [`examples/basic/stream_ws.py`](https://github.com/openai/openai-agents-python/tree/main/examples/basic/stream_ws.py).
 -   For long reasoning turns or networks with latency spikes, customize websocket keepalive behavior with `responses_websocket_options`. Increase `ping_timeout` to tolerate delayed pong frames, or set `ping_timeout=None` to disable heartbeat timeouts while keeping pings enabled. Prefer HTTP/SSE transport when reliability is more important than websocket latency.
 -   By default the SDK disables the incoming message-size limit (`max_size=None`). For long-lived agent processes behind proxies or in memory-constrained containers, set `responses_websocket_options={"max_size": 8 * 1024 * 1024}` to bound per-message memory usage.
+-   The [Responses API WebSocket service](https://developers.openai.com/api/docs/guides/websocket-mode) processes one response at a time on each connection and limits each connection to 60 minutes. Open a new connection after that limit; use multiple connections when you need parallel runs.
+-   The service keeps only the most recent response in connection-local memory. A failed `4xx` or `5xx` turn evicts the referenced `previous_response_id`. After reconnecting, a stored response can still be continued when available, but `store=False` and ZDR flows have no persisted fallback. Start a new chain with `previous_response_id=None` and send the full input context, or rebuild that context from locally managed session state.
 
 ### Hosted multi-agent (experimental)
 
@@ -495,6 +497,8 @@ english_agent = Agent(
 ## Runner-managed retries
 
 Retries are runtime-only and opt in. The SDK does not retry general model requests unless you set `ModelSettings(retry=...)` and your retry policy chooses to retry.
+
+On the Responses websocket transport, `retry_policies.provider_suggested()` recognizes pre-response overload frames and code-less `server_error` frames as retry suggestions. This does not enable retries by itself: you still need `ModelRetrySettings`, and the normal replay-safety checks still apply. If any response event has already arrived, the SDK does not replay the request.
 
 ```python
 from agents import Agent, ModelRetrySettings, ModelSettings, retry_policies

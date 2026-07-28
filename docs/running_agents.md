@@ -117,6 +117,8 @@ asyncio.run(main())
 
 Finish consuming streamed results before the context exits. Exiting the context while a websocket request is still in flight may force-close the shared connection.
 
+The service processes one response at a time on each websocket connection and limits a connection to 60 minutes. The helper reuses the connection but does not remove those constraints. After a reconnect, `store=False` and ZDR flows cannot recover an uncached `previous_response_id`; start a new chain with full input context or rebuild it from locally managed session state. See the [Responses WebSocket transport notes](models/index.md#responses-websocket-transport) for the full recovery behavior.
+
 If long reasoning turns hit websocket keepalive timeouts, increase `ping_timeout` or set `ping_timeout=None` to disable heartbeat timeouts. Use HTTP/SSE transport for runs where reliability matters more than websocket latency.
 
 ### Run config

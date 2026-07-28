@@ -29,7 +29,7 @@ Highlights:
 -   Added the public `agents.decorators` module and the shorter `@tool` alias alongside the existing function and guardrail decorators. Function tools now also support async callable objects.
 -   SDK configuration now consistently accepts either typed settings objects or dictionaries across agents, runs, models, sessions, sandboxes, and voice pipelines, with validation for unknown settings.
 -   Hardened error and diagnostic logging across models, tools, MCP, Realtime, sessions, sandboxes, and tracing to avoid exposing raw sensitive payloads while preserving useful debugging context.
--   Improved AnyLLM, LiteLLM, and Chat Completions compatibility, preserved session history across model retries, and added retries for WebSocket overloads that occur before a response starts.
+-   Improved AnyLLM, LiteLLM, and Chat Completions compatibility, preserved session history across model retries, and added provider retry guidance for WebSocket overloads that occur before a response starts so opt-in Runner retry policies can act when replay is permitted.
 -   Added [create-time-only S3 mounts for Vercel sandboxes](sandbox/clients.md#mounts-and-remote-storage) through `VercelCloudBucketMountStrategy`. Mounted sessions exclude bucket contents from workspace persistence and intentionally do not support dynamic mount changes or session resume.
 
 ### 0.18.0
