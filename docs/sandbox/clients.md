@@ -33,6 +33,8 @@ For most users, start with one of these two sandbox clients:
 
 Unix-local is the easiest way to start developing against a local filesystem. Move to Docker or a hosted provider when you need stronger environment isolation or production-style parity.
 
+`SandboxPathGrant.host_path` is Docker-only and maps a host path to a different POSIX path inside the container. Unix-local supports only same-path grants. See [Manifest path grants](guide.md#manifest) for details.
+
 To switch from Unix-local to Docker, keep the agent definition the same and change only the run config:
 
 ```python
