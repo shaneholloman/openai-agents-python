@@ -134,6 +134,7 @@ select = [
   "RUF006", # unowned asyncio tasks
   "RUF012", # mutable class attributes without ClassVar
   "RUF100", # unused noqa directives
+  "TRY201", # needless exception name in raise statements
   "UP", # pyupgrade
 ]
 isort = { combine-as-imports = true, known-first-party = ["agents"] }
