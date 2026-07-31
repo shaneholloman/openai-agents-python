@@ -101,6 +101,9 @@ else:
 
 T = TypeVar("T")
 
+_SAFE_EXCEPTION_GROUP_MESSAGE = "MCP request failed with additional errors."
+_SAFE_EXCEPTION_MESSAGE = "An additional error occurred during the MCP request."
+
 
 def _safe_transport_cause(http_error: Exception) -> Exception | None:
     """Keep a transport exception only when its HTTPX URLs need no sanitization."""
@@ -134,6 +137,37 @@ def _safe_transport_cause(http_error: Exception) -> Exception | None:
 def _first_unsafe_transport_error(http_errors: list[Exception]) -> Exception | None:
     """Return the first transport error whose HTTPX URLs require sanitization."""
     return next((error for error in http_errors if _safe_transport_cause(error) is None), None)
+
+
+def _is_http_transport_error(error: BaseException) -> bool:
+    """Return whether an exception is an HTTPX transport error."""
+    return isinstance(error, httpx.HTTPStatusError | httpx.RequestError)
+
+
+def _credential_safe_exception_group(error_group: BaseExceptionGroup) -> BaseExceptionGroup:
+    """Replace an exception group with a fixed-data graph that retains control semantics."""
+    safe_exceptions = [
+        _credential_safe_exception_group(error)
+        if isinstance(error, BaseExceptionGroup)
+        else _credential_safe_exception_leaf(error)
+        for error in error_group.exceptions
+    ]
+    return BaseExceptionGroup(_SAFE_EXCEPTION_GROUP_MESSAGE, safe_exceptions)
+
+
+def _credential_safe_exception_leaf(error: BaseException) -> BaseException:
+    """Create a fixed-data replacement for one retained exception leaf."""
+    if isinstance(error, asyncio.CancelledError):
+        return asyncio.CancelledError()
+    if isinstance(error, KeyboardInterrupt):
+        return KeyboardInterrupt()
+    if isinstance(error, SystemExit):
+        return SystemExit()
+    if isinstance(error, GeneratorExit):
+        return GeneratorExit()
+    if isinstance(error, Exception):
+        return RuntimeError(_SAFE_EXCEPTION_MESSAGE)
+    return BaseException(_SAFE_EXCEPTION_MESSAGE)
 
 
 def _log_transport_warning(message: str, http_error: Exception) -> None:
@@ -826,6 +860,64 @@ class _MCPServerWithClientSession(MCPServer, abc.ABC):
             raise error from None
         raise error from cause
 
+    def _user_error_for_request_operation(
+        self,
+        operation: str,
+        http_error: Exception,
+    ) -> UserError:
+        """Build a credential-safe error for an MCP request operation."""
+        error_message = f"Failed to {operation} on MCP server '{self._error_name}': "
+        if isinstance(http_error, httpx.HTTPStatusError):
+            error_message += f"HTTP error {http_error.response.status_code}"
+        elif isinstance(http_error, httpx.ConnectError):
+            error_message += "Connection lost. The server may have disconnected."
+        elif isinstance(http_error, httpx.TimeoutException):
+            error_message += "Connection timeout."
+        else:
+            error_message += "Request failed."
+        return UserError(error_message)
+
+    async def _run_request_with_transport_error_redaction(
+        self,
+        operation: str,
+        func: Callable[[], Awaitable[T]],
+    ) -> T:
+        """Run an MCP request without retaining credential-bearing HTTP errors."""
+        transport_error: UserError | None = None
+        base_error_group: BaseExceptionGroup | None = None
+        try:
+            return await func()
+        except (httpx.HTTPStatusError, httpx.RequestError) as http_error:
+            transport_error = self._user_error_for_request_operation(operation, http_error)
+        except BaseExceptionGroup as error_group:
+            http_errors = self._extract_http_errors_from_exception(error_group)
+            if not http_errors:
+                raise
+            selected_http_error = http_errors[0]
+            http_group, remaining_group = error_group.split(_is_http_transport_error)
+            assert http_group is not None
+            mapped_transport_error = self._user_error_for_request_operation(
+                operation,
+                selected_http_error,
+            )
+            if remaining_group is None:
+                transport_error = mapped_transport_error
+            else:
+                safe_remaining_group = _credential_safe_exception_group(remaining_group)
+                base_error_group = BaseExceptionGroup(
+                    _SAFE_EXCEPTION_GROUP_MESSAGE,
+                    [mapped_transport_error, *safe_remaining_group.exceptions],
+                )
+            http_errors.clear()
+            del selected_http_error
+            del http_group
+            del remaining_group
+
+        if base_error_group is not None:
+            raise base_error_group
+        assert transport_error is not None
+        self._raise_mapped_transport_error(transport_error, None)
+
     async def _run_with_retries(self, func: Callable[[], Awaitable[T]]) -> T:
         attempts = 0
         while True:
@@ -1079,7 +1171,10 @@ class _MCPServerWithClientSession(MCPServer, abc.ABC):
             raise UserError("Server not initialized. Make sure you call `connect()` first.")
         session = self.session
         assert session is not None
-        return await self._maybe_serialize_request(lambda: session.list_prompts())
+        return await self._run_request_with_transport_error_redaction(
+            "list prompts",
+            lambda: self._maybe_serialize_request(lambda: session.list_prompts()),
+        )
 
     async def get_prompt(
         self, name: str, arguments: dict[str, Any] | None = None
@@ -1089,7 +1184,10 @@ class _MCPServerWithClientSession(MCPServer, abc.ABC):
             raise UserError("Server not initialized. Make sure you call `connect()` first.")
         session = self.session
         assert session is not None
-        return await self._maybe_serialize_request(lambda: session.get_prompt(name, arguments))
+        return await self._run_request_with_transport_error_redaction(
+            "get prompt",
+            lambda: self._maybe_serialize_request(lambda: session.get_prompt(name, arguments)),
+        )
 
     async def list_resources(self, cursor: str | None = None) -> ListResourcesResult:
         """List the resources available on the server."""
@@ -1097,7 +1195,10 @@ class _MCPServerWithClientSession(MCPServer, abc.ABC):
             raise UserError("Server not initialized. Make sure you call `connect()` first.")
         session = self.session
         assert session is not None
-        return await self._maybe_serialize_request(lambda: session.list_resources(cursor))
+        return await self._run_request_with_transport_error_redaction(
+            "list resources",
+            lambda: self._maybe_serialize_request(lambda: session.list_resources(cursor)),
+        )
 
     async def list_resource_templates(
         self, cursor: str | None = None
@@ -1107,7 +1208,10 @@ class _MCPServerWithClientSession(MCPServer, abc.ABC):
             raise UserError("Server not initialized. Make sure you call `connect()` first.")
         session = self.session
         assert session is not None
-        return await self._maybe_serialize_request(lambda: session.list_resource_templates(cursor))
+        return await self._run_request_with_transport_error_redaction(
+            "list resource templates",
+            lambda: self._maybe_serialize_request(lambda: session.list_resource_templates(cursor)),
+        )
 
     async def read_resource(self, uri: str) -> ReadResourceResult:
         """Read the contents of a specific resource by URI.
@@ -1122,7 +1226,10 @@ class _MCPServerWithClientSession(MCPServer, abc.ABC):
         assert session is not None
         from pydantic import AnyUrl
 
-        return await self._maybe_serialize_request(lambda: session.read_resource(AnyUrl(uri)))
+        return await self._run_request_with_transport_error_redaction(
+            "read resource",
+            lambda: self._maybe_serialize_request(lambda: session.read_resource(AnyUrl(uri))),
+        )
 
     async def cleanup(self):
         """Cleanup the server."""
