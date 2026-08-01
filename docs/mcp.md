@@ -9,6 +9,10 @@ context to language models. From the official documentation:
 
 The Agents Python SDK understands multiple MCP transports. This lets you reuse existing MCP servers or build your own to expose filesystem, HTTP, or connector backed tools to an agent.
 
+!!! warning "Trust MCP servers before connecting"
+
+    MCP tools can expose data from the model context and perform actions with the credentials you provide. Connect only to servers you trust, use least-privilege credentials, keep access tokens in authorization fields or headers rather than URLs, and require approval for sensitive operations. See the [OpenAI MCP security guidance](https://developers.openai.com/api/docs/guides/tools-connectors-mcp#risks-and-safety).
+
 ## Choosing an MCP integration
 
 Before wiring an MCP server into an agent decide where the tool calls should execute and which transports you can reach. The matrix below summarises the options that the Python SDK supports.

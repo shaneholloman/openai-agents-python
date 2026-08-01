@@ -307,6 +307,8 @@ You can use any Python function as a tool. The Agents SDK will set up the tool a
 -   The schema for the function inputs is automatically created from the function's arguments
 -   Descriptions for each input are taken from the docstring of the function, unless disabled
 
+Tools created by `@tool` expose the original Python callable through the read-only `__wrapped__` attribute. This is useful for inspection and testing, but calling it directly bypasses the tool runtime pipeline, including schema validation, context injection, guardrails, timeouts, failure handling, and tracing. Hand-built `FunctionTool` instances do not expose `__wrapped__`.
+
 We use Python's `inspect` module to extract the function signature, along with [`griffe`](https://mkdocstrings.github.io/griffe/) to parse docstrings and `pydantic` for schema creation.
 
 When you are using OpenAI Responses models, `@function_tool(defer_loading=True)` hides a function tool until `ToolSearchTool()` loads it. You can also group related function tools with [`tool_namespace()`][agents.tool.tool_namespace]. See [Hosted tool search](#hosted-tool-search) for the full setup and constraints.

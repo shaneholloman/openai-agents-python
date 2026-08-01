@@ -66,6 +66,8 @@ See the code snippet below for details.
 
 If the input or output fails the guardrail, the Guardrail can signal this with a tripwire. As soon as we see a guardrail that has triggered the tripwires, we immediately raise a `{Input,Output}GuardrailTripwireTriggered` exception and halt the Agent execution.
 
+The exception's `guardrail_result` identifies the guardrail that triggered the tripwire. For an input tripwire raised by the runner, `exception.run_data.input_guardrail_results` contains every input guardrail result completed before the run stopped, including the result that triggered the tripwire. The streamed result exposes the same accumulated results through `input_guardrail_results` after `stream_events()` raises. `run_data` can be `None` when an exception is raised outside a runner-managed execution path.
+
 ## Implementing a guardrail
 
 You need to provide a function that receives input, and returns a [`GuardrailFunctionOutput`][agents.guardrail.GuardrailFunctionOutput]. In this example, we'll do this by running an Agent under the hood.

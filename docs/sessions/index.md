@@ -361,7 +361,10 @@ session = RedisSession.from_url(
     url="redis://localhost:6379/0",
 )
 result = await Runner.run(agent, "Hello", session=session)
+await session.close()
 ```
+
+`from_url(...)` creates and owns the Redis client. After `close()`, the session is terminal and subsequent session operations raise `RuntimeError`; repeated or concurrent `close()` calls are safe. If your application already manages a Redis client, construct `RedisSession(...)` directly with `redis_client=...`. In that case, `close()` is a no-op and the caller retains both client ownership and session usability.
 
 ### SQLAlchemy sessions
 
@@ -411,6 +414,7 @@ async with DaprSession.from_address(
 Notes:
 
 -   `from_address(...)` creates and owns the Dapr client for you. If your app already manages one, construct `DaprSession(...)` directly with `dapr_client=...`.
+-   Exiting the context or calling `close()` makes an owned-client session terminal; subsequent session operations raise `RuntimeError`, while repeated or concurrent `close()` calls are safe. With an injected client, `close()` is a no-op and the session remains usable.
 -   Pass `ttl=...` to let the backing state store expire old session data automatically when the store supports TTL.
 -   Pass `consistency=DAPR_CONSISTENCY_STRONG` when you need stronger read-after-write guarantees.
 -   The Dapr Python SDK also checks the HTTP sidecar endpoint. In local development, start Dapr with `--dapr-http-port 3500` as well as the gRPC port used in `dapr_address`.
