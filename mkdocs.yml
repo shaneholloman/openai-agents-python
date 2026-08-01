@@ -59,6 +59,14 @@ plugins:
                     - Concepts: sandbox/guide.md
                     - Sandbox clients: sandbox/clients.md
                     - Agent memory: sandbox/memory.md
+                - Realtime agents:
+                    - Quickstart: realtime/quickstart.md
+                    - Transport: realtime/transport.md
+                    - Guide: realtime/guide.md
+                - Voice agents:
+                    - Quickstart: voice/quickstart.md
+                    - Pipeline: voice/pipeline.md
+                    - Tracing: voice/tracing.md
                 - Models: models/index.md
                 - Tools: tools.md
                 - Guardrails: guardrails.md
@@ -77,14 +85,6 @@ plugins:
                 - Usage: usage.md
                 - Model context protocol (MCP): mcp.md
                 - Tracing: tracing.md
-                - Realtime agents:
-                    - Quickstart: realtime/quickstart.md
-                    - Transport: realtime/transport.md
-                    - Guide: realtime/guide.md
-                - Voice agents:
-                    - Quickstart: voice/quickstart.md
-                    - Pipeline: voice/pipeline.md
-                    - Tracing: voice/tracing.md
                 - Agent visualization: visualization.md
                 - REPL utility: repl.md
                 - Examples: examples.md
@@ -209,6 +209,13 @@ plugins:
                     - 概念: sandbox/guide.md
                     - Sandbox クライアント: sandbox/clients.md
                     - エージェントメモリ: sandbox/memory.md
+                - リアルタイムエージェント:
+                    - realtime/quickstart.md
+                    - realtime/guide.md
+                - 音声エージェント:
+                    - voice/quickstart.md
+                    - voice/pipeline.md
+                    - voice/tracing.md
                 - モデル: models/index.md
                 - tools.md
                 - guardrails.md
@@ -227,13 +234,6 @@ plugins:
                 - usage.md
                 - mcp.md
                 - tracing.md
-                - リアルタイムエージェント:
-                    - realtime/quickstart.md
-                    - realtime/guide.md
-                - 音声エージェント:
-                    - voice/quickstart.md
-                    - voice/pipeline.md
-                    - voice/tracing.md
                 - visualization.md
                 - repl.md
                 - コード例: examples.md
@@ -252,6 +252,13 @@ plugins:
                     - 개념: sandbox/guide.md
                     - 샌드박스 클라이언트: sandbox/clients.md
                     - 에이전트 메모리: sandbox/memory.md
+                - 실시간 에이전트:
+                    - realtime/quickstart.md
+                    - realtime/guide.md
+                - 음성 에이전트:
+                    - voice/quickstart.md
+                    - voice/pipeline.md
+                    - voice/tracing.md
                 - 모델: models/index.md
                 - tools.md
                 - guardrails.md
@@ -270,13 +277,6 @@ plugins:
                 - usage.md
                 - mcp.md
                 - tracing.md
-                - 실시간 에이전트:
-                    - realtime/quickstart.md
-                    - realtime/guide.md
-                - 음성 에이전트:
-                    - voice/quickstart.md
-                    - voice/pipeline.md
-                    - voice/tracing.md
                 - visualization.md
                 - repl.md
                 - 코드 예제: examples.md
@@ -295,6 +295,13 @@ plugins:
                     - 概念: sandbox/guide.md
                     - 沙箱客户端: sandbox/clients.md
                     - 智能体记忆: sandbox/memory.md
+                - 实时智能体:
+                    - realtime/quickstart.md
+                    - realtime/guide.md
+                - 语音智能体:
+                    - voice/quickstart.md
+                    - voice/pipeline.md
+                    - voice/tracing.md
                 - 模型: models/index.md
                 - tools.md
                 - guardrails.md
@@ -313,13 +320,6 @@ plugins:
                 - usage.md
                 - mcp.md
                 - tracing.md
-                - 实时智能体:
-                    - realtime/quickstart.md
-                    - realtime/guide.md
-                - 语音智能体:
-                    - voice/quickstart.md
-                    - voice/pipeline.md
-                    - voice/tracing.md
                 - visualization.md
                 - repl.md
                 - 示例: examples.md

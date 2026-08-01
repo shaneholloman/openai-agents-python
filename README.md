@@ -10,14 +10,15 @@ The OpenAI Agents SDK is a lightweight yet powerful framework for building multi
 ### Core concepts:
 
 1. [**Agents**](https://openai.github.io/openai-agents-python/agents): LLMs configured with instructions, tools, guardrails, and handoffs
-1. [**Sandbox Agents**](https://openai.github.io/openai-agents-python/sandbox_agents): Agents preconfigured to work with a container to perform work over long time horizons.
+1. [**Sandbox agents**](https://openai.github.io/openai-agents-python/sandbox_agents): Agents preconfigured to work with a container to perform work over long time horizons.
+1. [**Realtime agents**](https://openai.github.io/openai-agents-python/realtime/quickstart/): Build powerful voice agents with `gpt-realtime-2.1` and full agent features
+1. [**Voice agents**](https://openai.github.io/openai-agents-python/voice/quickstart/): Build voice pipelines that combine speech-to-text, an agent workflow, and text-to-speech
 1. **[Agents as tools](https://openai.github.io/openai-agents-python/tools/#agents-as-tools) / [Handoffs](https://openai.github.io/openai-agents-python/handoffs/)**: Delegating to other agents for specific tasks
 1. [**Tools**](https://openai.github.io/openai-agents-python/tools/): Various Tools let agents take actions (functions, MCP, hosted tools)
 1. [**Guardrails**](https://openai.github.io/openai-agents-python/guardrails/): Configurable safety checks for input and output validation
 1. [**Human in the loop**](https://openai.github.io/openai-agents-python/human_in_the_loop/): Built-in mechanisms for involving humans across agent runs
 1. [**Sessions**](https://openai.github.io/openai-agents-python/sessions/): Automatic conversation history management across agent runs
 1. [**Tracing**](https://openai.github.io/openai-agents-python/tracing/): Built-in tracking of agent runs, allowing you to view, debug and optimize your workflows
-1. [**Realtime Agents**](https://openai.github.io/openai-agents-python/realtime/quickstart/): Build powerful voice agents with `gpt-realtime-2.1` and full agent features
 
 Explore the [examples](https://github.com/openai/openai-agents-python/tree/main/examples) directory to see the SDK in action, and read our [documentation](https://openai.github.io/openai-agents-python/) for more details.
 
@@ -48,7 +49,26 @@ For voice support, install with the optional `voice` group: `uv add 'openai-agen
 
 ## Run your first agents
 
-The SDK supports three primary ways to run agents. Set the `OPENAI_API_KEY` environment variable before running any of these examples.
+The SDK supports four primary ways to run agents. Set the `OPENAI_API_KEY` environment variable before running any of these examples.
+
+### Run a text agent
+
+Use a text `Agent` for workflows that do not need a persistent realtime connection or a sandbox workspace.
+
+```python
+from agents import Agent, Runner
+
+agent = Agent(name="Assistant", instructions="You are a helpful assistant")
+
+result = Runner.run_sync(agent, "Write a haiku about recursion in programming.")
+print(result.final_output)
+
+# Code within the code,
+# Functions calling themselves,
+# Infinite loop's dance.
+```
+
+(_For Jupyter notebook users, see [hello_world_jupyter.ipynb](https://github.com/openai/openai-agents-python/blob/main/examples/basic/hello_world_jupyter.ipynb)_)
 
 ### Run a sandbox agent
 
@@ -77,25 +97,6 @@ result = Runner.run_sync(
 print(result.final_output)
 ```
 
-### Run a text agent
-
-Use a text `Agent` for workflows that do not need a persistent realtime connection or a sandbox workspace.
-
-```python
-from agents import Agent, Runner
-
-agent = Agent(name="Assistant", instructions="You are a helpful assistant")
-
-result = Runner.run_sync(agent, "Write a haiku about recursion in programming.")
-print(result.final_output)
-
-# Code within the code,
-# Functions calling themselves,
-# Infinite loop's dance.
-```
-
-(_For Jupyter notebook users, see [hello_world_jupyter.ipynb](https://github.com/openai/openai-agents-python/blob/main/examples/basic/hello_world_jupyter.ipynb)_)
-
 ### Run a realtime agent
 
 Use a [`RealtimeAgent`](https://openai.github.io/openai-agents-python/realtime/quickstart/) for low-latency, server-side voice and multimodal experiences over WebSocket.
@@ -119,6 +120,35 @@ async def main() -> None:
                 print(event.item)
             elif event.type == "agent_end":
                 break
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+### Run a voice agent
+
+Use a [`VoicePipeline`](https://openai.github.io/openai-agents-python/voice/quickstart/) to turn audio into text, run an agent workflow, and stream generated speech.
+
+```python
+import asyncio
+
+import numpy as np
+
+from agents import Agent
+from agents.voice import AudioInput, SingleAgentVoiceWorkflow, VoicePipeline
+
+
+async def main() -> None:
+    agent = Agent(name="Assistant", instructions="You are a helpful voice assistant.")
+    pipeline = VoicePipeline(workflow=SingleAgentVoiceWorkflow(agent))
+    audio_input = AudioInput(buffer=np.zeros(24000 * 3, dtype=np.int16))
+
+    result = await pipeline.run(audio_input)
+    async for event in result.stream():
+        if event.type == "voice_stream_event_audio":
+            # Forward or play event.data.
+            pass
+
 
 if __name__ == "__main__":
     asyncio.run(main())
