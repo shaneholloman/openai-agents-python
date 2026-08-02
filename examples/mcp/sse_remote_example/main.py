@@ -77,7 +77,7 @@ async def run(url: str, name: str) -> None:
 
         trace_id = gen_trace_id()
         with trace(workflow_name="SSE MCP Server Example", trace_id=trace_id):
-            print(f"View trace: https://platform.openai.com/traces/trace?trace_id={trace_id}\n")
+            print(f"View trace: https://platform.openai.com/logs/trace?trace_id={trace_id}\n")
             result = await Runner.run(agent, "Use the MCP add tool to add 7 and 22.")
             print(result.final_output)
 

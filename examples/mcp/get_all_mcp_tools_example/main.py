@@ -73,7 +73,7 @@ async def main():
     ) as server:
         trace_id = gen_trace_id()
         with trace(workflow_name="MCP get_all_mcp_tools Example", trace_id=trace_id):
-            print(f"View trace: https://platform.openai.com/traces/trace?trace_id={trace_id}\n")
+            print(f"View trace: https://platform.openai.com/logs/trace?trace_id={trace_id}\n")
 
             print("=== Fetching all tools with strict schemas ===")
             all_tools = await list_tools(server, convert_to_strict=True)

@@ -97,7 +97,7 @@ async def main():
     ) as server:
         trace_id = gen_trace_id()
         with trace(workflow_name="Simple Prompt Demo", trace_id=trace_id):
-            print(f"Trace: https://platform.openai.com/traces/trace?trace_id={trace_id}\n")
+            print(f"Trace: https://platform.openai.com/logs/trace?trace_id={trace_id}\n")
 
             await show_available_prompts(server)
             await demo_code_review(server)
@@ -128,4 +128,9 @@ if __name__ == "__main__":
     finally:
         if process:
             process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
             print("Server terminated.")

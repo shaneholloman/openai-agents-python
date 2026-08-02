@@ -4,8 +4,9 @@ import json
 import logging
 import os
 import struct
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from dataclasses import asdict
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -44,12 +45,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.setLevel(_log_level)
 
+STATIC_DIR = Path(__file__).with_name("static")
+
 
 class RealtimeWebSocketManager:
     def __init__(self):
         self.active_sessions: dict[str, RealtimeSession] = {}
         self.session_contexts: dict[str, Any] = {}
         self.websockets: dict[str, WebSocket] = {}
+        self.event_tasks: dict[str, asyncio.Task[None]] = {}
 
     async def connect(self, websocket: WebSocket, session_id: str):
         await websocket.accept()
@@ -78,16 +82,26 @@ class RealtimeWebSocketManager:
         self.session_contexts[session_id] = session_context
 
         # Start event processing task
-        asyncio.create_task(self._process_events(session_id))
+        self.event_tasks[session_id] = asyncio.create_task(
+            self._process_events(session_id),
+            name=f"realtime-events-{session_id}",
+        )
 
     async def disconnect(self, session_id: str):
-        if session_id in self.session_contexts:
-            await self.session_contexts[session_id].__aexit__(None, None, None)
-            del self.session_contexts[session_id]
-        if session_id in self.active_sessions:
-            del self.active_sessions[session_id]
-        if session_id in self.websockets:
-            del self.websockets[session_id]
+        event_task = self.event_tasks.pop(session_id, None)
+        try:
+            if event_task is not None:
+                event_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await event_task
+        finally:
+            session_context = self.session_contexts.pop(session_id, None)
+            try:
+                if session_context is not None:
+                    await session_context.__aexit__(None, None, None)
+            finally:
+                self.active_sessions.pop(session_id, None)
+                self.websockets.pop(session_id, None)
 
     async def send_audio(self, session_id: str, audio_bytes: bytes):
         if session_id in self.active_sessions:
@@ -415,9 +429,9 @@ app = FastAPI(lifespan=lifespan)
 
 @app.websocket("/ws/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
-    await manager.connect(websocket, session_id)
-    image_buffers: dict[str, dict[str, Any]] = {}
     try:
+        await manager.connect(websocket, session_id)
+        image_buffers: dict[str, dict[str, Any]] = {}
         while True:
             data = await websocket.receive_text()
             message = json.loads(data)
@@ -567,15 +581,17 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 await manager.interrupt(session_id)
 
     except WebSocketDisconnect:
+        pass
+    finally:
         await manager.disconnect(session_id)
 
 
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
 
 @app.get("/")
 async def read_index():
-    return FileResponse("static/index.html")
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 if __name__ == "__main__":

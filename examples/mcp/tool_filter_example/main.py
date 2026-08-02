@@ -51,7 +51,7 @@ async def main():
         )
         trace_id = gen_trace_id()
         with trace(workflow_name="MCP Tool Filter Example", trace_id=trace_id):
-            print(f"View trace: https://platform.openai.com/traces/trace?trace_id={trace_id}\n")
+            print(f"View trace: https://platform.openai.com/logs/trace?trace_id={trace_id}\n")
             result = await run_with_auto_approval(
                 agent, f"List the files in this allowed directory: {samples_dir}"
             )

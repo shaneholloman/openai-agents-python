@@ -453,7 +453,7 @@ async def run_healthcare_support_workflow(
     )
     orchestrator = build_orchestrator(sandbox_policy_tool=sandbox_policy_tool)
     trace_id = gen_trace_id()
-    trace_url = f"https://platform.openai.com/traces/trace?trace_id={trace_id}"
+    trace_url = f"https://platform.openai.com/logs/trace?trace_id={trace_id}"
 
     try:
         async with sandbox:

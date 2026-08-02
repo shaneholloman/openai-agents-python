@@ -135,3 +135,8 @@ if __name__ == "__main__":
     finally:
         if process:
             process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()

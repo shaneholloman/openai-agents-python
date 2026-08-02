@@ -55,7 +55,7 @@ async def main():
             print(f"Other event: {event.item.type}")
 
         if not saw_code_interpreter_call:
-            print("No code_interpreter_call item was emitted.")
+            raise RuntimeError("No code_interpreter_call item was emitted.")
         print(f"Final output: {result.final_output}")
 
 

@@ -98,7 +98,7 @@ async def main() -> None:
     # context: dict[str, str] = {}
 
     trace_id = gen_trace_id()
-    log(f"View trace: https://platform.openai.com/traces/trace?trace_id={trace_id}")
+    log(f"View trace: https://platform.openai.com/logs/trace?trace_id={trace_id}")
 
     with trace("Codex same thread example", trace_id=trace_id):
         log("Turn 1: inspect AGENTS.md with the Codex tool.")

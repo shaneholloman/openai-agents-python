@@ -71,7 +71,7 @@ async def main():
                 open_file(temp_path)
 
         if not generated_image:
-            print("No image_generation_call item was returned.")
+            raise RuntimeError("No image_generation_call item was returned.")
 
 
 if __name__ == "__main__":

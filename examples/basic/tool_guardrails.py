@@ -121,26 +121,23 @@ agent = Agent(
 async def main():
     print("=== Tool Guardrails Example ===\n")
 
-    try:
-        # Example 1: Normal operation - should work fine
-        print("1. Normal email sending:")
-        result = await Runner.run(
-            agent,
-            "Send an email to john@example.com with subject 'Welcome' and body "
-            "'Welcome to our service.'",
-        )
-        print(f"✅ Successful tool execution: {result.final_output}\n")
+    # Example 1: Normal operation - should work fine
+    print("1. Normal email sending:")
+    result = await Runner.run(
+        agent,
+        "Send an email to john@example.com with subject 'Welcome' and body "
+        "'Welcome to our service.'",
+    )
+    print(f"✅ Successful tool execution: {result.final_output}\n")
 
-        # Example 2: Input guardrail triggers - function tool call is rejected but execution continues
-        print("2. Attempting to send email with suspicious content:")
-        result = await Runner.run(
-            agent,
-            "Send an email to john@example.com with subject 'Introduction' and body "
-            "'Introducing ACME corp.'",
-        )
-        print(f"❌ Guardrail rejected function tool call: {result.final_output}\n")
-    except Exception as e:
-        print(f"Error: {e}\n")
+    # Example 2: Input guardrail triggers - function tool call is rejected but execution continues
+    print("2. Attempting to send email with suspicious content:")
+    result = await Runner.run(
+        agent,
+        "Send an email to john@example.com with subject 'Introduction' and body "
+        "'Introducing ACME corp.'",
+    )
+    print(f"❌ Guardrail rejected function tool call: {result.final_output}\n")
 
     try:
         # Example 3: Output guardrail triggers - should raise exception for sensitive data
@@ -151,13 +148,10 @@ async def main():
         print("🚨 Output guardrail triggered: Execution halted for sensitive data")
         print(f"Details: {e.output.output_info}\n")
 
-    try:
-        # Example 4: Output guardrail triggers - reject returning function tool output but continue execution
-        print("4. Rejecting function tool output containing phone numbers:")
-        result = await Runner.run(agent, "Get contact info for user456")
-        print(f"❌ Guardrail rejected function tool output: {result.final_output}\n")
-    except Exception as e:
-        print(f"Error: {e}\n")
+    # Example 4: Output guardrail triggers - reject returning function tool output but continue execution
+    print("4. Rejecting function tool output containing phone numbers:")
+    result = await Runner.run(agent, "Get contact info for user456")
+    print(f"❌ Guardrail rejected function tool output: {result.final_output}\n")
 
 
 if __name__ == "__main__":

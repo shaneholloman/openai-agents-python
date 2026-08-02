@@ -1,27 +1,31 @@
 """
 Example demonstrating how to access reasoning summaries when a model returns them.
 
-Some models, like gpt-5.5, provide a reasoning_content field in addition to the regular content.
+Some models, like gpt-5.6, provide reasoning summaries in addition to the regular content.
 This example shows how to access that content from both streaming and non-streaming responses,
-and how to handle responses that do not include a reasoning summary.
+and verifies that the requested summary was returned.
 
 To run this example, you need to:
 1. Set your OPENAI_API_KEY environment variable
-2. Use a model that supports reasoning content (e.g., gpt-5.5)
+2. Use a model that supports reasoning summaries (e.g., gpt-5.6)
 """
 
 import asyncio
 import os
-from typing import Any, cast
 
-from openai.types.responses import ResponseOutputRefusal, ResponseOutputText
+from openai.types.responses import (
+    ResponseOutputMessage,
+    ResponseOutputRefusal,
+    ResponseOutputText,
+    ResponseReasoningItem,
+)
 from openai.types.shared.reasoning import Reasoning
 
 from agents import ModelSettings
 from agents.models.interface import ModelTracing
 from agents.models.openai_provider import OpenAIProvider
 
-MODEL_NAME = os.getenv("REASONING_MODEL_NAME") or "gpt-5.5"
+MODEL_NAME = os.getenv("REASONING_MODEL_NAME") or "gpt-5.6"
 
 
 async def stream_with_reasoning_content():
@@ -42,7 +46,7 @@ async def stream_with_reasoning_content():
     async for event in model.stream_response(
         system_instructions="You are a helpful assistant that writes creative content.",
         input="Write a haiku about recursion in programming",
-        model_settings=ModelSettings(reasoning=Reasoning(effort="medium", summary="detailed")),
+        model_settings=ModelSettings(reasoning=Reasoning(effort="high", summary="auto")),
         tools=[],
         output_schema=None,
         handoffs=[],
@@ -63,7 +67,9 @@ async def stream_with_reasoning_content():
             print(f"\033[32m{event.delta}\033[0m", end="", flush=True)
             regular_content += event.delta
     if not reasoning_content:
-        print("\n(No reasoning summary deltas were returned.)")
+        raise RuntimeError(f"Model {MODEL_NAME} returned no reasoning summary deltas.")
+    if not regular_content:
+        raise RuntimeError(f"Model {MODEL_NAME} returned no output text deltas.")
     print("\n")
 
 
@@ -76,12 +82,16 @@ async def get_response_with_reasoning_content():
     model = provider.get_model(MODEL_NAME)
 
     print("\n=== Non-streaming Example ===")
-    print("Prompt: Explain the concept of recursion in programming")
+    prompt = (
+        "A recursive function uses T(n) = 2 * T(n - 1) + 1 with T(0) = 1. "
+        "Compute T(20) and derive a closed form."
+    )
+    print(f"Prompt: {prompt}")
 
     response = await model.get_response(
         system_instructions="You are a helpful assistant that explains technical concepts clearly.",
-        input="Explain the concept of recursion in programming",
-        model_settings=ModelSettings(reasoning=Reasoning(effort="medium", summary="detailed")),
+        input=prompt,
+        model_settings=ModelSettings(reasoning=Reasoning(effort="high", summary="auto")),
         tools=[],
         output_schema=None,
         handoffs=[],
@@ -92,36 +102,37 @@ async def get_response_with_reasoning_content():
     )
 
     # Extract reasoning content and regular content from the response
-    reasoning_content = None
-    regular_content = None
+    reasoning_parts: list[str] = []
+    regular_parts: list[str] = []
 
     for item in response.output:
-        if hasattr(item, "type") and item.type == "reasoning":
-            reasoning_content = item.summary[0].text
-        elif hasattr(item, "type") and item.type == "message":
-            if item.content and len(item.content) > 0:
-                content_item = item.content[0]
+        if isinstance(item, ResponseReasoningItem):
+            reasoning_parts.extend(summary.text for summary in item.summary)
+        elif isinstance(item, ResponseOutputMessage):
+            for content_item in item.content:
                 if isinstance(content_item, ResponseOutputText):
-                    regular_content = content_item.text
+                    regular_parts.append(content_item.text)
                 elif isinstance(content_item, ResponseOutputRefusal):
-                    refusal_item = cast(Any, content_item)
-                    regular_content = refusal_item.refusal
+                    regular_parts.append(content_item.refusal)
+
+    reasoning_content = "\n".join(reasoning_parts)
+    regular_content = "\n".join(regular_parts)
+
+    if not reasoning_content:
+        raise RuntimeError(f"Model {MODEL_NAME} returned no reasoning summary.")
+    if not regular_content:
+        raise RuntimeError(f"Model {MODEL_NAME} returned no regular output content.")
 
     print("\n\n### Reasoning Content:")
-    print(reasoning_content or "No reasoning content provided")
+    print(reasoning_content)
     print("\n\n### Regular Content:")
-    print(regular_content or "No regular content provided")
+    print(regular_content)
     print("\n")
 
 
 async def main():
-    try:
-        await stream_with_reasoning_content()
-        await get_response_with_reasoning_content()
-    except Exception as e:
-        print(f"Error: {e}")
-        print("\nNote: This example requires a model that supports reasoning content.")
-        print("You may need to use a specific model like gpt-5.5 or similar.")
+    await stream_with_reasoning_content()
+    await get_response_with_reasoning_content()
 
 
 if __name__ == "__main__":
