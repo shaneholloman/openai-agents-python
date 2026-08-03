@@ -445,6 +445,64 @@ async def _run_output_guardrails_for_stream(
         raise
 
 
+_SIDE_EFFECT_ITEM_TYPES = frozenset({"tool_call_item", "tool_call_output_item"})
+
+
+def _reasoning_indexes_tied_to_retained_items(
+    items: list[RunItem],
+    retained_indexes: set[int],
+) -> set[int]:
+    """Indexes of the reasoning items whose tied item is being retained.
+
+    Applies the same association rule as
+    ``agents.run_internal.items._drop_reasoning_items_preceding_dropped_calls``: a reasoning item
+    is tied to the next *non-reasoning* model-emitted item. Keeping a group whose following item is
+    dropped would leave a dangling reasoning item, which the Responses API rejects on the next
+    request (``reasoning was provided without its required following item``); dropping a group
+    whose following item is retained would strip the context that call needs to be replayed.
+
+    A trailing reasoning group - one with no following non-reasoning item at all - is not tied to
+    anything retained, so it is dropped. Note this is stricter than the reference, which keeps such
+    a group because the item it belongs to may still arrive later in a longer history; here the
+    turn is complete, so there is nothing left to tie it to.
+    """
+    tied: set[int] = set()
+    for index in range(len(items) - 1, -1, -1):
+        if items[index].type != "reasoning_item":
+            continue
+        for next_index in range(index + 1, len(items)):
+            if items[next_index].type == "reasoning_item":
+                continue
+            if next_index in retained_indexes:
+                tied.add(index)
+            break
+    return tied
+
+
+def _retained_items_for_blocked_output(items: list[RunItem]) -> list[RunItem]:
+    """Pick out the items of a final turn to keep when its output is not deliverable.
+
+    A tool that already ran has to stay in the session, together with the context needed to replay
+    its call. Everything else - the assistant message the guardrail rejected above all - is dropped,
+    including the reasoning that belongs to the rejected message rather than to a retained call.
+
+    ``_SIDE_EFFECT_ITEM_TYPES`` is enumerated rather than derived, so an item type added later is
+    *discarded* here by default and has to be classified deliberately. A record of a side effect
+    that goes unclassified is a bug, so the safer default is the one that surfaces as a missing item
+    rather than as a rejected message quietly reaching the session.
+    """
+    retained_indexes = {
+        index for index, item in enumerate(items) if item.type in _SIDE_EFFECT_ITEM_TYPES
+    }
+    if not retained_indexes:
+        return []
+    # Reasoning items are not side effects themselves, but a reasoning model requires the reasoning
+    # item tied to a function call to accompany it in the next request.
+    retained_indexes |= _reasoning_indexes_tied_to_retained_items(items, retained_indexes)
+    # Indexed rather than filtered by type so the retained items keep the model's own order.
+    return [item for index, item in enumerate(items) if index in retained_indexes]
+
+
 async def _finalize_streamed_final_output(
     *,
     streamed_result: RunResultStreaming,
@@ -463,18 +521,33 @@ async def _finalize_streamed_final_output(
         # pair even when an agent output guardrail blocks delivery of the final result.
         await save_items(items, response_id, store_setting)
 
-    output_guardrail_results = await _run_output_guardrails_for_stream(
-        agent=agent,
-        run_config=run_config,
-        output=output,
-        context_wrapper=context_wrapper,
-        streamed_result=streamed_result,
-    )
+    try:
+        output_guardrail_results = await _run_output_guardrails_for_stream(
+            agent=agent,
+            run_config=run_config,
+            output=output,
+            context_wrapper=context_wrapper,
+            streamed_result=streamed_result,
+        )
+    except Exception:
+        # The blocked output itself is not persisted, but a tool that already ran is: the next run
+        # has to see that side effect rather than re-issue it. This turn reaches here with tool
+        # items when `tool_use_behavior="stop_on_first_tool"` (or `stop_at_tool_names`, or a custom
+        # callable) turned a tool result straight into the final output.
+        if not persist_before_output_guardrails:
+            retained_items = _retained_items_for_blocked_output(items)
+            if retained_items:
+                await save_items(retained_items, response_id, store_setting)
+        raise
+
     streamed_result.output_guardrail_results = output_guardrail_results
     streamed_result.final_output = output
     streamed_result.is_complete = True
 
     if not persist_before_output_guardrails:
+        # Saved as one ordered batch so the session mirrors the model response. Doing it in two
+        # halves would both reorder the turn and, because the first save advances the turn's
+        # persisted-item count, make the second one a no-op.
         await save_items(items, response_id, store_setting)
 
     streamed_result._event_queue.put_nowait(QueueCompleteSentinel())
