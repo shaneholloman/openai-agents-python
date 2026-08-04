@@ -158,6 +158,7 @@ Use `RunConfig` to override behavior for a single run without changing each agen
 
 -   [`tool_execution`][agents.run.RunConfig.tool_execution]: Configure SDK-side execution behavior for local tool calls, such as limiting how many function tools run at once.
 -   [`tool_not_found_behavior`][agents.run.RunConfig.tool_not_found_behavior]: Configure how the runner handles unresolved function tool calls emitted by the model. The default raises `ModelBehaviorError`; opt in to return a model-visible error output instead.
+-   [`tool_name_collision_policy`][agents.run.RunConfig.tool_name_collision_policy]: Configure how the runner handles bare function-tool and handoff names that collide. The default, `"warn"`, logs an actionable warning and exposes only the current dispatch winner; `"error"` raises `UserError` before the model is called. Strict validation for namespaced and deferred-loading tools is unchanged.
 -   [`tool_error_formatter`][agents.run.RunConfig.tool_error_formatter]: Customize model-visible tool error messages, such as approval rejections and opt-in tool-not-found outputs.
 
 Nested handoffs are available as an opt-in beta. Enable ordered transcript compaction by passing `RunConfig(nest_handoff_history=True)` or set `handoff(..., nest_handoff_history=True)` to turn it on for a specific handoff. The built-in mapper places generated assistant summary segments around lossless message items instead of collapsing the whole transcript into one message. If you prefer to keep the raw transcript (the default), leave the flag unset or provide a `handoff_input_filter` (or `handoff_history_mapper`) that forwards the conversation exactly as you need. To change the wrapper text used in generated summary segments without writing a custom mapper, call [`set_conversation_history_wrappers`][agents.handoffs.set_conversation_history_wrappers] (and [`reset_conversation_history_wrappers`][agents.handoffs.reset_conversation_history_wrappers] to restore the defaults).
@@ -528,7 +529,7 @@ result = Runner.run_sync(
 print(result.final_output)
 ```
 
-Set `include_in_history=False` when you do not want the fallback output appended to conversation history.
+`RunErrorHandlerResult.include_in_history` defaults to `True`. For a max-turns handler, this appends the synthesized fallback output to conversation history and persists it to the configured session. Set `include_in_history=False` when you want the fallback returned to the caller without adding it to result history or session storage.
 
 Use `"model_refusal"` when a model refusal should produce an application-specific fallback instead of ending the run with `ModelRefusalError`.
 

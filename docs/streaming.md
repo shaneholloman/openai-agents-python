@@ -87,6 +87,8 @@ If you are manually continuing from [`result.to_input_list(mode="normalized")`][
 
 `handoff_occured` is intentionally misspelled for backward compatibility.
 
+A handoff call is emitted only as `handoff_requested`; it is not also emitted as `tool_called`. Ordinary function tool calls in the same turn still emit `tool_called`.
+
 When you use hosted tool search, `tool_search_called` is emitted when the model issues a tool-search request and `tool_search_output_created` is emitted when the Responses API returns the loaded subset.
 
 With Programmatic Tool Calling, `tool_called` is emitted for the generated `program` and for ordinary program-owned child tool calls. `tool_output` is emitted for child tool outputs and the matching `program_output`. Program-owned hosted MCP `mcp_approval_request` and `mcp_list_tools` items are exceptions: they are emitted as `mcp_approval_requested` and `mcp_list_tools`, wrapping [`MCPApprovalRequestItem`][agents.items.MCPApprovalRequestItem] and [`MCPListToolsItem`][agents.items.MCPListToolsItem], respectively. Inspect the raw item's `type` to distinguish the remaining items; program-owned child calls also carry a `caller` whose type is `program` and whose caller ID identifies the parent program.

@@ -447,6 +447,12 @@ agent = Agent(
 )
 ```
 
+## Pagination
+
+The built-in local MCP server classes automatically follow `nextCursor` when listing tools and prompts. `list_tools()` returns the complete tool list before applying filters or populating its cache, and `list_prompts()` returns one combined result with `nextCursor=None`. If a later page fails or a server repeats a cursor, the operation raises an error instead of exposing or caching partial results.
+
+Resources remain explicitly paginated. Pass the `nextCursor` from `list_resources()` or `list_resource_templates()` back as the `cursor` argument to retrieve the next page.
+
 ## Caching
 
 Every agent run calls `list_tools()` on each MCP server. Remote servers can introduce noticeable latency, so all of the MCP server classes expose a `cache_tools_list` option. Set it to `True` only if you are confident that the tool definitions do not change frequently. To force a fresh list later, call `invalidate_tools_cache()` on the server instance.
