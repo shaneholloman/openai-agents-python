@@ -186,6 +186,10 @@ class RealtimeModel(abc.ABC):
         """
         return False
 
+    def _retire_response_audio(self, response_id: str) -> None:
+        """Release model-owned response audio indexes after session guardrails settle."""
+        return None
+
     @abc.abstractmethod
     async def close(self) -> None:
         """Close the session."""
