@@ -12,6 +12,25 @@ If you need to configure a specific agent or run instead, start with:
 -   [Models](models/index.md) for model selection and provider configuration.
 -   [Tracing](tracing.md) for per-run tracing metadata and custom trace processors.
 
+## Configuration objects and dictionaries
+
+SDK-owned configuration parameters generally accept either their typed settings object or a dictionary containing the same fields. This applies across agent, run, model, session, sandbox, and voice configuration boundaries whose type annotations include a dictionary. Nested SDK-owned settings can also use dictionaries.
+
+```python
+from agents import Agent
+
+agent = Agent(
+    name="Assistant",
+    model="gpt-5.6-sol",
+    model_settings={
+        "reasoning": {"effort": "high"},
+        "verbosity": "low",
+    },
+)
+```
+
+The SDK normalizes these dictionaries into the corresponding settings objects. Unknown fields in SDK-owned dataclass configurations raise `TypeError`, which helps catch misspelled option names early. Check the parameter's type annotation or API reference to confirm whether a specific boundary accepts a dictionary.
+
 ## API keys and clients
 
 By default, the SDK uses the `OPENAI_API_KEY` environment variable for LLM requests and tracing. The key is resolved when the SDK first creates an OpenAI client (lazy initialization), so set the environment variable before your first model call. If you are unable to set that environment variable before your app starts, you can use the [set_default_openai_key()][agents.set_default_openai_key] function to set the key.
@@ -182,9 +201,9 @@ logger.setLevel(logging.WARNING)
 logger.addHandler(logging.StreamHandler())
 ```
 
-### Sensitive data in logs
+### Sensitive data in logs and diagnostics
 
-Certain logs may contain sensitive data (for example, user data).
+Certain logs and diagnostic exceptions may contain sensitive data (for example, model or tool inputs and outputs).
 
 By default, the SDK does **not** log LLM inputs/outputs or tool inputs/outputs. These protections are controlled by:
 
@@ -199,3 +218,5 @@ If you need to include this data temporarily for debugging, set either variable 
 export OPENAI_AGENTS_DONT_LOG_MODEL_DATA=0
 export OPENAI_AGENTS_DONT_LOG_TOOL_DATA=0
 ```
+
+These flags also control whether affected failures retain payload-bearing diagnostic details. For example, with tool-data redaction enabled, invalid function-tool arguments raise a generic `ModelBehaviorError` without chaining the underlying validation error. Setting either variable to `0` can expose raw model or tool data in logs, exception messages, exception chains, and other diagnostic context, so enable it only in a controlled development environment.
