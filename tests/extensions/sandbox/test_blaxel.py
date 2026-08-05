@@ -2747,6 +2747,7 @@ class TestFinalCoverageGaps:
     @pytest.mark.asyncio
     async def test_prune_returns_none_when_no_pid(self, fake_sandbox: _FakeSandboxInstance) -> None:
         """Cover line 819: prune returns None when process_id_to_prune_from_meta returns None."""
+        from agents.extensions.sandbox.blaxel import sandbox as blaxel_sandbox
         from agents.extensions.sandbox.blaxel.sandbox import _BlaxelPtySessionEntry
         from agents.sandbox.session.pty_types import PTY_PROCESSES_MAX
 
@@ -2762,10 +2763,7 @@ class TestFinalCoverageGaps:
             session._pty_sessions[i + 300] = entry
             session._reserved_pty_process_ids.add(i + 300)
 
-        with patch(
-            "agents.extensions.sandbox.blaxel.sandbox.process_id_to_prune_from_meta",
-            return_value=None,
-        ):
+        with patch.object(blaxel_sandbox, "process_id_to_prune_from_meta", return_value=None):
             result = session._prune_pty_sessions_if_needed()
             assert result is None
 
