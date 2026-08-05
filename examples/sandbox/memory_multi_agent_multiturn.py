@@ -112,7 +112,6 @@ def _build_gtm_agent(*, model: str, manifest: Manifest) -> SandboxAgent:
             ),
             Filesystem(),
             Shell(),
-            Filesystem(),
         ],
     )
 
