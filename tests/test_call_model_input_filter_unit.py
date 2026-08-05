@@ -1,20 +1,15 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 from typing import Any
 
 import pytest
 from openai.types.responses import ResponseOutputMessage, ResponseOutputText
 
-# Make the repository tests helpers importable from this unit test
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tests"))
-from fake_model import FakeModel  # type: ignore
-
 # Import directly from submodules to avoid heavy __init__ side effects
 from agents.agent import Agent
 from agents.exceptions import UserError
 from agents.run import CallModelData, ModelInputData, RunConfig, Runner
+from tests.fake_model import FakeModel
 
 
 @pytest.mark.asyncio
