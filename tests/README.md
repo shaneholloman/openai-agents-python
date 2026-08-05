@@ -8,7 +8,7 @@ Before running any tests, make sure you have `uv` installed (and ideally run `ma
 make tests
 ```
 
-`make tests` runs the shard-safe suite in parallel and then runs tests marked `serial` in a separate serial pass.
+`make tests` runs the shard-safe suite first, then runs the tests marked `serial` after all xdist workers have exited. The serial runner limits collection to test files containing the literal `pytest.mark.serial`, so keep that literal marker in every file containing serial tests. For indirect or custom serial marker spellings, use `uv run pytest -m serial` to perform generic pytest collection.
 
 ## Performance and determinism
 

@@ -41,7 +41,8 @@ typecheck:
 	trap - EXIT
 
 .PHONY: tests
-tests: tests-parallel tests-serial
+tests: tests-parallel
+	$(MAKE) tests-serial
 
 .PHONY: tests-asyncio-stability
 tests-asyncio-stability:
@@ -53,7 +54,7 @@ tests-parallel:
 
 .PHONY: tests-serial
 tests-serial:
-	uv run pytest -m serial
+	uv run python .github/scripts/run_serial_tests.py
 
 .PHONY: integration-tests
 integration-tests:
