@@ -14,9 +14,13 @@ from .exceptions import (
     AgentsException,
     InputGuardrailTripwireTriggered,
     MaxTurnsExceeded,
+    ModelBehaviorError,
     OutputGuardrailTripwireTriggered,
     RunErrorDetails,
     UserError,
+    _clear_data_redacted_error_traceback,
+    _detach_data_redacted_error_traceback,
+    _is_error_data_redacted,
 )
 from .guardrail import (
     InputGuardrailResult,
@@ -276,19 +280,40 @@ class Runner:
         """
 
         runner = DEFAULT_AGENT_RUNNER
-        return await runner.run(
-            starting_agent,
-            input,
-            context=context,
-            max_turns=max_turns,
-            hooks=hooks,
-            run_config=run_config,
-            error_handlers=error_handlers,
-            previous_response_id=previous_response_id,
-            auto_previous_response_id=auto_previous_response_id,
-            conversation_id=conversation_id,
-            session=session,
-        )
+        redacted_error: AgentsException | None = None
+        try:
+            return await runner.run(
+                starting_agent,
+                input,
+                context=context,
+                max_turns=max_turns,
+                hooks=hooks,
+                run_config=run_config,
+                error_handlers=error_handlers,
+                previous_response_id=previous_response_id,
+                auto_previous_response_id=auto_previous_response_id,
+                conversation_id=conversation_id,
+                session=session,
+            )
+        except AgentsException as error:
+            if not _is_error_data_redacted(error):
+                raise
+            _detach_data_redacted_error_traceback(error)
+            redacted_error = error
+
+        starting_agent = cast(Any, None)
+        input = cast(Any, None)
+        context = cast(Any, None)
+        hooks = cast(Any, None)
+        run_config = cast(Any, None)
+        error_handlers = cast(Any, None)
+        previous_response_id = None
+        auto_previous_response_id = cast(Any, None)
+        conversation_id = None
+        session = cast(Any, None)
+        runner = cast(Any, None)
+        assert redacted_error is not None
+        raise redacted_error from None
 
     @classmethod
     def run_sync(
@@ -358,19 +383,40 @@ class Runner:
         """
 
         runner = DEFAULT_AGENT_RUNNER
-        return runner.run_sync(
-            starting_agent,
-            input,
-            context=context,
-            max_turns=max_turns,
-            hooks=hooks,
-            run_config=run_config,
-            error_handlers=error_handlers,
-            previous_response_id=previous_response_id,
-            conversation_id=conversation_id,
-            session=session,
-            auto_previous_response_id=auto_previous_response_id,
-        )
+        redacted_error: AgentsException | None = None
+        try:
+            return runner.run_sync(
+                starting_agent,
+                input,
+                context=context,
+                max_turns=max_turns,
+                hooks=hooks,
+                run_config=run_config,
+                error_handlers=error_handlers,
+                previous_response_id=previous_response_id,
+                conversation_id=conversation_id,
+                session=session,
+                auto_previous_response_id=auto_previous_response_id,
+            )
+        except AgentsException as error:
+            if not _is_error_data_redacted(error):
+                raise
+            _detach_data_redacted_error_traceback(error)
+            redacted_error = error
+
+        starting_agent = cast(Any, None)
+        input = cast(Any, None)
+        context = cast(Any, None)
+        hooks = cast(Any, None)
+        run_config = cast(Any, None)
+        error_handlers = cast(Any, None)
+        previous_response_id = None
+        auto_previous_response_id = cast(Any, None)
+        conversation_id = None
+        session = cast(Any, None)
+        runner = cast(Any, None)
+        assert redacted_error is not None
+        raise redacted_error from None
 
     @classmethod
     def run_streamed(
@@ -1643,17 +1689,21 @@ class AgentRunner:
                     trace_include_sensitive_data=run_config.trace_include_sensitive_data,
                 )
                 if isinstance(exc, AgentsException):
-                    exc.run_data = RunErrorDetails(
-                        input=original_input,
-                        new_items=session_items,
-                        raw_responses=model_responses,
-                        last_agent=current_agent,
-                        context_wrapper=context_wrapper,
-                        input_guardrail_results=input_guardrail_results,
-                        output_guardrail_results=output_guardrail_results,
-                        tool_input_guardrail_results=tool_input_guardrail_results,
-                        tool_output_guardrail_results=tool_output_guardrail_results,
-                    )
+                    if _is_error_data_redacted(exc):
+                        _detach_data_redacted_error_traceback(exc)
+                    else:
+                        _clear_data_redacted_error_traceback(exc)
+                        exc.run_data = RunErrorDetails(
+                            input=original_input,
+                            new_items=session_items,
+                            raw_responses=model_responses,
+                            last_agent=current_agent,
+                            context_wrapper=context_wrapper,
+                            input_guardrail_results=input_guardrail_results,
+                            output_guardrail_results=output_guardrail_results,
+                            tool_input_guardrail_results=tool_input_guardrail_results,
+                            tool_output_guardrail_results=tool_output_guardrail_results,
+                        )
                 raise
             finally:
                 await cleanup_models_after_run(tool_use_tracker)
@@ -1778,13 +1828,15 @@ class AgentRunner:
         try:
             # Drive the coroutine to completion, harvesting the final RunResult.
             return default_loop.run_until_complete(task)
-        except BaseException:
+        except BaseException as error:
             # If the sync caller aborts (KeyboardInterrupt, etc.), make sure the scheduled task
             # does not linger on the shared loop by cancelling it and waiting for completion.
             if not task.done():
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     default_loop.run_until_complete(task)
+            if isinstance(error, ModelBehaviorError):
+                _detach_data_redacted_error_traceback(error)
             raise
         finally:
             if not default_loop.is_closed():
