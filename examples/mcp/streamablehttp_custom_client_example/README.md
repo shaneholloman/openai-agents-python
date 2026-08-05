@@ -1,5 +1,7 @@
 # Custom HTTP Client Factory Example
 
+This repository example targets MCP Python SDK v2 and `httpx2`, and is intended to run with the repository's locked development environment. The Agents SDK client itself supports MCP v1 with `httpx` and MCP v2 with `httpx2`.
+
 This example demonstrates how to use the new `httpx_client_factory` parameter in `MCPServerStreamableHttp` to configure custom HTTP client behavior for MCP StreamableHTTP connections.
 
 ## Features Demonstrated
@@ -25,13 +27,13 @@ This example demonstrates how to use the new `httpx_client_factory` parameter in
 ### Basic Custom Client
 
 ```python
-import httpx
+import httpx2
 from agents.mcp import MCPServerStreamableHttp
 
-def create_custom_http_client() -> httpx.AsyncClient:
-    return httpx.AsyncClient(
+def create_custom_http_client() -> httpx2.AsyncClient:
+    return httpx2.AsyncClient(
         verify=False,  # Disable SSL verification for testing
-        timeout=httpx.Timeout(60.0, read=120.0),
+        timeout=httpx2.Timeout(60.0, read=120.0),
         headers={"X-Custom-Client": "my-app"},
     )
 
