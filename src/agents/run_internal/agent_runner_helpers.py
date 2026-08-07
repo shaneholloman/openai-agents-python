@@ -283,8 +283,28 @@ def resolve_resumed_context(
     run_state: RunState[TContext],
     context: RunContextWrapper[TContext] | TContext | None,
 ) -> RunContextWrapper[TContext]:
-    """Return the context wrapper for a resumed run, overriding when provided."""
+    """Return the context wrapper for a resumed run, overriding when provided.
+
+    When an override is supplied, the restored ``RunContextWrapper`` stays
+    authoritative. Only its application ``context`` value is replaced so
+    run-owned wrapper state (approvals, usage, turn input, tool input, ...)
+    survives the override instead of being dropped by a fresh wrapper.
+    Nested ``Agent.as_tool()`` resumes should pass the parent application
+    context into ``Runner.run`` / ``Runner.run_streamed`` so this same path
+    applies there.
+    """
     if context is not None:
+        existing_context = run_state._context
+        if existing_context is not None:
+            application_context = (
+                context.context if isinstance(context, RunContextWrapper) else context
+            )
+            if existing_context is not context:
+                existing_context.context = application_context
+            set_agent_tool_state_scope(existing_context, run_state._agent_tool_state_scope_id)
+            run_state._context = existing_context
+            return existing_context
+
         context_wrapper = ensure_context_wrapper(context)
         set_agent_tool_state_scope(context_wrapper, run_state._agent_tool_state_scope_id)
         run_state._context = context_wrapper
