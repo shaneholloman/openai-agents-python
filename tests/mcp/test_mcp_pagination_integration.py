@@ -13,6 +13,7 @@ from ..fake_model import FakeModel
 from ..test_responses import get_function_tool_call, get_text_message
 
 PAGINATED_SERVER_PATH = Path(__file__).parent / "servers" / "paginated.py"
+pytestmark = pytest.mark.review_optional
 
 
 def create_paginated_server() -> MCPServerStdio:

@@ -10,6 +10,12 @@ make tests
 
 `make tests` runs the shard-safe suite first with pytest-xdist using up to nine workers, then runs the tests marked `serial` after all xdist workers have exited. Set `PYTEST_XDIST_AUTO_NUM_WORKERS` to a positive integer to override the automatic worker count and cap. The serial runner limits collection to test files containing the literal `pytest.mark.serial`, so keep that literal marker in every file containing serial tests. For indirect or custom serial marker spellings, use `uv run pytest -m serial` to perform generic pytest collection.
 
+The `serial` marker means that a test needs exclusive execution after every xdist worker exits, not merely ordered execution within one worker. Use it for shared external resources, process-wide state, or timing-sensitive lifecycle tests that have demonstrated interference under xdist. Tests that use their own subprocess, random port, or temporary directory do not need `serial` solely for that reason; prove them under xdist instead.
+
+`make tests-review` omits tests marked `review_optional`. These are slow subsystem-specific integration, subprocess, or multiprocessing checks that remain mandatory in the final `make tests` verification. Use the review target only as a preliminary check during an iterative implementation review when the task-owned paths do not affect any marked test or its owning subsystem. Inspect the current owners with `rg -n "review_optional" tests` when deciding; if the boundary is uncertain, run `make tests`.
+
+Choose review-round coverage by impact. For a leaf subsystem change, run `make tests-review` plus the owning subsystem's complete test file or directory without a marker filter, so its `review_optional` cases are restored. For cross-cutting runtime changes such as runner orchestration, agent or item flow, shared persistence, or test infrastructure, run `make tests` during review. Prefer the full suite whenever the affected boundary is ambiguous. This selection changes only iterative feedback; the final verification always runs `make tests`.
+
 `make typecheck` runs mypy and pyright concurrently. Pyright uses four analysis threads by default; set `PYRIGHT_THREADS` to a positive integer to override the local thread count. The speedup does not remove either analyzer or narrow its selected project or source scope.
 
 ## Performance and determinism

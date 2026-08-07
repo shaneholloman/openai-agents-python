@@ -1325,6 +1325,7 @@ async def test_legacy_destructive_noops_leave_database_unlocked(tmp_path: Path, 
 
 @pytest.mark.parametrize("branch_name", [None, "shared_branch"])
 @pytest.mark.parametrize("turn_number", [1, 3])
+@pytest.mark.review_optional
 async def test_branch_allocation_is_serialized_across_processes(
     tmp_path: Path, branch_name: str | None, turn_number: int
 ):
@@ -3084,6 +3085,7 @@ async def test_pop_item_uses_branch_snapshot_when_branch_switches_concurrently()
         session.close()
 
 
+@pytest.mark.review_optional
 async def test_pop_item_claim_is_unique_across_processes(tmp_path: Path):
     """Two processes must not return the same destructively read item."""
     db_path = tmp_path / "advanced_pop_processes.db"

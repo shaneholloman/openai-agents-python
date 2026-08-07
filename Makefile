@@ -48,6 +48,10 @@ typecheck-src:
 tests: tests-parallel
 	$(MAKE) tests-serial
 
+.PHONY: tests-review
+tests-review: tests-parallel-review
+	$(MAKE) tests-serial-review
+
 .PHONY: tests-asyncio-stability
 tests-asyncio-stability:
 	bash .github/scripts/run-asyncio-teardown-stability.sh
@@ -56,9 +60,17 @@ tests-asyncio-stability:
 tests-parallel:
 	uv run pytest -n "$${PYTEST_XDIST_AUTO_NUM_WORKERS:-auto}" $(if $(PYTEST_XDIST_AUTO_NUM_WORKERS),,--maxprocesses=9) --dist worksteal -m "not serial"
 
+.PHONY: tests-parallel-review
+tests-parallel-review:
+	uv run pytest -n "$${PYTEST_XDIST_AUTO_NUM_WORKERS:-auto}" $(if $(PYTEST_XDIST_AUTO_NUM_WORKERS),,--maxprocesses=9) --dist worksteal -m "not serial and not review_optional"
+
 .PHONY: tests-serial
 tests-serial:
 	uv run python .github/scripts/run_serial_tests.py
+
+.PHONY: tests-serial-review
+tests-serial-review:
+	uv run python .github/scripts/run_serial_tests.py --exclude-review-optional
 
 .PHONY: integration-tests
 integration-tests:

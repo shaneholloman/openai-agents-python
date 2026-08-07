@@ -7,8 +7,11 @@ import sys
 from pathlib import Path
 from typing import cast
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src"
+pytestmark = pytest.mark.review_optional
 
 
 def _run_python(script: str) -> dict[str, object]:

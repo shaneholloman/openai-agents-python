@@ -613,6 +613,7 @@ def test_batch_trace_processor_shutdown_without_timeout_preserves_export_retries
 
 
 @pytest.mark.serial
+@pytest.mark.review_optional
 def test_tracing_atexit_cleanup_timeout_preserves_process_exit_code_on_504() -> None:
     script = textwrap.dedent(
         """

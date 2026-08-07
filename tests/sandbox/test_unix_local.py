@@ -73,6 +73,7 @@ async def test_unix_local_rejects_host_path_before_creating_workspace(
         )
 
 
+@pytest.mark.review_optional
 class TestUnixLocalPty:
     @pytest.mark.asyncio
     async def test_tty_fd_close_is_owned_without_blocking_termination(

@@ -35,16 +35,6 @@ if shutil.which("docker") is None:
         "Docker executable is not available; skipping Dapr integration tests",
         allow_module_level=True,
     )
-try:
-    client = docker.from_env()
-    client.ping()
-except DockerException:
-    pytest.skip(
-        "Docker daemon is not available; skipping Dapr integration tests", allow_module_level=True
-    )
-else:
-    client.close()
-
 from testcontainers.core.container import DockerContainer  # type: ignore[import-untyped]
 from testcontainers.core.network import Network  # type: ignore[import-untyped]
 from testcontainers.core.waiting_utils import wait_for_logs  # type: ignore[import-untyped]
@@ -58,8 +48,22 @@ from agents.extensions.memory import (
 from tests.fake_model import FakeModel
 from tests.test_responses import get_text_message
 
-# Docker-backed integration tests should stay on the serial test path.
-pytestmark = [pytest.mark.asyncio, pytest.mark.serial]
+# Docker-backed integration tests should stay on the exclusive serial test path.
+pytestmark = [pytest.mark.asyncio, pytest.mark.review_optional, pytest.mark.serial]
+
+
+@pytest.fixture(scope="module", autouse=True)
+def require_docker_daemon():
+    """Skip the selected Dapr tests when the Docker daemon is unavailable."""
+    client = None
+    try:
+        client = docker.from_env()
+        client.ping()
+    except DockerException:
+        pytest.skip("Docker daemon is not available; skipping Dapr integration tests")
+    finally:
+        if client is not None:
+            client.close()
 
 
 def wait_for_dapr_health(host: str, port: int, timeout: int = 60) -> bool:

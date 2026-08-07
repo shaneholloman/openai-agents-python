@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import fnmatch
 import os
 import sys
@@ -26,20 +27,26 @@ def _relative(path: Path) -> str:
     return str(path.relative_to(ROOT))
 
 
-def _serial_args() -> list[str]:
+def _serial_args(*, marker_expression: str = "serial") -> list[str]:
     return [
         sys.executable,
         "-m",
         "pytest",
         *(_relative(path) for path in _serial_test_files()),
         "-m",
-        "serial",
+        marker_expression,
     ]
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--exclude-review-optional", action="store_true")
+    args = parser.parse_args()
     os.chdir(ROOT)
-    os.execv(sys.executable, _serial_args())
+    marker_expression = (
+        "serial and not review_optional" if args.exclude_review_optional else "serial"
+    )
+    os.execv(sys.executable, _serial_args(marker_expression=marker_expression))
 
 
 if __name__ == "__main__":
