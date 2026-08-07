@@ -34,7 +34,7 @@ from openai.types.responses import (
     ResponseReasoningItem,
 )
 
-from agents import Agent, Runner, function_tool
+from agents import Agent, Runner, function_tool, trace
 from agents.exceptions import ModelBehaviorError, UserError
 from agents.model_settings import ModelSettings
 from agents.models.chatcmpl_converter import Converter
@@ -50,6 +50,7 @@ from agents.models.chatcmpl_stream_handler import (
 from agents.models.interface import ModelTracing
 from agents.models.openai_chatcompletions import OpenAIChatCompletionsModel
 from agents.models.openai_provider import OpenAIProvider
+from tests.testing_processor import fetch_ordered_spans
 from tests.utils.simple_session import SimpleListSession
 
 
@@ -3916,3 +3917,158 @@ async def test_stream_handler_drops_citations_reported_before_any_text() -> None
     message = cast(ResponseOutputMessage, completed.response.output[0])
     assert len(message.content) == 1
     assert cast(ResponseOutputText, message.content[0]).text == "It will rain tomorrow."
+
+
+def _usageless_stream_patch(usage: CompletionUsage | None = None):
+    """Patch `_fetch_response` with a stream whose only chunk carries `usage`."""
+    chunk = ChatCompletionChunk(
+        id="chunk-id",
+        created=1,
+        model="fake",
+        object="chat.completion.chunk",
+        choices=[Choice(index=0, delta=ChoiceDelta(content="Hello"))],
+        usage=usage,
+    )
+
+    async def fake_stream() -> AsyncIterator[ChatCompletionChunk]:
+        yield chunk
+
+    async def patched_fetch_response(self, *args, **kwargs):
+        resp = Response(
+            id="resp-id",
+            created_at=0,
+            model="fake-model",
+            object="response",
+            output=[],
+            tool_choice="none",
+            tools=[],
+            parallel_tool_calls=False,
+        )
+        return resp, fake_stream()
+
+    return patched_fetch_response
+
+
+@pytest.mark.allow_call_model_methods
+@pytest.mark.asyncio
+async def test_streamed_run_counts_request_when_provider_omits_usage(monkeypatch) -> None:
+    """A stream that never carries a usage chunk still made a request.
+
+    Providers without `stream_options.include_usage` finish the stream with no usage payload.
+    The run must still report the request, while token counts stay at zero because the
+    provider genuinely did not report them.
+    """
+    monkeypatch.setattr(
+        OpenAIChatCompletionsModel, "_fetch_response", _usageless_stream_patch(usage=None)
+    )
+    agent = Agent(name="test", model=OpenAIProvider(use_responses=False).get_model("gpt-4"))
+
+    result = Runner.run_streamed(agent, "hi")
+    completed: ResponseCompletedEvent | None = None
+    async for event in result.stream_events():
+        raw = getattr(event, "data", None)
+        if isinstance(raw, ResponseCompletedEvent):
+            completed = raw
+
+    assert result.context_wrapper.usage.requests == 1
+    assert result.context_wrapper.usage.total_tokens == 0
+    # No usage payload is synthesized, so nothing reports token counts that never arrived.
+    assert completed is not None
+    assert completed.response.usage is None
+
+
+@pytest.mark.allow_call_model_methods
+@pytest.mark.asyncio
+async def test_streamed_run_does_not_double_count_when_usage_is_present(monkeypatch) -> None:
+    """The usage-less path must not add a second request when usage did arrive."""
+    monkeypatch.setattr(
+        OpenAIChatCompletionsModel,
+        "_fetch_response",
+        _usageless_stream_patch(
+            usage=CompletionUsage(completion_tokens=5, prompt_tokens=7, total_tokens=12)
+        ),
+    )
+    agent = Agent(name="test", model=OpenAIProvider(use_responses=False).get_model("gpt-4"))
+
+    result = Runner.run_streamed(agent, "hi")
+    async for _ in result.stream_events():
+        pass
+
+    assert result.context_wrapper.usage.requests == 1
+    assert result.context_wrapper.usage.total_tokens == 12
+
+
+@pytest.mark.allow_call_model_methods
+@pytest.mark.asyncio
+async def test_streamed_span_records_the_request_when_provider_omits_usage(monkeypatch) -> None:
+    """Streamed tracing must record the request the same way the non-streaming path does.
+
+    Non-streaming writes a span usage object with `requests: 1` when the provider reports no
+    usage. Streaming used to omit span usage entirely, so the run reported one request while
+    the model span showed none.
+    """
+    monkeypatch.setattr(
+        OpenAIChatCompletionsModel, "_fetch_response", _usageless_stream_patch(usage=None)
+    )
+    model = OpenAIProvider(use_responses=False).get_model("gpt-4")
+
+    with trace(workflow_name="test"):
+        async for _ in model.stream_response(
+            system_instructions=None,
+            input="",
+            model_settings=ModelSettings(),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=ModelTracing.ENABLED,
+            previous_response_id=None,
+            conversation_id=None,
+            prompt=None,
+        ):
+            pass
+
+    spans = fetch_ordered_spans()
+    generation = next(s for s in spans if s.span_data.type == "generation")
+    assert generation.span_data.usage is not None
+    assert generation.span_data.usage["requests"] == 1
+    # The provider reported no tokens, so every total stays at zero.
+    assert generation.span_data.usage["total_tokens"] == 0
+
+
+@pytest.mark.allow_call_model_methods
+@pytest.mark.asyncio
+async def test_stream_span_is_recorded_for_a_consumer_that_stops_at_the_terminal_event(
+    monkeypatch,
+) -> None:
+    """A caller that stops at `response.completed` closes the generator.
+
+    Anything recorded only after the yield loop never runs for such a consumer, so the span
+    has to be populated before the terminal event is handed out.
+    """
+    monkeypatch.setattr(
+        OpenAIChatCompletionsModel, "_fetch_response", _usageless_stream_patch(usage=None)
+    )
+    model = OpenAIProvider(use_responses=False).get_model("gpt-4")
+
+    with trace(workflow_name="test"):
+        stream = model.stream_response(
+            system_instructions=None,
+            input="",
+            model_settings=ModelSettings(),
+            tools=[],
+            output_schema=None,
+            handoffs=[],
+            tracing=ModelTracing.ENABLED,
+            previous_response_id=None,
+            conversation_id=None,
+            prompt=None,
+        )
+        stream_agen = cast(Any, stream)
+        async for event in stream_agen:
+            if event.type == "response.completed":
+                break  # stop consuming, as a caller watching for the terminal event would
+        await stream_agen.aclose()
+
+    generation = next(s for s in fetch_ordered_spans() if s.span_data.type == "generation")
+    assert generation.span_data.usage is not None
+    assert generation.span_data.usage["requests"] == 1

@@ -56,7 +56,11 @@ from ...usage import (
     Usage,
     _attach_raw_usage_snapshot,
     _extract_raw_usage_snapshot,
+    _mark_request_completed_without_usage,
     _raw_usage_snapshot,
+    _requests_for_response_without_usage,
+    _response_usage_to_usage,
+    model_usage_to_span_usage,
 )
 from ...util._error_tracing import model_span_errors, record_model_error_on_span
 from ...util._json import _to_dump_compatible
@@ -416,8 +420,11 @@ class AnyLLMModel(Model):
                     output_tokens_details=response.usage.output_tokens_details,
                 )
                 if response.usage
-                else Usage()
+                # The request completed, so it counts even when the provider omits usage.
+                else Usage(requests=1)
             )
+
+            span_response.span_data.usage = model_usage_to_span_usage(usage)
 
             if tracing.include_data():
                 span_response.span_data.response = response
@@ -481,6 +488,11 @@ class AnyLLMModel(Model):
                         final_response = chunk.response
                         if model_settings.preserve_raw_usage is True:
                             _attach_raw_usage_snapshot(chunk.response, chunk.response.usage)
+                        if final_response.usage is None:
+                            # Match the non-streaming path: the request happened even though
+                            # the provider reported no usage. Recorded without synthesizing a
+                            # usage payload, so tokens are not reported as real zeros.
+                            _mark_request_completed_without_usage(final_response)
                     elif chunk_type in {"response.failed", "response.incomplete"}:
                         terminal_response = getattr(chunk, "response", None)
                         terminal_failure_error = response_terminal_failure_error(
@@ -502,6 +514,14 @@ class AnyLLMModel(Model):
                         yielded_terminal_event = True
                         # Populate the span before yielding the terminal event so a consumer
                         # that stops there still leaves a fully recorded span.
+                        if final_response is not None:
+                            span_response.span_data.usage = model_usage_to_span_usage(
+                                _response_usage_to_usage(final_response.usage)
+                                if final_response.usage
+                                else Usage(
+                                    requests=_requests_for_response_without_usage(final_response)
+                                )
+                            )
                         if tracing.include_data() and final_response:
                             span_response.span_data.response = final_response
                             span_response.span_data.input = input
@@ -607,7 +627,8 @@ class AnyLLMModel(Model):
                     output_tokens_details=response.usage.completion_tokens_details,  # type: ignore[arg-type]
                 )
                 if response.usage
-                else Usage()
+                # The request completed, so it counts even when the provider omits usage.
+                else Usage(requests=1)
             )
 
             # Some providers signal a filtered non-streaming completion only through
@@ -783,6 +804,10 @@ class AnyLLMModel(Model):
                     else {"reasoning_tokens": 0}
                 ),
             }
+        elif _requests_for_response_without_usage(final_response):
+            # Keep streamed tracing aligned with the non-streaming path, which records the
+            # request even when the provider reports no usage.
+            span_generation.span_data.usage = model_usage_to_span_usage(Usage(requests=1))
 
     @overload
     async def _fetch_chat_response(

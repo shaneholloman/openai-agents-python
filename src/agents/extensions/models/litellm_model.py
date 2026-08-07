@@ -58,7 +58,13 @@ from ...tool import Tool
 from ...tracing import generation_span
 from ...tracing.span_data import GenerationSpanData
 from ...tracing.spans import Span
-from ...usage import Usage, _cache_write_tokens, _make_input_tokens_details
+from ...usage import (
+    Usage,
+    _cache_write_tokens,
+    _make_input_tokens_details,
+    _requests_for_response_without_usage,
+    model_usage_to_span_usage,
+)
 from ...util._error_tracing import model_span_errors
 from ...util._json import _to_dump_compatible
 
@@ -289,10 +295,11 @@ class LitellmModel(Model):
                         ),
                     )
                     if response.usage
-                    else Usage()
+                    # The request completed, so it counts even when the provider omits usage.
+                    else Usage(requests=1)
                 )
             else:
-                usage = Usage()
+                usage = Usage(requests=1)
                 logger.warning("No usage information returned from Litellm")
 
             if tracing.include_data():
@@ -424,6 +431,12 @@ class LitellmModel(Model):
                     if chunk.type == "response.completed":
                         final_response = chunk.response
                         yielded_terminal_event = True
+                        # Populate the span before yielding, because a caller that stops
+                        # consuming at the terminal event closes this generator and never
+                        # resumes it, which would leave the span without usage.
+                        self._populate_stream_generation_span(
+                            span_generation, final_response, tracing
+                        )
 
                     yield chunk
             except asyncio.CancelledError:
@@ -444,26 +457,36 @@ class LitellmModel(Model):
                         else:
                             raise
 
-            if tracing.include_data() and final_response:
-                span_generation.span_data.output = [final_response.model_dump()]
+    @staticmethod
+    def _populate_stream_generation_span(
+        span_generation: Span[GenerationSpanData],
+        final_response: Response,
+        tracing: ModelTracing,
+    ) -> None:
+        if tracing.include_data():
+            span_generation.span_data.output = [final_response.model_dump()]
 
-            if final_response and final_response.usage:
-                span_generation.span_data.usage = {
-                    "requests": 1,
-                    "input_tokens": final_response.usage.input_tokens,
-                    "output_tokens": final_response.usage.output_tokens,
-                    "total_tokens": final_response.usage.total_tokens,
-                    "input_tokens_details": (
-                        final_response.usage.input_tokens_details.model_dump()
-                        if final_response.usage.input_tokens_details
-                        else {"cached_tokens": 0, "cache_write_tokens": 0}
-                    ),
-                    "output_tokens_details": (
-                        final_response.usage.output_tokens_details.model_dump()
-                        if final_response.usage.output_tokens_details
-                        else {"reasoning_tokens": 0}
-                    ),
-                }
+        if final_response.usage:
+            span_generation.span_data.usage = {
+                "requests": 1,
+                "input_tokens": final_response.usage.input_tokens,
+                "output_tokens": final_response.usage.output_tokens,
+                "total_tokens": final_response.usage.total_tokens,
+                "input_tokens_details": (
+                    final_response.usage.input_tokens_details.model_dump()
+                    if final_response.usage.input_tokens_details
+                    else {"cached_tokens": 0, "cache_write_tokens": 0}
+                ),
+                "output_tokens_details": (
+                    final_response.usage.output_tokens_details.model_dump()
+                    if final_response.usage.output_tokens_details
+                    else {"reasoning_tokens": 0}
+                ),
+            }
+        elif _requests_for_response_without_usage(final_response):
+            # Keep streamed tracing aligned with the non-streaming path, which records the
+            # request even when the provider reports no usage.
+            span_generation.span_data.usage = model_usage_to_span_usage(Usage(requests=1))
 
     @overload
     async def _fetch_response(
