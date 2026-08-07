@@ -40,7 +40,8 @@ class FakeDaprClient:
         """Get state from in-memory store."""
         response = Mock()
         response.data = self._state.get(key, b"")
-        response.etag = self._etags.get(key)
+        # The Dapr SDK reports a missing etag as an empty string rather than None.
+        response.etag = self._etags.get(key, "")
         return response
 
     async def save_state(
@@ -1327,3 +1328,263 @@ async def test_dapr_session_operation_waiting_behind_close_raises():
                 task.cancel()
                 with suppress(asyncio.CancelledError, RuntimeError):
                     await task
+
+
+async def test_add_items_preserves_created_at_metadata(
+    fake_dapr_client: FakeDaprClient, monkeypatch: pytest.MonkeyPatch
+):
+    """`created_at` must be set once and not overwritten by subsequent add_items calls."""
+    session = await _create_test_session(fake_dapr_client)
+
+    try:
+        monkeypatch.setattr("agents.extensions.memory.dapr_session.time.time", lambda: 1000.0)
+        await session.add_items([{"role": "user", "content": "first"}])
+        first = json.loads(fake_dapr_client._state[session._metadata_key].decode("utf-8"))
+        assert first["created_at"] == "1000"
+        assert first["updated_at"] == "1000"
+
+        monkeypatch.setattr("agents.extensions.memory.dapr_session.time.time", lambda: 2000.0)
+        await session.add_items([{"role": "user", "content": "second"}])
+        second = json.loads(fake_dapr_client._state[session._metadata_key].decode("utf-8"))
+        assert second["created_at"] == "1000"
+        assert second["updated_at"] == "2000"
+    finally:
+        await session.close()
+
+
+async def test_metadata_creation_does_not_request_first_write(
+    fake_dapr_client: FakeDaprClient, monkeypatch: pytest.MonkeyPatch
+):
+    """Creating the metadata key must not ask for first-write concurrency.
+
+    Dapr treats a write with no etag as last-write-wins even when first-write is requested,
+    so asking for it on the create would imply a guarantee the store does not provide. The
+    SDK reports a missing etag as an empty string, so this also pins that the empty value is
+    not mistaken for a real one.
+    """
+    session = await _create_test_session(fake_dapr_client, "metadata_create_concurrency")
+
+    try:
+        real_save = fake_dapr_client.save_state
+        seen: list[tuple[str | None, Any]] = []
+
+        async def record_metadata_saves(
+            store_name: str,
+            key: str,
+            value: str | bytes,
+            **kwargs: Any,
+        ) -> None:
+            if key == session._metadata_key:
+                seen.append(
+                    (kwargs.get("etag"), getattr(kwargs.get("options"), "concurrency", None))
+                )
+            await real_save(store_name, key, value, **kwargs)
+
+        monkeypatch.setattr(fake_dapr_client, "save_state", record_metadata_saves)
+
+        await session.add_items([{"role": "user", "content": "first"}])
+        assert len(seen) == 1
+        create_etag, create_concurrency = seen[0]
+        # No real etag existed, so no etag is sent and concurrency is left unspecified
+        # rather than first-write, which Dapr would ignore here anyway.
+        assert create_etag is None
+        assert getattr(create_concurrency, "name", None) == "unspecified"
+
+        await session.add_items([{"role": "user", "content": "second"}])
+        assert len(seen) == 2
+        update_etag, update_concurrency = seen[1]
+        # Metadata now exists, so the update is guarded by the etag that backed it.
+        assert update_etag is not None
+        assert getattr(update_concurrency, "name", None) == "first_write"
+    finally:
+        await session.close()
+
+
+async def test_stale_metadata_etag_retries_and_keeps_created_at(
+    fake_dapr_client: FakeDaprClient, monkeypatch: pytest.MonkeyPatch
+):
+    """A metadata save guarded by a stale etag must retry and keep the stored `created_at`.
+
+    Once the metadata key exists, every later append reads a real etag and saves against it.
+    A writer holding an etag that another append has already superseded is rejected, so it
+    re-reads and adopts the stored `created_at` rather than replacing it with its own `now`.
+
+    Dapr treats a write with no etag as last-write-wins even when first-write concurrency is
+    requested, so the create is deliberately not covered here. This is the guarantee the
+    store actually provides.
+    """
+    session_id = "shared_session_created_at_stale_etag"
+    first = await _create_test_session(fake_dapr_client, session_id=session_id)
+    second = await _create_test_session(fake_dapr_client, session_id=session_id)
+
+    try:
+        monkeypatch.setattr("agents.extensions.memory.dapr_session.time.time", lambda: 1000.0)
+        await first.add_items([{"role": "user", "content": "first"}])
+        created = json.loads(fake_dapr_client._state[first._metadata_key].decode("utf-8"))
+        assert created["created_at"] == "1000"
+        stale_etag = fake_dapr_client._etags[first._metadata_key]
+
+        # A second append supersedes that etag, so the value captured above is now stale but
+        # still non-null, which is the situation the guard is actually for.
+        monkeypatch.setattr("agents.extensions.memory.dapr_session.time.time", lambda: 1500.0)
+        await first.add_items([{"role": "user", "content": "second"}])
+        assert fake_dapr_client._etags[first._metadata_key] != stale_etag
+
+        real_read = second._read_created_at
+        calls = 0
+
+        async def read_stale_once() -> tuple[str | None, str | None]:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                # Pretend this writer read the metadata before the second append landed.
+                return "1000", stale_etag
+            return await real_read()
+
+        monkeypatch.setattr(second, "_read_created_at", read_stale_once)
+        monkeypatch.setattr("agents.extensions.memory.dapr_session.time.time", lambda: 2000.0)
+        await second.add_items([{"role": "user", "content": "third"}])
+
+        final = json.loads(fake_dapr_client._state[second._metadata_key].decode("utf-8"))
+        # The stale save is rejected, so the retry reads the stored value and keeps it.
+        assert final["created_at"] == "1000"
+        assert final["updated_at"] == "2000"
+        # Two reads means the conditional save actually rejected the stale one and retried.
+        assert calls == 2
+    finally:
+        await first.close()
+        await second.close()
+
+
+async def test_add_items_survives_metadata_write_giving_up(
+    fake_dapr_client: FakeDaprClient, monkeypatch: pytest.MonkeyPatch, caplog: Any
+):
+    """A metadata write that exhausts its retries must not fail an append that already landed.
+
+    The messages key is saved before the metadata key, so raising here would report failure for
+    items that are already in the session, and the natural retry of `add_items` would store the
+    same batch a second time.
+    """
+    import logging
+
+    session = await _create_test_session(fake_dapr_client, "metadata_gives_up")
+
+    try:
+        real_save = fake_dapr_client.save_state
+
+        async def fail_only_metadata_saves(
+            store_name: str,
+            key: str,
+            value: str | bytes,
+            **kwargs: Any,
+        ) -> None:
+            if key == session._metadata_key:
+                raise RuntimeError("etag mismatch")
+            await real_save(store_name, key, value, **kwargs)
+
+        monkeypatch.setattr(fake_dapr_client, "save_state", fail_only_metadata_saves)
+        monkeypatch.setattr(session, "_calculate_retry_delay", lambda attempt: 0.0)
+
+        with caplog.at_level(logging.WARNING):
+            await session.add_items([{"role": "user", "content": "kept"}])
+
+        items = await session.get_items()
+        assert [item.get("content") for item in items] == ["kept"]
+
+        warnings = [
+            record for record in caplog.records if "could not update" in record.getMessage()
+        ]
+        assert warnings
+        # Data logging is off by default, so neither the caller-supplied session id nor the
+        # provider error text may reach the record.
+        for record in warnings:
+            assert "metadata_gives_up" not in record.getMessage()
+            assert "etag mismatch" not in record.getMessage()
+    finally:
+        await session.close()
+
+
+@pytest.mark.parametrize(
+    ("dont_log_model_data", "dont_log_tool_data", "redacted"),
+    [
+        (True, False, True),
+        (False, True, True),
+        (False, False, False),
+    ],
+    ids=["model-redacted", "tool-redacted", "fully-diagnostic"],
+)
+async def test_metadata_write_warning_respects_data_policies(
+    fake_dapr_client: FakeDaprClient,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: Any,
+    dont_log_model_data: bool,
+    dont_log_tool_data: bool,
+    redacted: bool,
+):
+    """The give-up warning must obey both data policies, and never lose the committed items.
+
+    `log_model_and_tool_action_warning` redacts when either policy is on, so only the mode with
+    both off may carry the session id or the provider error. This inspects the whole LogRecord
+    rather than just the rendered message, because the session id travels in `extra` and the
+    exception travels in `exc_info`, neither of which shows up in `getMessage()`.
+    """
+    import logging
+
+    import agents._debug as _debug
+
+    session_id = f"metadata_policy_{dont_log_model_data}_{dont_log_tool_data}"
+    session = await _create_test_session(fake_dapr_client, session_id)
+
+    try:
+        monkeypatch.setattr(_debug, "DONT_LOG_MODEL_DATA", dont_log_model_data)
+        monkeypatch.setattr(_debug, "DONT_LOG_TOOL_DATA", dont_log_tool_data)
+
+        real_save = fake_dapr_client.save_state
+        error_text = "etag mismatch"
+
+        async def fail_only_metadata_saves(
+            store_name: str,
+            key: str,
+            value: str | bytes,
+            **kwargs: Any,
+        ) -> None:
+            if key == session._metadata_key:
+                raise RuntimeError(error_text)
+            await real_save(store_name, key, value, **kwargs)
+
+        monkeypatch.setattr(fake_dapr_client, "save_state", fail_only_metadata_saves)
+        monkeypatch.setattr(session, "_calculate_retry_delay", lambda attempt: 0.0)
+
+        with caplog.at_level(logging.WARNING):
+            await session.add_items([{"role": "user", "content": "kept"}])
+
+        # The append landed regardless of how the failure was logged.
+        items = await session.get_items()
+        assert [item.get("content") for item in items] == ["kept"]
+
+        records = [record for record in caplog.records if "could not update" in record.getMessage()]
+        assert len(records) == 1
+        record = records[0]
+        rendered = logging.Formatter().format(record)
+
+        if redacted:
+            # Redacted form is the bare message with no exception and no diagnostic context.
+            assert record.msg == "%s"
+            assert record.exc_info is None
+            assert record.exc_text is None
+            assert not hasattr(record, "openai_agents_diagnostic_context")
+            assert session_id not in rendered
+            assert error_text not in rendered
+            assert all(
+                session_id not in str(value) and error_text not in str(value)
+                for value in record.__dict__.values()
+            )
+        else:
+            # Diagnostic form carries the exception and the session id, by design.
+            assert record.msg == "%s: %s"
+            assert record.exc_info is not None
+            assert isinstance(record.exc_info[1], RuntimeError)
+            assert error_text in rendered
+            assert record.openai_agents_diagnostic_context == {"session_id": session_id}
+    finally:
+        await session.close()
