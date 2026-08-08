@@ -6,19 +6,25 @@ search:
 
 ## 前提条件
 
-Agents SDK の基本的な[クイックスタート手順](../quickstart.md)に従い、仮想環境をセットアップしていることを確認してください。次に、SDK のオプションの音声依存パッケージをインストールします。
+Agents SDKの基本的な[クイックスタート手順](../quickstart.md)に従い、仮想環境をセットアップしていることを確認してください。次に、SDK からオプションの音声依存関係をインストールします。
 
 ```bash
 pip install 'openai-agents[voice]'
 ```
 
-## 基本概念
+以下のデモコードでは、マイクとスピーカーの I/O に [`sounddevice`](https://pypi.org/project/sounddevice/) も使用します。これは `voice` extra には含まれていません。
 
-知っておくべき主要な概念は、3 ステップのプロセスである [`VoicePipeline`][agents.voice.pipeline.VoicePipeline] です。
+```bash
+pip install sounddevice
+```
 
-1. 音声テキスト変換モデルを実行し、音声をテキストに変換します。
-2. 通常はエージェント型ワークフローであるコードを実行し、結果を生成します。
-3. テキスト音声変換モデルを実行し、結果のテキストを音声に戻します。
+## 概念
+
+理解しておくべき主な概念は [`VoicePipeline`][agents.voice.pipeline.VoicePipeline] です。これは次の 3 ステップのプロセスです。
+
+1. 音声テキスト変換モデルを実行して、音声をテキストに変換します。
+2. 通常はエージェントワークフローであるコードを実行して、結果を生成します。
+3. テキスト音声変換モデルを実行して、結果のテキストを音声に戻します。
 
 ```mermaid
 graph LR
@@ -48,7 +54,7 @@ graph LR
 
 ## エージェント
 
-まず、いくつかのエージェントをセットアップします。この SDK でエージェントを構築した経験があれば、馴染みのある作業でしょう。ここでは、2 つのエージェント、1 つのハンドオフ、1 つのツールを用意します。
+まず、複数のエージェントをセットアップします。この SDK でエージェントを構築したことがあれば、見慣れた内容です。2 つのエージェント、設定済みのハンドオフ、ツールを 1 つ用意します。
 
 ```python
 import random
@@ -56,7 +62,6 @@ import random
 from agents import Agent
 from agents.decorators import tool
 from agents.extensions.handoff_prompt import prompt_with_handoff_instructions
-
 
 
 @tool
@@ -89,7 +94,7 @@ agent = Agent(
 
 ## 音声パイプライン
 
-ワークフローとして [`SingleAgentVoiceWorkflow`][agents.voice.workflow.SingleAgentVoiceWorkflow] を使用し、シンプルな音声パイプラインをセットアップします。
+ワークフローに [`SingleAgentVoiceWorkflow`][agents.voice.workflow.SingleAgentVoiceWorkflow] を使用して、シンプルな音声パイプラインをセットアップします。
 
 ```python
 from agents.voice import SingleAgentVoiceWorkflow, VoicePipeline
@@ -189,4 +194,4 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-この例を実行すると、エージェントが話しかけてきます！自分でエージェントに話しかけられるデモについては、[examples/voice/static](https://github.com/openai/openai-agents-python/tree/main/examples/voice/static) の例をご覧ください。
+このコード例を実行すると、エージェントが音声を生成し、実際に聞くことができます。自分でエージェントに話しかけられるデモについては、[examples/voice/static](https://github.com/openai/openai-agents-python/tree/main/examples/voice/static) のコード例をご覧ください。

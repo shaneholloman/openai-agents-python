@@ -4,51 +4,51 @@ search:
 ---
 # トレーシング
 
-Agents SDK にはトレーシングが組み込まれており、エージェントの実行中に発生するイベント（LLM 生成、ツール呼び出し、ハンドオフ、ガードレール、さらにはカスタムイベント）を包括的に記録します。[Traces ダッシュボード](https://platform.openai.com/traces)を使用すると、開発環境および本番環境でワークフローをデバッグ、可視化、監視できます。
+Agents SDKには組み込みのトレーシングが含まれており、エージェントの実行中に発生するイベント（LLM生成、ツール呼び出し、ハンドオフ、ガードレール、さらにはカスタムイベントまで）の包括的な記録を収集します。[トレースダッシュボード](https://platform.openai.com/traces)を使用すると、開発環境と本番環境でワークフローをデバッグ、可視化、監視できます。
 
 !!!note
 
-    トレーシングはデフォルトで有効です。一般的な次の 3 つの方法で無効にできます。
+    トレーシングはデフォルトで有効です。一般的な無効化方法は次の 3 つです：
 
-    1. 環境変数 `OPENAI_AGENTS_DISABLE_TRACING=1` を設定すると、トレーシングをグローバルに無効化できます
-    2. コード内で [`set_tracing_disabled(True)`][agents.set_tracing_disabled] を使用すると、トレーシングをグローバルに無効化できます
-    3. [`agents.run.RunConfig.tracing_disabled`][] を `True` に設定すると、単一の実行についてトレーシングを無効化できます
+    1. 環境変数 `OPENAI_AGENTS_DISABLE_TRACING=1` を設定して、トレーシングをグローバルに無効化できます
+    2. [`set_tracing_disabled(True)`][agents.set_tracing_disabled] を使用して、コード内でトレーシングをグローバルに無効化できます
+    3. [`agents.run.RunConfig.tracing_disabled`][] を `True` に設定して、単一の実行に対するトレーシングを無効化できます
 
-***OpenAI の API を使用し、Zero Data Retention（ZDR）ポリシーの下で運用している組織では、トレーシングを利用できません。***
+***Zero Data Retention (ZDR) ポリシーの下でOpenAIの API を使用する組織では、トレーシングを利用できません。***
 
 ## トレースとスパン
 
--   **トレース**は、「ワークフロー」における単一のエンドツーエンド操作を表します。トレースはスパンで構成され、次のプロパティがあります。
-    -   `workflow_name`: 論理的なワークフローまたはアプリです。たとえば、「コード生成」や「カスタマーサービス」です。
-    -   `trace_id`: トレースの一意な ID です。指定しない場合は自動生成されます。形式は `trace_<32_alphanumeric>` である必要があります。
-    -   `group_id`: 同じ会話の複数のトレースを関連付けるための、オプションのグループ ID です。たとえば、チャットスレッド ID を使用できます。
+-   **トレース**: 「ワークフロー」における単一のエンドツーエンド操作を表します。トレースは複数のスパンで構成されます。トレースには次のプロパティがあります：
+    -   `workflow_name`: 論理的なワークフローまたはアプリの名前です。たとえば、「コード生成」や「カスタマーサービス」です。
+    -   `trace_id`: トレースの一意な ID です。指定しなかった場合は自動的に生成されます。形式は `trace_<32_alphanumeric>` である必要があります。
+    -   `group_id`: 同じ会話の複数のトレースを関連付けるための任意のグループ ID です。たとえば、チャットスレッド ID を使用できます。
     -   `disabled`: True の場合、トレースは記録されません。
-    -   `metadata`: トレースのオプションのメタデータです。
--   **スパン**は、開始時刻と終了時刻を持つ操作を表します。スパンには次の情報があります。
-    -   `started_at` および `ended_at` のタイムスタンプ。
-    -   `trace_id`: スパンが属するトレースを表します
+    -   `metadata`: トレースの任意のメタデータです。
+-   **スパン**: 開始時刻と終了時刻を持つ操作を表します。スパンには次のものがあります：
+    -   `started_at` と `ended_at` のタイムスタンプ。
+    -   `trace_id`: 所属するトレースを表します
     -   `parent_id`: このスパンの親スパン（存在する場合）を指します
-    -   `span_data`: スパンに関する情報です。たとえば、`AgentSpanData` にはエージェントに関する情報が含まれ、`GenerationSpanData` には LLM 生成に関する情報が含まれます。
+    -   `span_data`: スパンに関する情報です。たとえば、`AgentSpanData` にはエージェントに関する情報が含まれ、`GenerationSpanData` にはLLM生成に関する情報が含まれます。
 
 ## デフォルトのトレーシング
 
-デフォルトでは、SDK は次の項目をトレースします。
+デフォルトでは、SDK は次の項目をトレースします：
 
 -   `Runner.{run, run_sync, run_streamed}()` 全体が `trace()` でラップされます。
--   各ランナー呼び出しが `task_span()` でラップされます。
--   各モデルターンが `turn_span()` でラップされます。
+-   Runner の各呼び出しが `task_span()` でラップされます。
+-   モデルの各ターンが `turn_span()` でラップされます。
 -   エージェントが実行されるたびに、`agent_span()` でラップされます
--   LLM 生成は `generation_span()` でラップされます
+-   LLM生成は `generation_span()` でラップされます
 -   各関数ツール呼び出しは `function_span()` でラップされます
 -   ガードレールは `guardrail_span()` でラップされます
 -   ハンドオフは `handoff_span()` でラップされます
 -   音声入力（音声テキスト変換）は `transcription_span()` でラップされます
 -   音声出力（テキスト音声変換）は `speech_span()` でラップされます
--   関連する音声スパンは `speech_group_span()` の配下に配置される場合があります
+-   SDK は、関連する音声スパンを `speech_group_span()` の子として配置する場合があります
 
-デフォルトでは、トレース名は「Agent workflow」です。`trace` を使用する場合はこの名前を設定できます。また、[`RunConfig`][agents.run.RunConfig] を使用して名前やその他のプロパティを設定することもできます。
+デフォルトでは、トレース名はリテラル文字列 `Agent workflow` です。`trace` を使用する場合はこの名前を設定できます。また、[`RunConfig`][agents.run.RunConfig] を使用して名前やその他のプロパティを設定できます。
 
-よりコンパクトな階層にする場合は、その実行についてタスクスパンとターンスパンの自動作成を無効にします。エージェント、生成、関数、ガードレール、ハンドオフ、カスタムの各スパンは引き続き記録されます。
+よりコンパクトな階層にする場合は、実行に対するタスクスパンとターンスパンの自動作成を無効にします。エージェント、生成、関数、ガードレール、ハンドオフ、およびカスタムの各スパンは引き続き記録されます。
 
 ```python
 from agents import RunConfig, Runner
@@ -60,11 +60,11 @@ result = await Runner.run(
 )
 ```
 
-さらに、[カスタムトレーシングプロセッサー](#custom-tracing-processors)を設定して、トレースを別の送信先に送信できます（置き換え先または追加の送信先として使用できます）。
+さらに、[カスタムトレーシングプロセッサー](#custom-tracing-processors)を設定し、別の送信先（代替またはセカンダリの送信先）へトレースを送信できます。
 
-## 長時間実行ワーカーと即時エクスポート
+## 長時間稼働ワーカーと即時エクスポート
 
-デフォルトの [`BatchTraceProcessor`][agents.tracing.processors.BatchTraceProcessor] は、数秒ごと、またはメモリ内キューがサイズのしきい値に達した場合はそれより早く、バックグラウンドでトレースをエクスポートします。また、プロセス終了時には最後のフラッシュを実行します。Celery、RQ、Dramatiq、FastAPI のバックグラウンドタスクなどの長時間実行ワーカーでは、通常、追加のコードなしでトレースが自動的にエクスポートされますが、各ジョブの完了直後には Traces ダッシュボードに表示されない場合があります。
+デフォルトの [`BatchTraceProcessor`][agents.tracing.processors.BatchTraceProcessor] は、数秒ごと、またはメモリ内キューがサイズのしきい値に達した場合はそれより早く、バックグラウンドでトレースをエクスポートします。また、プロセスの終了時に最終フラッシュも実行します。Celery、RQ、Dramatiq、FastAPI のバックグラウンドタスクなど、長時間稼働するワーカーでは、通常、追加のコードなしでトレースが自動的にエクスポートされますが、各ジョブの完了直後にはトレースダッシュボードに表示されない場合があります。
 
 作業単位の終了時に即時配信を保証する必要がある場合は、トレースコンテキストの終了後に [`flush_traces()`][agents.tracing.flush_traces] を呼び出します。
 
@@ -103,11 +103,11 @@ async def run(prompt: str, background_tasks: BackgroundTasks):
     return {"status": "queued"}
 ```
 
-[`flush_traces()`][agents.tracing.flush_traces] は、現在バッファリングされているトレースとスパンのエクスポートが完了するまでブロックします。そのため、構築途中のトレースをフラッシュしないように、`trace()` が閉じた後に呼び出してください。デフォルトのエクスポート遅延で問題がない場合は、この呼び出しを省略できます。
+[`flush_traces()`][agents.tracing.flush_traces] は、現在バッファリングされているトレースとスパンのエクスポートが完了するまでブロックします。そのため、構築途中のトレースをフラッシュしないよう、`trace()` が閉じた後に呼び出してください。デフォルトのエクスポート遅延で問題ない場合は、この呼び出しを省略できます。
 
 ## 上位レベルのトレース
 
-複数回の `run()` 呼び出しを単一のトレースに含めたい場合があります。その場合は、コード全体を `trace()` でラップします。
+複数の `run()` 呼び出しを 1 つのトレースに含めたい場合があります。その場合は、コード全体を `trace()` でラップします。
 
 ```python
 from agents import Agent, Runner, trace
@@ -122,49 +122,49 @@ async def main():
         print(f"Rating: {second_result.final_output}")
 ```
 
-1. 2 回の `Runner.run` 呼び出しが `with trace()` でラップされているため、個別の実行によって 2 つのトレースが作成されるのではなく、全体のトレースに含まれます。
+1. `Runner.run` の 2 回の呼び出しが `with trace()` でラップされているため、それぞれが別個のトレースを作成するのではなく、両方の実行が 1 つの全体的なトレースに含まれます。
 
 ## トレースの作成
 
-[`trace()`][agents.tracing.trace] 関数を使用してトレースを作成できます。トレースは開始して終了する必要があります。これには次の 2 つの方法があります。
+[`trace()`][agents.tracing.trace] 関数を使用してトレースを作成できます。トレースは開始して終了する必要があります。その方法は次の 2 つです：
 
-1. **推奨**: `with trace(...) as my_trace` のように、トレースをコンテキストマネージャーとして使用します。これにより、適切なタイミングでトレースが自動的に開始および終了します。
+1. **推奨**: トレースをコンテキストマネージャーとして使用します（例：`with trace(...) as my_trace`）。これにより、適切なタイミングでトレースが自動的に開始および終了されます。
 2. [`trace.start()`][agents.tracing.Trace.start] と [`trace.finish()`][agents.tracing.Trace.finish] を手動で呼び出すこともできます。
 
-現在のトレースは、Python の [`contextvar`](https://docs.python.org/3/library/contextvars.html) を介して追跡されます。つまり、並行処理でも自動的に機能します。トレースを手動で開始／終了する場合は、現在のトレースを更新するために、`start()`／`finish()` に `mark_as_current` と `reset_current` を渡す必要があります。
+現在のトレースは、Python の [`contextvar`](https://docs.python.org/3/library/contextvars.html) を介して追跡されます。つまり、並行処理でも自動的に機能します。トレースを手動で開始および終了する場合は、現在のトレースを更新するため、`start()` に `mark_as_current` を渡し、`finish()` に `reset_current` を渡します。
 
 ## スパンの作成
 
-各種 [`*_span()`][agents.tracing.create] メソッドを使用してスパンを作成できます。通常、スパンを手動で作成する必要はありません。カスタムスパン情報を追跡するために、[`custom_span()`][agents.tracing.custom_span] 関数を利用できます。
+さまざまな [`*_span()`][agents.tracing.create] メソッドを使用してスパンを作成できます。通常、スパンを手動で作成する必要はありません。カスタムスパン情報を追跡するために、[`custom_span()`][agents.tracing.custom_span] 関数を使用できます。
 
-スパンは自動的に現在のトレースの一部となり、Python の [`contextvar`](https://docs.python.org/3/library/contextvars.html) を介して追跡される、最も近い現在のスパンの下にネストされます。
+スパンは自動的に現在のトレースに含まれ、Python の [`contextvar`](https://docs.python.org/3/library/contextvars.html) を介して追跡される、最も近い現在のスパンの下にネストされます。
 
 ## 機密データ
 
-特定のスパンでは、機密性の高い可能性があるデータが取得される場合があります。
+一部のスパンでは、機密である可能性のあるデータを取得する場合があります。
 
-`generation_span()` は LLM 生成の入力／出力を保存し、`function_span()` は関数呼び出しの入力／出力を保存します。これらには機密データが含まれる可能性があるため、[`RunConfig.trace_include_sensitive_data`][agents.run.RunConfig.trace_include_sensitive_data] を使用して、そのデータの取得を無効にできます。
+`generation_span()` はLLM生成の入力と出力を保存し、`function_span()` は関数呼び出しの入力と出力を保存します。これらには機密データが含まれる可能性があるため、[`RunConfig.trace_include_sensitive_data`][agents.run.RunConfig.trace_include_sensitive_data] を使用して、そのデータの取得を無効にできます。
 
-同様に、音声スパンには、デフォルトで入出力音声の base64 エンコードされた PCM データが含まれます。[`VoicePipelineConfig.trace_include_sensitive_audio_data`][agents.voice.pipeline_config.VoicePipelineConfig.trace_include_sensitive_audio_data] を設定すると、この音声データの取得を無効にできます。
+同様に、音声スパンには、デフォルトで入力音声と出力音声の base64 エンコードされた PCM データが含まれます。[`VoicePipelineConfig.trace_include_sensitive_audio_data`][agents.voice.pipeline_config.VoicePipelineConfig.trace_include_sensitive_audio_data] を設定することで、この音声データの取得を無効にできます。
 
-デフォルトでは、`trace_include_sensitive_data` は `True` です。アプリを実行する前に、環境変数 `OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA` を `true/1` または `false/0` に設定することで、コードを変更せずにデフォルト値を設定できます。
+デフォルトでは、`trace_include_sensitive_data` は `True` です。アプリを実行する前に、環境変数 `OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA` を `true/1` または `false/0` に設定してエクスポートすると、コードを使用せずにデフォルト値を設定できます。
 
 ## カスタムトレーシングプロセッサー
 
-トレーシングの上位レベルのアーキテクチャは次のとおりです。
+トレーシングの上位レベルのアーキテクチャは次のとおりです：
 
 -   初期化時に、トレースの作成を担うグローバルな [`TraceProvider`][agents.tracing.provider.TraceProvider] を作成します。
--   [`TraceProvider`][agents.tracing.provider.TraceProvider] に [`BatchTraceProcessor`][agents.tracing.processors.BatchTraceProcessor] を設定します。このプロセッサーはトレース／スパンをバッチ単位で [`BackendSpanExporter`][agents.tracing.processors.BackendSpanExporter] に送信し、同エクスポーターがスパンとトレースをバッチ単位で OpenAI バックエンドにエクスポートします。
+-   `TraceProvider` に [`BatchTraceProcessor`][agents.tracing.processors.BatchTraceProcessor] を設定します。これは、トレースとスパンをバッチで [`BackendSpanExporter`][agents.tracing.processors.BackendSpanExporter] に送信し、そこからスパンとトレースをバッチでOpenAIバックエンドへエクスポートします。
 
-このデフォルト設定をカスタマイズし、トレースを代替または追加のバックエンドに送信したり、エクスポーターの動作を変更したりするには、次の 2 つの方法があります。
+このデフォルト設定をカスタマイズし、代替または追加のバックエンドへトレースを送信したり、エクスポーターの動作を変更したりするには、次の 2 つの方法があります：
 
-1. [`add_trace_processor()`][agents.tracing.add_trace_processor] を使用すると、準備ができたトレースとスパンを受け取る**追加の**トレースプロセッサーを追加できます。これにより、トレースを OpenAI のバックエンドへ送信する処理に加えて、独自の処理も実行できます。
-2. [`set_trace_processors()`][agents.tracing.set_trace_processors] を使用すると、デフォルトのプロセッサーを独自のトレースプロセッサーで**置き換える**ことができます。この場合、OpenAI バックエンドへ送信する `TracingProcessor` を含めない限り、トレースは OpenAI バックエンドに送信されません。
+1. [`add_trace_processor()`][agents.tracing.add_trace_processor] を使用すると、準備ができたトレースとスパンを受け取る**追加の**トレースプロセッサーを追加できます。これにより、OpenAIバックエンドへのトレース送信に加えて、独自の処理を実行できます。
+2. [`set_trace_processors()`][agents.tracing.set_trace_processors] を使用すると、デフォルトのプロセッサーを独自のトレースプロセッサーで**置き換える**ことができます。その場合、トレースを送信する `TracingProcessor` を含めない限り、トレースはOpenAIバックエンドへ送信されません。
 
 
-## OpenAI 以外のモデルでのトレーシング
+## OpenAI以外のモデルでのトレーシング
 
-OpenAI 以外のモデルでも OpenAI API キーを使用すれば、トレーシングを無効にすることなく、OpenAI Traces ダッシュボードで無料のトレーシングを有効にできます。アダプターの選択と設定に関する注意事項については、モデルガイドの[サードパーティ製アダプター](models/index.md#third-party-adapters)セクションを参照してください。
+OpenAI以外のモデルを使用する場合、トレーシングを無効にすることなく、OpenAI Traces ダッシュボードで無料のトレーシングを有効にするため、トレーシングエクスポーターにOpenAI API キーを指定できます。アダプターの選択と設定に関する注意事項については、モデルガイドの[サードパーティアダプター](models/index.md#third-party-adapters)セクションを参照してください。
 
 ```python
 import os
@@ -185,7 +185,7 @@ agent = Agent(
 )
 ```
 
-単一の実行にのみ別のトレーシングキーが必要な場合は、グローバルエクスポーターを変更する代わりに、`RunConfig` を介して渡してください。
+単一の実行に対してのみ別のトレーシングキーが必要な場合は、グローバルエクスポーターを変更する代わりに、`RunConfig` を介して渡します。
 
 ```python
 from agents import Runner, RunConfig
@@ -197,21 +197,21 @@ await Runner.run(
 )
 ```
 
-## 追加情報
-- OpenAI Traces ダッシュボードで無料のトレースを確認できます。
+## 補足事項
+- OpenAI Traces ダッシュボードで無料のトレースを表示できます。
 
 
-## エコシステム統合
+## エコシステム連携
 
-以下のコミュニティおよびベンダーの統合は、OpenAI Agents SDK のトレーシングインターフェースをサポートしています。
+以下のコミュニティおよびベンダーによる連携は、OpenAI Agents SDKのトレーシング API サーフェスをサポートしています。
 
 ### 外部トレーシングプロセッサー一覧
 
 -   [Weights & Biases](https://weave-docs.wandb.ai/guides/integrations/openai_agents)
 -   [Arize-Phoenix](https://docs.arize.com/phoenix/tracing/integrations-tracing/openai-agents-sdk)
 -   [Future AGI](https://docs.futureagi.com/docs/tracing/auto/openai_agents/)
--   [MLflow（セルフホスト／OSS）](https://mlflow.org/docs/latest/tracing/integrations/openai-agent)
--   [MLflow（Databricks ホスト）](https://docs.databricks.com/aws/en/mlflow/mlflow-tracing#-automatic-tracing)
+-   [MLflow (セルフホスト／OSS)](https://mlflow.org/docs/latest/tracing/integrations/openai-agent)
+-   [MLflow (Databricks ホスト)](https://docs.databricks.com/aws/en/mlflow/mlflow-tracing#-automatic-tracing)
 -   [Braintrust](https://braintrust.dev/docs/guides/traces/integrations#openai-agents-sdk)
 -   [Pydantic Logfire](https://logfire.pydantic.dev/docs/integrations/llms/openai/#openai-agents)
 -   [AgentOps](https://docs.agentops.ai/v1/integrations/agentssdk)

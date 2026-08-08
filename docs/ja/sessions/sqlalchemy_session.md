@@ -4,11 +4,11 @@ search:
 ---
 # SQLAlchemy セッション
 
-`SQLAlchemySession` は SQLAlchemy を使用して、本番環境に対応したセッション実装を提供します。これにより、SQLAlchemy がサポートする任意のデータベース（PostgreSQL、MySQL、SQLite など）をセッションストレージとして使用できます。
+`SQLAlchemySession` は SQLAlchemy を使用して本番環境対応のセッション実装を提供し、SQLAlchemy がサポートする任意のデータベース（PostgreSQL、MySQL、SQLite など）をセッションストレージとして使用できるようにします。
 
 ## インストール
 
-SQLAlchemy セッションには、`sqlalchemy` extra が必要です。
+SQLAlchemy セッションには、`openai-agents` パッケージの optional-dependency extra `sqlalchemy` が必要です。
 
 ```bash
 pip install openai-agents[sqlalchemy]
@@ -18,7 +18,7 @@ pip install openai-agents[sqlalchemy]
 
 ### データベース URL の使用
 
-最も簡単に使い始める方法は次のとおりです。
+最も簡単に開始する方法は次のとおりです。
 
 ```python
 import asyncio
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### 既存エンジンの使用
+### 既存のエンジンの使用
 
 既存の SQLAlchemy エンジンを使用するアプリケーションの場合は、次のようにします。
 
@@ -75,9 +75,9 @@ if __name__ == "__main__":
 
 ## 非 ASCII テキストの保存
 
-デフォルトでは、`SQLAlchemySession` はセッション項目を JSON にシリアライズする際に、非 ASCII 文字をエスケープします。これにより、項目の読み込み時に元のテキストへ復元できる状態を維持しながら、従来の保存形式が保持されます。
+デフォルトでは、`SQLAlchemySession` はセッション項目を JSON にシリアライズする際に、非 ASCII 文字をエスケープします。これにより、従来の保存形式を維持しながら、項目の読み込み時には元のテキストを復元できます。
 
-保存される JSON 内で多言語テキストを読みやすい状態に保つには、`ensure_ascii=False` を設定します。
+保存された JSON 内で多言語テキストを読み取り可能な状態に保つには、`ensure_ascii=False` を設定します。
 
 ```python
 session = SQLAlchemySession.from_url(
@@ -88,7 +88,7 @@ session = SQLAlchemySession.from_url(
 )
 ```
 
-既存のエンジンを使用する場合は、同じオプションを `SQLAlchemySession(...)` に直接渡すこともできます。この設定で変更されるのは、データベースに保存される JSON 表現のみです。セッションメソッドが返す値は変更されません。
+既存のエンジンを使用する場合は、同じオプションを `SQLAlchemySession(...)` に直接渡すことができます。この設定によって変更されるのはデータベースに保存される JSON 表現のみであり、セッションメソッドが返す値は変更されません。
 
 
 ## API リファレンス

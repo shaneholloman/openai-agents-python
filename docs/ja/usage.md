@@ -4,13 +4,13 @@ search:
 ---
 # 使用量
 
-Agents SDK は、すべての実行についてトークン使用量を自動的に追跡します。使用量には実行コンテキストからアクセスでき、コストの監視、制限の適用、分析の記録に利用できます。
+Agents SDK は、実行ごとのトークン使用量を自動的に追跡します。実行コンテキストから使用量にアクセスし、コストの監視、上限の適用、分析データの記録に利用できます。
 
 ## 追跡対象
 
-- **requests**: 実行された LLM API 呼び出しの数
+- **requests**: LLM API の呼び出し回数
 - **input_tokens**: 送信された入力トークンの合計
-- **output_tokens**: 受信された出力トークンの合計
+- **output_tokens**: 受信した出力トークンの合計
 - **total_tokens**: 入力 + 出力
 - **request_usage_entries**: リクエストごとの使用量内訳のリスト
 - **details**:
@@ -19,7 +19,7 @@ Agents SDK は、すべての実行についてトークン使用量を自動的
 
 ## 実行からの使用量へのアクセス
 
-`Runner.run(...)` の後、使用量には `result.context_wrapper.usage` 経由でアクセスします。
+`Runner.run(...)` の実行後、`result.context_wrapper.usage` から使用量にアクセスできます。
 
 ```python
 result = await Runner.run(agent, "What's the weather in Tokyo?")
@@ -31,20 +31,20 @@ print("Output tokens:", usage.output_tokens)
 print("Total tokens:", usage.total_tokens)
 ```
 
-使用量は、この実行中のすべてのモデル呼び出し（ツール呼び出しやハンドオフを含む）にわたって集計されます。
+使用量は、ツール呼び出しやハンドオフを生成するモデル呼び出しを含め、実行中のすべてのモデル呼び出しを通じて集計されます。
 
-### サードパーティ製アダプターでの使用量の有効化
+### サードパーティーアダプターでの使用量の有効化
 
-使用量のレポートは、サードパーティ製アダプターやプロバイダーバックエンドによって異なります。アダプター経由のモデルに依存しており、正確な `result.context_wrapper.usage` の値が必要な場合は:
+使用量レポートは、サードパーティーアダプターやプロバイダーのバックエンドによって異なります。サードパーティーアダプターを介してモデルにアクセスし、正確な `result.context_wrapper.usage` 値が必要な場合は、以下を確認してください。
 
-- `AnyLLMModel` では、上流プロバイダーが使用量を返す場合、使用量は自動的に伝播されます。ストリーミングされた Chat Completions バックエンドでは、使用量チャンクが出力される前に `ModelSettings(include_usage=True)` が必要になる場合があります。
-- `LitellmModel` では、一部のプロバイダーバックエンドはデフォルトで使用量を報告しないため、`ModelSettings(include_usage=True)` が必要になることがよくあります。
+- `AnyLLMModel` では、上流のプロバイダーが使用量を返すと、その情報が自動的に伝播されます。Chat Completions バックエンドからのレスポンスをストリーミングする場合、使用量チャンクを出力するために `ModelSettings(include_usage=True)` が必要になることがあります。
+- `LitellmModel` では、一部のプロバイダーのバックエンドがデフォルトで使用量を報告しないため、多くの場合 `ModelSettings(include_usage=True)` が必要です。
 
-Models ガイドの [サードパーティ製アダプター](models/index.md#third-party-adapters) セクションにあるアダプター固有の注記を確認し、デプロイ予定の正確なプロバイダーバックエンドを検証してください。
+モデルガイドの[サードパーティーアダプター](models/index.md#third-party-adapters)セクションにあるアダプター固有の注記を確認し、デプロイ予定のプロバイダーのバックエンドで使用量レポートを検証してください。
 
 ## リクエストごとの使用量追跡
 
-SDK は、各 API リクエストの使用量を `request_usage_entries` で自動的に追跡します。これは、詳細なコスト計算やコンテキストウィンドウ消費量の監視に役立ちます。
+SDK は、各 API リクエストの使用量を `request_usage_entries` で自動的に追跡します。これは、詳細なコスト計算やコンテキストウィンドウの消費量の監視に役立ちます。
 
 ```python
 result = await Runner.run(agent, "What's the weather in Tokyo?")
@@ -55,7 +55,7 @@ for i, request in enumerate(result.context_wrapper.usage.request_usage_entries):
 
 ## セッションでの使用量へのアクセス
 
-`Session`（例: `SQLiteSession`）を使用する場合、`Runner.run(...)` の各呼び出しは、その特定の実行の使用量を返します。セッションはコンテキスト用に会話履歴を保持しますが、各実行の使用量は独立しています。
+`Session`（例: `SQLiteSession`）を使用する場合、`Runner.run(...)` を呼び出すたびに、その特定の実行の使用量が返されます。セッションはコンテキストとして会話履歴を保持しますが、各実行の使用量は独立しています。
 
 ```python
 session = SQLiteSession("my_conversation")
@@ -67,11 +67,11 @@ second = await Runner.run(agent, "Can you elaborate?", session=session)
 print(second.context_wrapper.usage.total_tokens)  # Usage for second run
 ```
 
-セッションは実行間の会話コンテキストを保持しますが、各 `Runner.run()` 呼び出しから返される使用量メトリクスは、その特定の実行のみを表します。セッションでは、以前のメッセージが各実行に入力として再投入される場合があり、これにより以降のターンにおける入力トークン数に影響します。
+セッションは実行間で会話コンテキストを保持しますが、各 `Runner.run()` 呼び出しによって返される使用量メトリクスは、その実行のみを表します。セッションでは、以前のメッセージが各実行への入力として再度渡される場合があり、それによって後続ターンの入力トークン数が増加します。
 
 ## フックでの使用量の利用
 
-`RunHooks` を使用している場合、各フックに渡される `context` オブジェクトには `usage` が含まれます。これにより、主要なライフサイクルのタイミングで使用量をログ記録できます。
+`RunHooks` を使用している場合、各フックに渡される `context` オブジェクトには `usage` が含まれます。これにより、ライフサイクルの主要な時点で使用量をログに記録できます。
 
 ```python
 class MyHooks(RunHooks):
@@ -82,9 +82,9 @@ class MyHooks(RunHooks):
 
 ## API リファレンス
 
-詳細な API ドキュメントについては、以下を参照してください:
+詳細な API ドキュメントについては、以下を参照してください。
 
--   [`Usage`][agents.usage.Usage] - 使用量追跡データ構造
--   [`RequestUsage`][agents.usage.RequestUsage] - リクエストごとの使用量詳細
--   [`RunContextWrapper`][agents.run.RunContextWrapper] - 実行コンテキストからの使用量へのアクセス
--   [`RunHooks`][agents.run.RunHooks] - 使用量追跡ライフサイクルへのフック
+-   [`Usage`][agents.usage.Usage] - 使用量追跡のデータ構造
+-   [`RequestUsage`][agents.usage.RequestUsage] - リクエストごとの使用量の詳細
+-   [`RunContextWrapper`][agents.run.RunContextWrapper] - 実行コンテキストから使用量にアクセス
+-   [`RunHooks`][agents.run.RunHooks] - 使用量追跡のライフサイクルへのフック

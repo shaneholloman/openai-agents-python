@@ -8,7 +8,7 @@ search:
 
 ## 安装
 
-SQLAlchemy 会话需要安装 `sqlalchemy` 可选依赖：
+SQLAlchemy 会话需要 `openai-agents` 软件包中的 `sqlalchemy` 可选依赖 extra：
 
 ```bash
 pip install openai-agents[sqlalchemy]
@@ -16,7 +16,7 @@ pip install openai-agents[sqlalchemy]
 
 ## 快速入门
 
-### 数据库 URL 的使用
+### 数据库 URL
 
 最简单的入门方式：
 
@@ -42,7 +42,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### 现有引擎的使用
+### 现有引擎
 
 对于已有 SQLAlchemy 引擎的应用程序：
 
@@ -73,9 +73,9 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## 非 ASCII 文本的存储
+## 非 ASCII 文本存储
 
-默认情况下，`SQLAlchemySession` 在将会话项序列化为 JSON 时会转义非 ASCII 字符。这样既能保留原有的存储格式，也能在加载会话项时无损还原原始文本。
+默认情况下，`SQLAlchemySession` 在将会话条目序列化为 JSON 时会转义非 ASCII 字符。这会保留原有的存储格式，同时在加载条目时仍能无损还原原始文本。
 
 如果希望多语言文本在存储的 JSON 中保持可读，请设置 `ensure_ascii=False`：
 
@@ -88,10 +88,10 @@ session = SQLAlchemySession.from_url(
 )
 ```
 
-使用现有引擎时，也可以将相同的选项直接传递给 `SQLAlchemySession(...)`。此设置仅会更改数据库中存储的 JSON 表示形式，不会更改会话方法返回的值。
+使用现有引擎时，也可以将相同的选项直接传递给 `SQLAlchemySession(...)`。此设置仅会更改数据库中存储的 JSON 表示形式；不会更改会话方法返回的值。
 
 
 ## API 参考
 
-- [`SQLAlchemySession`][agents.extensions.memory.sqlalchemy_session.SQLAlchemySession] - 主类
+- [`SQLAlchemySession`][agents.extensions.memory.sqlalchemy_session.SQLAlchemySession] - 主要类
 - [`Session`][agents.memory.session.Session] - 基础会话协议

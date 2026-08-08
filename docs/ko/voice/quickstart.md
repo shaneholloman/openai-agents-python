@@ -6,10 +6,16 @@ search:
 
 ## 사전 요구 사항
 
-Agents SDK의 기본 [빠른 시작 지침](../quickstart.md)을 따르고 가상 환경을 설정했는지 확인합니다. 그런 다음 SDK에서 선택적 음성 종속성을 설치합니다.
+Agents SDK의 기본 [빠른 시작 지침](../quickstart.md)을 따르고 가상 환경을 설정했는지 확인합니다. 그런 다음 SDK에서 선택적 음성 의존성을 설치합니다.
 
 ```bash
 pip install 'openai-agents[voice]'
+```
+
+아래 데모 코드는 마이크 및 스피커 I/O에 [`sounddevice`](https://pypi.org/project/sounddevice/)도 사용하며, 이는 `voice` extra에 포함되지 않습니다.
+
+```bash
+pip install sounddevice
 ```
 
 ## 개념
@@ -17,7 +23,7 @@ pip install 'openai-agents[voice]'
 알아야 할 주요 개념은 3단계 프로세스인 [`VoicePipeline`][agents.voice.pipeline.VoicePipeline]입니다.
 
 1. 음성-텍스트 변환 모델을 실행하여 오디오를 텍스트로 변환합니다.
-2. 일반적으로 에이전트 워크플로인 코드를 실행하여 결과를 생성합니다.
+2. 일반적으로 에이전틱 워크플로인 코드를 실행하여 결과를 생성합니다.
 3. 텍스트-음성 변환 모델을 실행하여 결과 텍스트를 다시 오디오로 변환합니다.
 
 ```mermaid
@@ -48,7 +54,7 @@ graph LR
 
 ## 에이전트
 
-먼저 몇 가지 에이전트를 설정하겠습니다. 이 SDK로 에이전트를 만들어 본 적이 있다면 익숙할 것입니다. 몇 개의 에이전트와 하나의 핸드오프, 하나의 도구를 사용합니다.
+먼저 에이전트를 설정해 보겠습니다. 이 SDK로 에이전트를 만들어 본 적이 있다면 익숙하게 느껴질 것입니다. 두 개의 에이전트, 구성된 핸드오프, 도구 하나를 사용합니다.
 
 ```python
 import random
@@ -56,7 +62,6 @@ import random
 from agents import Agent
 from agents.decorators import tool
 from agents.extensions.handoff_prompt import prompt_with_handoff_instructions
-
 
 
 @tool
@@ -89,7 +94,7 @@ agent = Agent(
 
 ## 음성 파이프라인
 
-[`SingleAgentVoiceWorkflow`][agents.voice.workflow.SingleAgentVoiceWorkflow]를 워크플로로 사용하여 간단한 음성 파이프라인을 설정합니다.
+[`SingleAgentVoiceWorkflow`][agents.voice.workflow.SingleAgentVoiceWorkflow]을 워크플로로 사용하여 간단한 음성 파이프라인을 설정합니다.
 
 ```python
 from agents.voice import SingleAgentVoiceWorkflow, VoicePipeline
@@ -121,7 +126,7 @@ async for event in result.stream():
 
 ```
 
-## 전체 구성
+## 전체 코드 통합
 
 ```python
 import asyncio
@@ -189,4 +194,4 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-이 예제를 실행하면 에이전트가 사용자에게 음성으로 응답합니다! 에이전트와 직접 대화할 수 있는 데모는 [examples/voice/static](https://github.com/openai/openai-agents-python/tree/main/examples/voice/static)의 코드 예제를 확인하세요.
+이 코드 예제를 실행하면 에이전트가 사용자가 들을 수 있는 음성 오디오를 생성합니다! 직접 에이전트와 대화할 수 있는 데모는 [examples/voice/static](https://github.com/openai/openai-agents-python/tree/main/examples/voice/static)의 코드 예제를 확인하세요.

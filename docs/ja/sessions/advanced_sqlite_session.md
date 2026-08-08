@@ -4,15 +4,15 @@ search:
 ---
 # 高度な SQLite セッション
 
-`AdvancedSQLiteSession` は、基本的な `SQLiteSession` の拡張版であり、会話の分岐、詳細な使用状況分析、構造化された会話クエリなど、高度な会話管理機能を提供します。
+`AdvancedSQLiteSession` は、基本的な `SQLiteSession` の拡張版であり、会話の分岐、詳細な使用量分析、構造化された会話クエリなど、高度な会話管理機能を提供します。
 
 ## 機能
 
-- **会話の分岐**: 任意のユーザーメッセージから別の会話経路を作成
-- **使用状況の追跡**: ターンごとの詳細なトークン使用状況分析と完全な JSON 内訳
-- **構造化クエリ**: ターン単位の会話、ツール使用状況の統計などを取得
-- **ブランチ管理**: 独立したブランチの切り替えと管理
-- **メッセージ構造のメタデータ**: メッセージタイプ、ツールの使用状況、会話フローを追跡
+- **会話の分岐**: 任意のユーザーメッセージから別の会話経路を作成できます
+- **使用量の追跡**: ターンごとの詳細なトークン使用量分析と、JSON 形式の完全な内訳を提供します
+- **構造化クエリ**: ターンごとの会話、ツール使用統計などを取得できます
+- **ブランチ管理**: ブランチを個別に切り替えて管理できます
+- **メッセージ構造メタデータ**: メッセージタイプ、ツール使用状況、会話フローを追跡できます
 
 ## クイックスタート
 
@@ -85,15 +85,15 @@ session = AdvancedSQLiteSession(
 ### パラメーター
 
 - `session_id` (str): 会話セッションの一意な識別子
-- `db_path` (str | Path): SQLite データベースファイルへのパス。インメモリストレージの場合、デフォルトは `:memory:` です
-- `create_tables` (bool): 高度なテーブルを自動的に作成するかどうか。デフォルトは `False` です
+- `db_path` (str | Path): SQLite データベースファイルへのパス。デフォルトは、インメモリストレージを使用する `:memory:` です
+- `create_tables` (bool): 拡張テーブルを自動的に作成するかどうか。デフォルトは `False` です
 - `logger` (logging.Logger | None): セッション用のカスタムロガー。デフォルトはモジュールロガーです
 
-## 使用状況の追跡
+## 使用量の追跡
 
-AdvancedSQLiteSession は、会話の各ターンのトークン使用状況データを保存することで、詳細な使用状況分析を提供します。**これは、エージェントの実行後に毎回 `store_run_usage` メソッドが呼び出されることに全面的に依存します。**
+AdvancedSQLiteSession は、会話の各ターンのトークン使用量データを保存することで、詳細な使用量分析を提供します。 **この機能は、各エージェント実行後に `store_run_usage` メソッドが呼び出されることに全面的に依存します。**
 
-### 使用状況データの保存
+### 使用量データの保存
 
 ```python
 # After each agent run, store the usage data
@@ -107,7 +107,7 @@ await session.store_run_usage(result)
 # - Detailed JSON token information (if available)
 ```
 
-### 使用状況統計の取得
+### 使用統計の取得
 
 ```python
 # Get session-level usage (all branches)
@@ -137,7 +137,7 @@ turn_2_usage = await session.get_turn_usage(user_turn_number=2)
 
 ## 会話の分岐
 
-AdvancedSQLiteSession の主な機能の 1 つは、任意のユーザーメッセージから会話のブランチを作成し、別の会話経路を探索できることです。
+AdvancedSQLiteSession の主要機能の 1 つは、任意のユーザーメッセージから会話のブランチを作成し、別の会話経路を探索できることです。
 
 ### ブランチの作成
 
@@ -165,7 +165,7 @@ branch_id = await session.create_branch_from_content(
 )
 ```
 
-ブランチ ID は、セッション ID の存続期間を通じて一意です。ブランチを削除したりセッションをクリアしたりすると、その会話データは削除されますが、以前使用したブランチ ID が再び使用可能になるわけではありません。別のブランチを作成する際は、新しい名前を使用してください。
+ブランチ ID は、セッション ID が存続する間、一意です。ブランチを削除したりセッションをクリアしたりすると、その会話データは削除されますが、以前に使用したブランチ ID が再び利用可能になるわけではありません。別のブランチを作成するときは、新しい名前を使用してください。
 
 ### ブランチ管理
 
@@ -184,7 +184,7 @@ await session.switch_to_branch(branch_id)
 await session.delete_branch(branch_id, force=True)  # force=True allows deleting current branch
 ```
 
-### ブランチワークフローの例
+### ブランチのワークフロー例
 
 ```python
 # Original conversation
@@ -247,9 +247,9 @@ for turn in matching_turns:
 
 ### メッセージ構造
 
-セッションは、以下を含むメッセージ構造を自動的に追跡します。
+セッションでは、以下を含むメッセージ構造が自動的に追跡されます。
 
-- メッセージタイプ（user、assistant、tool_call など）
+- メッセージタイプの値（`user`、`assistant`、`tool_call` など）
 - ツール呼び出しのツール名
 - ターン番号とシーケンス番号
 - ブランチとの関連付け
@@ -259,7 +259,7 @@ for turn in matching_turns:
 
 AdvancedSQLiteSession は、基本的な SQLite スキーマを 3 つの追加テーブルで拡張します。
 
-### `message_structure` テーブル
+### message_structure テーブル
 
 ```sql
 CREATE TABLE message_structure (
@@ -278,7 +278,7 @@ CREATE TABLE message_structure (
 );
 ```
 
-### `branch_reservations` テーブル
+### branch_reservations テーブル
 
 ```sql
 CREATE TABLE branch_reservations (
@@ -288,9 +288,9 @@ CREATE TABLE branch_reservations (
 );
 ```
 
-このテーブルは、コピーされた接頭部分が空のブランチを含め、ブランチ ID をアトミックに予約します。予約行はブランチの削除後やセッションのクリア後も保持されるため、古いセッションインスタンスが、同じ ID を再利用した後続のブランチに履歴をマージすることはありません。
+このテーブルは、コピーされたプレフィックスが空のブランチも含め、ブランチ ID をアトミックに予約します。予約行は、ブランチが削除された場合もセッションがクリアされた場合も保持されるため、古いセッションインスタンスが、同じ ID を再利用した後続のブランチに履歴をマージすることはできません。
 
-### `turn_usage` テーブル
+### turn_usage テーブル
 
 ```sql
 CREATE TABLE turn_usage (
@@ -310,12 +310,12 @@ CREATE TABLE turn_usage (
 );
 ```
 
-## 完全な例
+## 完全なコード例
 
-すべての機能を包括的に紹介する[完全な例](https://github.com/openai/openai-agents-python/tree/main/examples/memory/advanced_sqlite_session_example.py)をご確認ください。
+すべての機能を包括的に紹介する[完全なコード例](https://github.com/openai/openai-agents-python/tree/main/examples/memory/advanced_sqlite_session_example.py)をご覧ください。
 
 
 ## API リファレンス
 
 - [`AdvancedSQLiteSession`][agents.extensions.memory.advanced_sqlite_session.AdvancedSQLiteSession] - メインクラス
-- [`Session`][agents.memory.session.Session] - 基本セッションプロトコル
+- [`Session`][agents.memory.session.Session] - 基底セッションプロトコル
