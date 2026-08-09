@@ -57,6 +57,10 @@ Work in the user's current checkout and on the current branch by default. If the
 
 If isolation or a different checkout is needed, explain why and ask the user before changing Git state. This requirement also applies when another rule or workflow recommends a linked worktree: stop and request approval instead of choosing or creating one automatically.
 
+### Documentation Release Timing
+
+When a feature or bug fix introduces behavior that is not yet available in the latest published release, do not include `docs/` changes that describe that unreleased behavior in the feature or bug-fix pull request, and do not expect those changes as part of that pull request. Handle them in a separate docs-only pull request so maintainers can coordinate its merge timing with the release that makes the documentation accurate. This exception applies only when the documentation would be incorrect for the latest published release; documentation that is already accurate for released behavior remains part of the normal change scope.
+
 ### Scope Discipline and Complexity Reset
 
 - Implement the narrowest explicitly stated set of behaviors that satisfies the request. Do not interpret every shape accepted by a host-language protocol, third-party library, or reflection API unless those shapes are required by the task or supported behavior shipped in the latest release.
@@ -87,7 +91,6 @@ Treat the parameter and dataclass field order of exported runtime APIs as a comp
 
 ### Platform, Docs, and Security Review
 
-- Documentation is published to the live site, so coordinate SDK behavior changes and docs carefully. If docs describe behavior that is not released yet, either delay the docs change until the SDK release is available or split it into a follow-up PR.
 - Treat translation-safe English as a documentation compatibility requirement. In new or materially rewritten translatable prose under `docs/` (excluding generated API reference pages), state the actor, scope, ownership, ordering, modality, and lifecycle boundary explicitly whenever they affect the meaning. Use exact API identifiers in inline code, and replace ambiguous pronouns, overloaded nouns, or shorthand when a small clarification can prevent a materially different translation. Do not change the documented behavior merely to make a sentence easier to translate.
 - For new or materially rewritten translatable prose, use a lightweight cross-language review of only the changed English sentences and their immediate context. Have an independent reviewer or review pass inspect the source from Japanese, Korean, and Chinese translation perspectives and report only concrete risks such as an ambiguous actor, scope, ownership, ordering, modality, lifecycle boundary, overloaded SDK term, or identifier corruption. Resolve concrete findings in the English source and review the revised lines once. Do not generate full localized pages for routine documentation changes. Pure link, formatting, typo, and other edits that do not change translatable meaning may skip this review.
 - If a concrete concern cannot be resolved confidently from the English source, use a temporary translation of only the disputed sentence or paragraph as a focused probe; do not write or commit generated localized files. Reserve `docs/scripts/translate_docs.py --mode full --file <path>` and broader Japanese, Korean, and Chinese output review for changes to the translation tooling or translation controls, explicit localization work, or an explicitly requested broad translation audit. Add or change a fixed translation mapping only when actual cross-document evidence shows that one stable target term is correct across contexts. Prefer contextual guidance and established target-language developer terminology, including standard English terms, over a large or rigid mapping table.
@@ -259,7 +262,7 @@ make tests
 
 - Use the template at `.github/PULL_REQUEST_TEMPLATE/pull_request_template.md`; include a summary, test plan, and issue number if applicable.
 - In copy-ready GitHub text, use native issue and pull-request references: exactly `#123` for this repository and `owner/repo#123` for another repository. Do not qualify same-repository references as `openai/openai-agents-python#123`. Preserve closing forms such as `Fixes #123` or `Resolves #123`. Never wrap these references in Markdown links such as `[PR #123](https://github.com/owner/repo/pull/123)` or `[#123](...)`; those Codex-friendly links require manual cleanup after pasting into GitHub. Use descriptive Markdown links only for external resources or GitHub targets that cannot be expressed as a native issue or pull-request reference.
-- Add tests for new behavior when feasible and update documentation for user-facing changes.
+- Add tests for new behavior when feasible. Update documentation for user-facing changes, except unreleased-behavior documentation that must follow the separate docs-only pull request policy above.
 - Run `make format`, `make lint`, `make typecheck`, and `make tests` before marking work ready.
 - Commit messages should be concise and written in the imperative mood. Small, focused commits are preferred.
 
