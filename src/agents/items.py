@@ -211,7 +211,7 @@ def _tool_search_item_to_input_item(
 
 
 def _output_item_to_input_item(raw_item: Any) -> TResponseInputItem:
-    """Convert an output item into replayable input, normalizing tool_search items."""
+    """Convert an output item into replayable input, stripping output-only metadata."""
     item_type = (
         raw_item.get("type") if isinstance(raw_item, dict) else getattr(raw_item, "type", None)
     )
@@ -219,11 +219,32 @@ def _output_item_to_input_item(raw_item: Any) -> TResponseInputItem:
         return _tool_search_item_to_input_item(raw_item)
 
     if isinstance(raw_item, dict):
-        return cast(TResponseInputItem, dict(raw_item))
-    if isinstance(raw_item, BaseModel):
-        return cast(TResponseInputItem, raw_item.model_dump(exclude_unset=True))
+        payload = dict(raw_item)
+    elif isinstance(raw_item, BaseModel):
+        payload = raw_item.model_dump(exclude_unset=True)
+    else:
+        raise AgentsException(f"Unexpected raw item type: {type(raw_item)}")
 
-    raise AgentsException(f"Unexpected raw item type: {type(raw_item)}")
+    # ``created_by`` is server-assigned, output-only metadata that is absent from the Responses
+    # input-item schema, so it must not be replayed back to the API. Several output item types
+    # carry it (apply_patch/shell calls and tool-call outputs); the tool_search branch above
+    # already drops it, so do the same for every other item type.
+    payload.pop("created_by", None)
+    if item_type == "shell_call_output":
+        # ``shell_call_output.output`` is a list of content chunks that each carry their own
+        # output-only ``created_by``. ``payload`` was only shallow-copied above, so rebuild the
+        # list with fresh chunk copies to strip the nested field without mutating the caller's
+        # original mapping. Mirrors the two-level stripping the runner already does in
+        # ``turn_resolution``.
+        chunks = payload.get("output")
+        if isinstance(chunks, list):
+            payload["output"] = [
+                {key: value for key, value in chunk.items() if key != "created_by"}
+                if isinstance(chunk, dict)
+                else chunk
+                for chunk in chunks
+            ]
+    return cast(TResponseInputItem, payload)
 
 
 def _copy_tool_search_mapping(raw_item: Mapping[str, Any]) -> dict[str, Any]:
@@ -694,9 +715,10 @@ class ModelResponse:
 
     def to_input_items(self) -> list[TResponseInputItem]:
         """Convert the output into a list of input items suitable for passing to the model."""
-        # Most output items can be replayed via a direct model_dump. Tool-search items carry
-        # output-only metadata such as `created_by`, so they must go through the same replay
-        # sanitizer used elsewhere in the runtime.
+        # Most output items can be replayed via a direct model_dump, but several types (tool
+        # search, apply_patch/shell calls, and tool-call outputs) carry output-only metadata
+        # such as `created_by` that is not part of the input schema, so they go through the
+        # replay sanitizer that strips it before the items are sent back to the model.
         return [_output_item_to_input_item(it) for it in self.output]
 
 
