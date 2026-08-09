@@ -14,6 +14,7 @@ class SkillContractTest(unittest.TestCase):
         cls.skill = (cls.skill_root / "SKILL.md").read_text()
         cls.agent_config = (cls.skill_root / "agents" / "openai.yaml").read_text()
         cls.reviewer_brief = (cls.skill_root / "references" / "reviewer-brief.md").read_text()
+        cls.review_protocol = (cls.skill_root / "scripts" / "review_protocol.py").read_text()
         cls.repo_instructions = (cls.skill_root.parents[2] / "AGENTS.md").read_text()
 
     def test_repo_local_metadata_matches_skill(self) -> None:
@@ -107,9 +108,9 @@ class SkillContractTest(unittest.TestCase):
         required_text = (
             "establish that it does not edit, format, regenerate, stage, or create any "
             "task-owned deliverable",
-            "Record combined and component fingerprints immediately before each gate starts and "
-            "after it exits",
-            "both fingerprints match the reviewed fingerprint exactly",
+            "Record combined, component, and repository fingerprints immediately before each "
+            "gate starts and after it exits",
+            "all fingerprints match the reviewed repository state exactly",
             "cancel or stop the obsolete verification when practical",
             "Keep `$pr-draft-summary` deferred",
             "Invoke `$pr-draft-summary` last",
@@ -191,10 +192,14 @@ class SkillContractTest(unittest.TestCase):
             'dispatch every reviewer with `fork_turns: "none"`',
             "never pass the implementer's accumulated conversation or use a full-history fork",
             "Launch both reviewers before waiting",
-            "one event-driven wait of 180-300 seconds",
+            "one event-driven wait of 240 seconds",
             "Do not poll with `list_agents`, separate short waits, progress questions, or no-op "
             "`followup_task` messages",
-            "after one reviewer completes, continue waiting only for the remaining reviewer",
+            "After one reviewer completes, continue waiting only for the remaining reviewer with "
+            "another event-driven 240-second wait",
+            "If an event-driven wait times out while reviewers remain unfinished",
+            "repeat without polling until a reviewer completes, needs attention, or no unfinished "
+            "reviewers remain",
         )
         for text in required_skill_text:
             with self.subTest(text=text):
@@ -224,8 +229,10 @@ class SkillContractTest(unittest.TestCase):
             "Treat a second related finding in one root-cause group as a closure gate",
             "run the complexity reset once",
             "scan the complete inventory for sibling scenarios",
-            "mark the root-cause ID closed",
-            "Do not reopen it for another local patch without new contract evidence",
+            "mark the canonical root-cause ID closed",
+            "Do not reopen it for another local patch without new contract evidence or a newly "
+            "uncovered inventory ID",
+            "reject aliases, renamed IDs, and bare unknown IDs",
         )
         for text in required_text:
             with self.subTest(text=text):
@@ -242,7 +249,7 @@ class SkillContractTest(unittest.TestCase):
             "approximately 12 source-inspection tool calls per reviewer as a soft budget",
         )
         required_brief_text = (
-            "Indexed evidence manifest (`ID | exact path | SHA-256 | purpose`)",
+            "Indexed evidence manifest (`ID | role | exact path | SHA-256 | purpose`)",
             "Semantic component dependency map and invalidation reasons",
             '"checked_inventory_ids"',
             '"unchecked_inventory_ids"',
@@ -289,6 +296,102 @@ class SkillContractTest(unittest.TestCase):
         for text in required_text:
             with self.subTest(text=text):
                 self.assertIn(text, self.skill)
+
+    def test_machine_readable_protocol_closes_observed_convergence_gaps(self) -> None:
+        required_skill_text = (
+            "python scripts/review_protocol.py packet --packet <packet.json> --task-id "
+            "<task-id> --ledger <ledger.json>",
+            "packet path, byte size, SHA-256 digest",
+            "The implementer assigns every root-cause ID once",
+            "propose exactly `NEW:<slug>`",
+            "verification receipt containing the exact command, environment, exit status, "
+            "non-mutation basis",
+            "combined, component, and repository fingerprints",
+            "root evidence IDs absent from the packet's indexed evidence or inventory",
+            'role: "complete-diff"',
+            'role: "review-state"',
+            'role: "repository-status"',
+            "review_state.evidence_id",
+            "repository.status_evidence_id",
+            "Assign every component and all three control artifacts to both reviewers",
+            "requires the complete-diff digest to match its `tracked_diff_sha256`",
+            "requires `repository.exclusions` to account exactly",
+            "summary-only inventory row is incomplete",
+            "active control plane outside the packet",
+            "authorized budget history",
+            "immediately preceding round's immutable ledger snapshot plus SHA-256 digest",
+            "same-round retry or an advance of exactly one round",
+            "never use the mutable current ledger as its own prior snapshot",
+            "repository fingerprint covers unfiltered status plus content identity",
+            "receipt command must exactly match a structured command",
+            "exact key set emitted for their `file`, `symlink`, `gitlink`, `directory`, or "
+            "`missing` kind",
+            "Trust the active implementation control plane to record actual reviewer dispatches",
+            "assigns every inventory ID to exactly one canonical root",
+            "sibling scans that use a renamed root or unknown inventory",
+            "JSON booleans in integer fields",
+            "add and digest it in the frozen packet",
+            "python scripts/review_protocol.py reviewer-output --packet <packet.json> --reviewer "
+            "<reviewer-id> --output <output.json> --task-id <task-id> --ledger <ledger.json>",
+        )
+        required_brief_text = (
+            "## Machine-readable preflight",
+            "If the packet exceeds 12 KiB",
+            "NEW:<lowercase-slug>",
+            '"root_cause_evidence"',
+            "Every submitted contract evidence ID must name an indexed",
+            "submitted IDs must be additions owned by that root in the current ledger",
+            "Every contract evidence ID must resolve to an `evidence_artifacts[].id`",
+            "JSON booleans are not integers for protocol purposes",
+            "Each sibling-scenario scan must reuse a canonical root ID",
+            "verification.preflight_results` as an array of exact `command` and `result` objects",
+            "ledger file's JSON object to match the packet ledger exactly",
+            "not already owned by any canonical root",
+            "absolute `path` and `sha256` digest",
+            'role: "review-state"',
+            'role: "repository-status"',
+            "The `review_state` packet object contains exactly `evidence_id`",
+            "extra copied fingerprint or state fields are invalid",
+            "requires the complete-diff artifact digest to equal its `tracked_diff_sha256`",
+            "Supply the task ID and absolute task-global ledger path independently",
+            "requires `current_round` plus `remaining_budget` to equal the sum",
+            "immediately preceding round's immutable ledger snapshot and its SHA-256 digest",
+            "same-round retry or advance by exactly one",
+            "immutable snapshot must be a distinct file",
+            "an inventory ID owned by another root cannot be reassigned",
+            "does not provide cryptographic attestation against a malicious control plane",
+            "current budget history to preserve the prior prefix",
+            "each inventory ID has exactly one canonical root owner",
+            "accepts only a receipt path already indexed",
+            "task or repository-state drift",
+            "complete typed workspace entries",
+            "rejects an incomplete or unknown key for any workspace kind",
+            "unrelated successful commands are ineligible for credit",
+            'Encode those columns in each `kind: "contract"` inventory object',
+            'Encode those columns in each `kind: "authority-data-flow"` inventory object',
+            'Encode those columns in each `kind: "await-boundary"` inventory object',
+            "requires exclusions to account exactly",
+            "verification.credited_receipts",
+            "python scripts/review_protocol.py receipt",
+            "python scripts/review_protocol.py reviewer-output",
+        )
+        required_script_text = (
+            "PACKET_SOFT_LIMIT_BYTES = 12 * 1024",
+            "NEW_ROOT_CAUSE_ID",
+            "validate_packet",
+            "validate_reviewer_output",
+            "validate_receipt_data",
+        )
+
+        for text in required_skill_text:
+            with self.subTest(source="skill", text=text):
+                self.assertIn(text, self.skill)
+        for text in required_brief_text:
+            with self.subTest(source="brief", text=text):
+                self.assertIn(text, self.reviewer_brief)
+        for text in required_script_text:
+            with self.subTest(source="script", text=text):
+                self.assertIn(text, self.review_protocol)
 
     def test_final_reviewers_inherit_strategy_evidence(self) -> None:
         self.assertIn(
