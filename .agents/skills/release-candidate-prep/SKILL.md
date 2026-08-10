@@ -13,7 +13,7 @@ Use this skill only when the user explicitly invokes `$release-candidate-prep` a
 - Keep the user's source checkout on its existing clean `main` commit. Do not fast-forward it, switch its branch, or materialize release files there. Leave the dedicated release worktree in place for green handoff, blocked review, or recoverable failure.
 - Never push, open or edit a pull request, add labels or milestones, create a release, or otherwise mutate GitHub. Never run `gh`.
 - Own exactly `pyproject.toml`, `uv.lock`, and `tests/fixtures/released_api_contract.json`. Runtime, documentation, workflow, or other repository changes must land on `main` before release preparation.
-- Do not stash, reset, delete, overwrite, remove an existing worktree, or work around unrelated local changes. Fail before branch creation when the initial checkout is dirty or is not on `main`, the dedicated worktree is not clean and detached at refreshed `origin/main`, the release branch collides locally or remotely, the prospective packaged-contract gate fails, the planning review blocks, or `origin/main` advances after those gates run.
+- Do not stash, reset, delete, overwrite, remove an existing worktree, or work around unrelated local changes. Fail before branch creation when the initial checkout is dirty or is not on `main`, the dedicated worktree is not clean and detached at refreshed `origin/main`, the release branch collides locally or remotely, the prospective packaged-contract gate fails after the allowed dependency-bootstrap recovery, the planning review blocks, or `origin/main` advances after those gates run.
 - Treat `$final-release-review` as the controlling release checker, not only as a report generator. Its planning gate must be green before branch creation, and its final-candidate gate must inspect the materialized worktree and be green before PR-ready handoff. Any candidate content, commit, or base change invalidates the previous green result.
 - Remove inherited `OPENAI_API_KEY` from every child command. Release preparation does not require a live OpenAI API request.
 - Stop after the local commit, final release review, and copy-ready handoff. The user owns the push and pull-request creation.
@@ -46,6 +46,14 @@ Record the base commit as `<preflight-base>`, the source-checkout commit as `<so
 
 ## 3. Run the branch-free readiness gates
 
+Bootstrap the dedicated worktree before starting either readiness gate:
+
+```bash
+env -u OPENAI_API_KEY -u GITHUB_TOKEN -u GH_TOKEN UV_DEFAULT_INDEX=https://pypi.org/simple make sync
+```
+
+This dependency installation is mandatory environment preparation, not candidate materialization. It matches the prospective-contract CI job, which installs all optional dependencies before generating the contract. After synchronization, require `<release-worktree>` to remain clean except for ignored environment or `.tmp` output. If synchronization changes a tracked or untracked repository path, stop with that evidence instead of treating the changed checkout as the reviewed source.
+
 Run both gates against exact `<preflight-base>` before materializing any candidate:
 
 1. Start the prospective packaged-contract gate from `<release-worktree>`:
@@ -58,7 +66,9 @@ Run both gates against exact `<preflight-base>` before materializing any candida
 
 These gates are independent consumers of the same clean source commit. Start the prospective command as a long-running session and perform the read-only planning review while it runs when the execution environment supports overlap. Wait for both results before continuing. If concurrency is unavailable, run them sequentially with the prospective gate first; correctness must not depend on overlap.
 
-If either gate fails or blocks, stop without creating `release/v<version>`, leave the source checkout unchanged, retain the detached worktree, and report its path plus the prospective command failure or the planning review's unblock checklist. A failed prospective gate should direct maintainers to fix the public surface or `tests/fixtures/released_api_contract_policy.json` on `main`. A blocked planning review should direct runtime or documentation-timing follow-up to `main` as applicable. Do not continue merely because the review produced a well-formed report.
+If the prospective command reports only that optional dependency modules are unavailable, treat the result as a recoverable environment-bootstrap failure rather than a contract-gate decision. Do not ask the user to choose between synchronization and fixing `main`. Rerun the credential-free `make sync` command, require the worktree to remain clean, and retry the prospective command exactly once. Do not use this recovery for a contract mismatch, packaging or runtime compatibility failure, changed repository path, or any other substantive gate failure.
+
+If dependency synchronization still fails, the prospective command still reports unavailable dependency modules after the single retry, or either gate otherwise fails or blocks, stop without creating `release/v<version>`, leave the source checkout unchanged, retain the detached worktree, and report its path plus the exact failure or the planning review's unblock checklist. Classify a dependency installation failure as environment or dependency setup, a contract-generation mismatch as public-surface or `tests/fixtures/released_api_contract_policy.json` work on `main`, and a packaged compatibility failure by its actual failing source, packaging, platform, or runtime path. A blocked planning review should direct runtime or documentation-timing follow-up to `main` as applicable. Do not continue merely because the review produced a well-formed report.
 
 After both gates pass, require all of the following before materialization:
 
@@ -159,7 +169,8 @@ Also report the dedicated worktree path, local branch, commit SHA, parent `origi
 ## Failure behavior
 
 - Preflight or worktree creation failure: leave the source checkout unchanged and do not delete or reuse any colliding worktree.
-- Prospective-contract failure or blocked planning review: retain the detached worktree, do not create the release branch, and return the exact failure or unblock checklist.
+- Dependency-bootstrap failure: retry unavailable optional dependency setup only as described in the readiness-gate procedure, then retain the detached worktree and return the exact failure if recovery does not succeed.
+- Prospective-contract failure after the allowed dependency-bootstrap recovery or blocked planning review: retain the detached worktree, do not create the release branch, and return the exact failure or unblock checklist.
 - Materialization failure: retain the worktree and any branch or uncommitted evidence exactly as left by the failing command.
 - Blocked final-candidate review: retain the single release commit and worktree, do not call the candidate PR-ready, and return the checker-derived unblock checklist.
 - Freshness conflict or unexpected changed path: stop with recoverable worktree evidence rather than forcing a resolution or expanding the release manifest.
