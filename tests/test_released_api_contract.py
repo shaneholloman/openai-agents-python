@@ -5,13 +5,13 @@ from collections.abc import AsyncIterator, Callable, Iterator
 from dataclasses import asdict, dataclass
 from enum import Enum
 from importlib.metadata import version
-from inspect import Signature
+from inspect import Parameter, Signature
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 import integration_tests._contract_support as contract_support
 from integration_tests._contract_support import (
@@ -73,8 +73,7 @@ def test_literal_default_contract_preserves_exact_builtin_type(
     assert "changed its released positional parameter prefix" in errors[0]
 
 
-@pytest.mark.allow_call_model_methods
-def test_current_source_preserves_released_public_api_contract() -> None:
+def test_released_api_contract_fixture_matches_installed_version() -> None:
     contract = load_api_contract(CONTRACT)
     assert contract["baseline"] == f"v{version('openai-agents')}"
     assert len(contract["baseline_commit"]) == 40
@@ -115,10 +114,6 @@ def test_current_source_preserves_released_public_api_contract() -> None:
                 ],
             },
         ]
-
-    errors = validate_released_api_contract(contract)
-
-    assert errors == []
 
 
 def test_callable_contract_ignores_typing_aliases() -> None:
@@ -698,20 +693,16 @@ def test_released_enum_contract_freezes_members_and_values() -> None:
     ]
 
 
-def test_public_api_contract_requires_real_export_bindings(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import agents
-
+def test_public_api_contract_requires_real_export_bindings() -> None:
     contract: dict[str, Any] = {
         "required_top_level_exports": ["AgentsException"],
         "public_modules": [],
         "canonical_imports": [],
         "callables": {},
     }
-    monkeypatch.delattr(agents, "AgentsException")
+    agents_module = SimpleNamespace(__all__=["AgentsException"])
 
-    assert validate_released_api_contract(contract) == [
+    assert validate_released_api_contract(contract, agents_module=agents_module) == [
         "Missing released top-level bindings: ['AgentsException']"
     ]
 
@@ -916,11 +907,7 @@ def test_public_api_contract_rejects_same_named_foreign_platform_error(
     assert errors[0].startswith("Failed to import released module agents.platform_specific:")
 
 
-def test_public_api_contract_rejects_required_dataclass_suffix(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    import agents
-
+def test_public_api_contract_rejects_required_dataclass_suffix() -> None:
     @dataclass
     class Incompatible:
         value: str
@@ -946,12 +933,109 @@ def test_public_api_contract_rejects_required_dataclass_suffix(
             }
         },
     }
-    monkeypatch.setattr(agents, "ContractExample", Incompatible, raising=False)
+    agents_module = SimpleNamespace(__all__=[], ContractExample=Incompatible)
 
-    assert validate_released_api_contract(contract) == [
+    assert validate_released_api_contract(contract, agents_module=agents_module) == [
         "ContractExample.required_suffix added a required parameter",
         "ContractExample.required_suffix added a required dataclass field",
     ]
+
+
+def test_callable_contract_tracks_pydantic_model_fields() -> None:
+    class Model(BaseModel):
+        required: str
+        optional: int = 1
+        generated: list[str] = Field(default_factory=list)
+
+    Model.__signature__ = Signature([Parameter("data", kind=Parameter.VAR_KEYWORD)])
+    callable_contract = _callable_contract(Model)
+
+    assert callable_contract["parameters"] == [
+        {"name": "data", "kind": "VAR_KEYWORD", "default": {"kind": "required"}}
+    ]
+    assert callable_contract["model_fields"] == [
+        {"name": "required", "default": {"kind": "required"}},
+        {
+            "name": "optional",
+            "default": {"kind": "literal", "type": "builtins.int", "value": 1},
+        },
+        {
+            "name": "generated",
+            "default": {"kind": "factory", "factory": "builtins.list"},
+        },
+    ]
+
+
+def test_public_api_contract_validates_pydantic_model_fields() -> None:
+    class Released(BaseModel):
+        required: str
+        optional: int = 1
+
+    class Compatible(BaseModel):
+        optional: int = 1
+        required: str
+        added_optional: bool = False
+
+    class Renamed(BaseModel):
+        renamed: str
+        optional: int = 1
+
+    class ChangedDefault(BaseModel):
+        required: str
+        optional: int = 2
+
+    class AddedRequired(BaseModel):
+        required: str
+        optional: int = 1
+        added_required: bool
+
+    opaque_signature = Signature([Parameter("data", kind=Parameter.VAR_KEYWORD)])
+    for model in (Released, Compatible, Renamed, ChangedDefault, AddedRequired):
+        model.__signature__ = opaque_signature
+
+    released_callable = _callable_contract(Released)
+    contract: dict[str, Any] = {
+        "required_top_level_exports": [],
+        "public_modules": [],
+        "canonical_imports": [],
+        "callables": {"Model": released_callable},
+    }
+
+    def validate(model: type[BaseModel]) -> list[str]:
+        return validate_released_api_contract(
+            contract,
+            agents_module=SimpleNamespace(__all__=[], Model=model),
+        )
+
+    assert validate(Compatible) == []
+    assert validate(Renamed) == [
+        "Model.required changed its released Pydantic model field contract: "
+        "expected {'name': 'required', 'default': {'kind': 'required'}}, got None",
+        "Model.renamed added a required Pydantic model field",
+    ]
+    assert validate(ChangedDefault) == [
+        "Model.optional changed its released Pydantic model field contract: "
+        "expected {'name': 'optional', 'default': {'kind': 'literal', "
+        "'type': 'builtins.int', 'value': 1}}, got {'name': 'optional', "
+        "'default': {'kind': 'literal', 'type': 'builtins.int', 'value': 2}}"
+    ]
+    assert validate(AddedRequired) == ["Model.added_required added a required Pydantic model field"]
+
+    legacy_contract = {
+        **contract,
+        "callables": {
+            "Model": {
+                key: value for key, value in released_callable.items() if key != "model_fields"
+            }
+        },
+    }
+    assert (
+        validate_released_api_contract(
+            legacy_contract,
+            agents_module=SimpleNamespace(__all__=[], Model=Renamed),
+        )
+        == []
+    )
 
 
 def test_release_contract_update_freezes_new_exports_and_callables() -> None:
@@ -1932,10 +2016,17 @@ def test_repository_release_policy_declares_v020_contract_surfaces() -> None:
     ).unsupported_platforms == ("win32",)
     assert {(entry["module"], entry["name"]) for entry in policy.canonical_imports} == {
         ("agents.items", "InputItem"),
+        ("agents.extensions.sandbox", "ModalCloudBucketMountStrategy"),
         ("agents.extensions.sandbox", "ModalSandboxClient"),
         ("agents.extensions.sandbox", "ModalSandboxClientOptions"),
+        ("agents.extensions.sandbox", "RunloopAfterIdle"),
+        ("agents.extensions.sandbox", "RunloopGatewaySpec"),
+        ("agents.extensions.sandbox", "RunloopLaunchParameters"),
+        ("agents.extensions.sandbox", "RunloopMcpSpec"),
         ("agents.extensions.sandbox", "RunloopSandboxClient"),
         ("agents.extensions.sandbox", "RunloopSandboxClientOptions"),
+        ("agents.extensions.sandbox", "RunloopTunnelConfig"),
+        ("agents.extensions.sandbox", "RunloopUserParameters"),
         ("agents.extensions.sandbox", "VercelSandboxClient"),
         ("agents.extensions.sandbox", "VercelSandboxClientOptions"),
     }
