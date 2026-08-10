@@ -465,6 +465,15 @@ def _callable_kind(value: Callable[..., Any]) -> str | None:
     return None
 
 
+def _is_sdk_owned_callable(value: object) -> bool:
+    module_name = getattr(value, "__module__", None)
+    return (
+        _callable_kind(cast(Callable[..., Any], value)) is not None
+        and isinstance(module_name, str)
+        and (module_name == "agents" or module_name.startswith("agents."))
+    )
+
+
 def _enum_member_contract(value: object) -> list[dict[str, object]] | None:
     if not (issubclass(type(value), type) and issubclass(cast(type, value), enum.Enum)):
         return None
@@ -729,6 +738,15 @@ def _preserve_released_callable_for_promotion(
     callables[qualified_name] = deepcopy(released_callable)
 
 
+def _preserve_released_submodule_callables(
+    contract: Mapping[str, Any], callables: dict[str, Any], module_name: str
+) -> None:
+    for qualified_name, released_callable in contract["callables"].items():
+        callable_module, _, _ = qualified_name.rpartition(".")
+        if callable_module == module_name:
+            callables.setdefault(qualified_name, deepcopy(released_callable))
+
+
 def build_released_api_contract(
     contract: dict[str, Any],
     *,
@@ -924,6 +942,7 @@ def build_released_api_contract(
             )
     updated["public_modules"] = public_modules
     required_submodule_exports: dict[str, dict[str, Any]] = {}
+    released_submodule_exports = contract.get("required_submodule_exports", {})
     for module_name in public_modules:
         if module_name == "agents" or module_name in excluded_submodule_exports:
             continue
@@ -931,6 +950,7 @@ def build_released_api_contract(
             module = _import_contract_module(module_name, agents_module)
         except Exception as error:
             if _matches_platform_import_error(contract, module_name, error):
+                _preserve_released_submodule_callables(contract, callables, module_name)
                 continue
             if submodule_export_policy is not None and module_name in submodule_export_policy:
                 raise ValueError(
@@ -959,6 +979,38 @@ def build_released_api_contract(
         )
         if module_contract is not None:
             required_submodule_exports[module_name] = module_contract
+            released_names = set(released_submodule_exports.get(module_name, {}).get("names", []))
+            for name in module_contract["names"]:
+                qualified_name = f"{module_name}.{name}"
+                was_tracked = qualified_name in tracked_callables
+                if name in released_names and not was_tracked:
+                    continue
+                optional_dependency = _optional_dependency_for_binding_in_modules(
+                    {module_name: module_contract}, module_name, name
+                )
+                if optional_dependency is not None and not (
+                    _optional_dependency_is_available_for_contract(
+                        optional_dependency, policy_unsupported_platforms
+                    )
+                ):
+                    if was_tracked:
+                        callables[qualified_name] = deepcopy(contract["callables"][qualified_name])
+                    continue
+                value = getattr(module, name, None)
+                if value is None:
+                    continue
+                if not was_tracked and not _is_sdk_owned_callable(value):
+                    continue
+                kind = _callable_kind(value)
+                if kind is None:
+                    continue
+                try:
+                    _signature(value)
+                except (TypeError, ValueError):
+                    if was_tracked:
+                        callables[qualified_name] = deepcopy(contract["callables"][qualified_name])
+                    continue
+                callables[qualified_name] = _callable_contract(value)
     updated["required_submodule_exports"] = required_submodule_exports
 
     updated_errors = validate_released_api_contract(updated, agents_module=agents)

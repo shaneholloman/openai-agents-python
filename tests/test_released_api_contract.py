@@ -1209,6 +1209,235 @@ def test_release_contract_update_promotes_selected_submodule_exports(
     }
 
 
+def test_release_contract_update_freezes_new_sdk_submodule_callable_without_canonical_import(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Existing:
+        pass
+
+    class NewPublic:
+        def __init__(self, value: str, optional: int = 1) -> None:
+            self.value = value
+            self.optional = optional
+
+    Existing.__module__ = "agents.submodule"
+    NewPublic.__module__ = "agents.submodule"
+    agents_module = SimpleNamespace(__all__=["NewPublic"], NewPublic=NewPublic)
+    submodule = SimpleNamespace(
+        __all__=["Existing", "NewPublic"], Existing=Existing, NewPublic=NewPublic
+    )
+    contract: dict[str, Any] = {
+        "baseline": "v0.19.4",
+        "baseline_commit": "a" * 40,
+        "required_top_level_exports": [],
+        "public_modules": ["agents.submodule"],
+        "required_submodule_exports": {
+            "agents.submodule": {
+                "names": ["Existing"],
+                "optional_bindings": {},
+                "optional_exports": {},
+            }
+        },
+        "canonical_imports": [],
+        "callables": {},
+    }
+    monkeypatch.setattr(
+        contract_support,
+        "_import_contract_module",
+        lambda module_name, _agents_module: (
+            agents_module if module_name == "agents" else submodule
+        ),
+    )
+
+    updated = build_released_api_contract(
+        contract,
+        baseline="v0.20.0",
+        baseline_commit="b" * 40,
+        agents_module=agents_module,
+    )
+
+    assert "agents.submodule.Existing" not in updated["callables"]
+    assert updated["callables"]["NewPublic"] == _callable_contract(NewPublic)
+    assert updated["callables"]["agents.submodule.NewPublic"] == _callable_contract(NewPublic)
+    assert updated["canonical_imports"] == []
+
+    unchanged = build_released_api_contract(
+        updated,
+        baseline="v0.20.0",
+        baseline_commit="c" * 40,
+        agents_module=agents_module,
+    )
+    assert unchanged["callables"]["agents.submodule.NewPublic"] == _callable_contract(NewPublic)
+
+    class ChangedPublic:
+        def __init__(self, value: str, optional: int = 1, *, required: int) -> None:
+            self.value = value
+            self.optional = optional
+            self.required = required
+
+    ChangedPublic.__module__ = "agents.submodule"
+    submodule.NewPublic = ChangedPublic
+
+    assert validate_released_api_contract(updated, agents_module=agents_module) == [
+        "agents.submodule.NewPublic.required added a required parameter"
+    ]
+
+
+def test_release_contract_update_skips_new_third_party_submodule_callable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class ExternalPublic:
+        pass
+
+    ExternalPublic.__module__ = "external_package"
+    agents_module = SimpleNamespace(__all__=[])
+    submodule = SimpleNamespace(__all__=["ExternalPublic"], ExternalPublic=ExternalPublic)
+    contract: dict[str, Any] = {
+        "baseline": "v0.19.4",
+        "baseline_commit": "a" * 40,
+        "required_top_level_exports": [],
+        "public_modules": ["agents.submodule"],
+        "required_submodule_exports": {
+            "agents.submodule": {
+                "names": [],
+                "optional_bindings": {},
+                "optional_exports": {},
+            }
+        },
+        "canonical_imports": [],
+        "callables": {},
+    }
+    monkeypatch.setattr(
+        contract_support,
+        "_import_contract_module",
+        lambda module_name, _agents_module: (
+            agents_module if module_name == "agents" else submodule
+        ),
+    )
+
+    updated = build_released_api_contract(
+        contract,
+        baseline="v0.20.0",
+        baseline_commit="b" * 40,
+        agents_module=agents_module,
+    )
+
+    assert "agents.submodule.ExternalPublic" not in updated["callables"]
+
+
+def test_release_contract_update_preserves_tracked_submodule_callable_on_unsupported_platform(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class OptionalPublic:
+        def __init__(self, value: str) -> None:
+            self.value = value
+
+    OptionalPublic.__module__ = "agents.optional_parent"
+    agents_module = SimpleNamespace(__all__=[])
+    submodule = SimpleNamespace(__all__=[])
+    callable_contract = _callable_contract(OptionalPublic)
+    contract: dict[str, Any] = {
+        "baseline": "v0.19.4",
+        "baseline_commit": "a" * 40,
+        "required_top_level_exports": [],
+        "public_modules": ["agents.optional_parent"],
+        "required_submodule_exports": {
+            "agents.optional_parent": {
+                "names": ["OptionalPublic"],
+                "optional_bindings": {},
+                "optional_exports": {"OptionalPublic": "optional_backend"},
+            }
+        },
+        "optional_dependency_unsupported_platforms": {"optional_backend": ["win32"]},
+        "canonical_imports": [],
+        "callables": {"agents.optional_parent.OptionalPublic": callable_contract},
+    }
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(contract_support, "_optional_dependency_is_available", lambda _name: False)
+    monkeypatch.setattr(
+        contract_support,
+        "_import_contract_module",
+        lambda module_name, _agents_module: (
+            agents_module if module_name == "agents" else submodule
+        ),
+    )
+
+    updated = build_released_api_contract(
+        contract,
+        baseline="v0.20.0",
+        baseline_commit="b" * 40,
+        agents_module=agents_module,
+        release_policy=_release_policy(
+            {
+                "agents.optional_parent": {
+                    "optional_bindings": {},
+                    "optional_exports": {"OptionalPublic": "optional_backend"},
+                }
+            },
+            dependency_installations=(
+                OptionalDependencyInstallation(
+                    dependency_module="optional_backend",
+                    extra="optional-provider",
+                    unsupported_platforms=("win32",),
+                ),
+            ),
+        ),
+    )
+
+    assert updated["callables"]["agents.optional_parent.OptionalPublic"] == callable_contract
+
+
+def test_release_contract_update_preserves_tracked_submodule_callable_on_platform_import_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class PlatformPublic:
+        def __init__(self, value: str) -> None:
+            self.value = value
+
+    PlatformPublic.__module__ = "agents.platform_specific"
+    agents_module = SimpleNamespace(__all__=[])
+    callable_contract = _callable_contract(PlatformPublic)
+    contract: dict[str, Any] = {
+        "baseline": "v0.19.4",
+        "baseline_commit": "a" * 40,
+        "required_top_level_exports": [],
+        "public_modules": ["agents.platform_specific"],
+        "required_submodule_exports": {
+            "agents.platform_specific": {
+                "names": ["PlatformPublic"],
+                "optional_bindings": {},
+                "optional_exports": {},
+            }
+        },
+        "platform_import_errors": [
+            {
+                "module": "agents.platform_specific",
+                "platforms": ["win32"],
+                "error_type": "ImportError",
+                "message_contains": "not supported on Windows",
+            }
+        ],
+        "canonical_imports": [],
+        "callables": {"agents.platform_specific.PlatformPublic": callable_contract},
+    }
+
+    def import_platform_module(module_name: str, _: Any) -> Any:
+        assert module_name == "agents.platform_specific"
+        raise ImportError("Backend is not supported on Windows.")
+
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(contract_support, "_import_contract_module", import_platform_module)
+
+    updated = build_released_api_contract(
+        contract,
+        baseline="v0.20.0",
+        baseline_commit="b" * 40,
+        agents_module=agents_module,
+    )
+
+    assert updated["callables"]["agents.platform_specific.PlatformPublic"] == callable_contract
+
+
 def test_release_contract_policy_preserves_new_optional_export_in_core_install(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
