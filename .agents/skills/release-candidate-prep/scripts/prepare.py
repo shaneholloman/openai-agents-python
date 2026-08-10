@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare an uncommitted local release candidate from exact origin/main."""
+"""Preflight and materialize a local release candidate from exact origin/main."""
 
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ from collections.abc import Sequence
 
 ROOT = Path(__file__).resolve().parents[4]
 VERSION_PATTERN = re.compile(r"\d+\.\d+(?:\.\d+)*(?:[A-Za-z0-9.-]+)?\Z")
+COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}\Z")
 PROJECT_VERSION_PATTERN = re.compile(r'(?m)^version\s*=\s*"[^"]+"')
 RELEASE_PATHS = frozenset(
     {
@@ -34,6 +35,15 @@ RELEASE_PATHS = frozenset(
 
 class ReleasePreparationError(RuntimeError):
     """Report a safe, actionable release preparation failure."""
+
+
+@dataclass(frozen=True)
+class ReleasePreflight:
+    """Describe a branch-free release readiness input."""
+
+    base_commit: str
+    branch: str
+    version: str
 
 
 @dataclass(frozen=True)
@@ -107,6 +117,16 @@ def validate_version(version: str) -> str:
             "Version must be semver-like without a leading v, for example 0.20.1 or 0.21.0-rc1."
         )
     return version
+
+
+def validate_commit(commit: str) -> str:
+    """Validate an exact lowercase Git commit identifier."""
+
+    if COMMIT_PATTERN.fullmatch(commit) is None:
+        raise ReleasePreparationError(
+            "Expected base must be a full 40-character lowercase Git commit identifier."
+        )
+    return commit
 
 
 def project_version(repo: Path) -> str:
@@ -203,11 +223,16 @@ def _locked_project_version(repo: Path) -> str:
         for package in packages
         if package.get("name") == "openai-agents" and package.get("source") == {"editable": "."}
     ]
-    if len(matches) != 1 or not isinstance(matches[0].get("version"), str):
+    if len(matches) != 1:
         raise ReleasePreparationError(
             "uv.lock must contain exactly one editable openai-agents package with a version."
         )
-    return matches[0]["version"]
+    locked_version = matches[0].get("version")
+    if not isinstance(locked_version, str):
+        raise ReleasePreparationError(
+            "uv.lock must contain exactly one editable openai-agents package with a version."
+        )
+    return locked_version
 
 
 def _validate_prepared_files(repo: Path, version: str, base_commit: str) -> tuple[str, ...]:
@@ -241,8 +266,8 @@ def _validate_prepared_files(repo: Path, version: str, base_commit: str) -> tupl
     return tuple(sorted(changed))
 
 
-def prepare(repo: Path, version: str) -> PreparedCandidate:
-    """Prepare the three-file release candidate and leave it uncommitted."""
+def preflight(repo: Path, version: str) -> ReleasePreflight:
+    """Refresh exact main and validate release inputs without creating a branch."""
 
     repo = repo.resolve()
     version = validate_version(version)
@@ -278,6 +303,32 @@ def prepare(repo: Path, version: str) -> PreparedCandidate:
         raise ReleasePreparationError(f"Refreshed origin/main already declares version {version}.")
 
     _require_branch_absent(repo, branch)
+    if _status(repo):
+        raise ReleasePreparationError(
+            "Release preflight must leave the refreshed main working tree clean."
+        )
+    return ReleasePreflight(
+        base_commit=base_commit,
+        branch=branch,
+        version=version,
+    )
+
+
+def materialize(repo: Path, version: str, expected_base: str) -> PreparedCandidate:
+    """Create the three-file candidate only from the reviewed preflight commit."""
+
+    expected_base = validate_commit(expected_base)
+    release_input = preflight(repo, version)
+    if release_input.base_commit != expected_base:
+        raise ReleasePreparationError(
+            f"Preflight reviewed {expected_base}, but refreshed origin/main is "
+            f"{release_input.base_commit}; rerun release preflight and planning review."
+        )
+
+    repo = repo.resolve()
+    env = _release_environment()
+    branch = release_input.branch
+    base_commit = release_input.base_commit
     run_command(repo, ["git", "switch", "-c", branch], env=env, announce=True)
     replace_project_version(repo, version)
     run_command(repo, ["make", "sync"], env=env, announce=True)
@@ -304,12 +355,31 @@ def prepare(repo: Path, version: str) -> PreparedCandidate:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Prepare an uncommitted local release candidate from exact origin/main."
+        description="Preflight or materialize a local release candidate from exact origin/main."
     )
-    parser.add_argument(
+    subparsers = parser.add_subparsers(dest="phase", required=True)
+    preflight_parser = subparsers.add_parser(
+        "preflight",
+        help="Refresh exact main and validate inputs without creating a release branch.",
+    )
+    preflight_parser.add_argument(
         "--version",
         required=True,
         help="Release version without a leading v, for example 0.20.1.",
+    )
+    materialize_parser = subparsers.add_parser(
+        "materialize",
+        help="Create an uncommitted candidate from the reviewed preflight commit.",
+    )
+    materialize_parser.add_argument(
+        "--version",
+        required=True,
+        help="Release version without a leading v, for example 0.20.1.",
+    )
+    materialize_parser.add_argument(
+        "--expected-base",
+        required=True,
+        help="Exact 40-character origin/main commit approved by release preflight.",
     )
     return parser.parse_args()
 
@@ -317,10 +387,21 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     try:
-        candidate = prepare(ROOT, args.version)
+        if args.phase == "preflight":
+            release_input = preflight(ROOT, args.version)
+        else:
+            candidate = materialize(ROOT, args.version, args.expected_base)
     except (OSError, ReleasePreparationError, tomllib.TOMLDecodeError, json.JSONDecodeError) as exc:
         print(f"Release preparation failed: {exc}", file=sys.stderr)
         return 1
+
+    if args.phase == "preflight":
+        print("Release preflight passed on clean main without creating a branch.")
+        print(f"Base commit: {release_input.base_commit}")
+        print(f"Planned branch: {release_input.branch}")
+        print(f"Version: {release_input.version}")
+        print("Run the prospective contract and planning-review gates against this commit.")
+        return 0
 
     print("Release candidate prepared locally and left uncommitted.")
     print(f"Base commit: {candidate.base_commit}")

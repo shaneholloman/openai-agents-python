@@ -164,11 +164,37 @@ class VersionTests(unittest.TestCase):
                 "0.20.0",
             )
 
+    def test_validate_commit_requires_full_lowercase_identifier(self) -> None:
+        commit = "a" * 40
+        self.assertEqual(prepare.validate_commit(commit), commit)
+        for value in ("a" * 39, "A" * 40, "main", "a" * 41):
+            with self.subTest(value=value), self.assertRaises(prepare.ReleasePreparationError):
+                prepare.validate_commit(value)
+
 
 class PreparationTests(unittest.TestCase):
-    def test_prepare_creates_branch_and_exact_uncommitted_manifest(self) -> None:
+    def test_preflight_leaves_clean_main_without_creating_branch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             fixture = ReleaseRepository(Path(directory))
+
+            release_input = prepare.preflight(fixture.repo, "0.20.0")
+
+            self.assertEqual(release_input.base_commit, fixture.base_commit)
+            self.assertEqual(release_input.branch, "release/v0.20.0")
+            self.assertEqual(
+                run(fixture.repo, "git", "branch", "--show-current").stdout.strip(),
+                "main",
+            )
+            self.assertEqual(run(fixture.repo, "git", "status", "--porcelain").stdout, "")
+            self.assertNotIn(
+                "release/v0.20.0",
+                run(fixture.repo, "git", "branch", "--format=%(refname:short)").stdout.splitlines(),
+            )
+
+    def test_materialize_creates_branch_and_exact_uncommitted_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = ReleaseRepository(Path(directory))
+            release_input = prepare.preflight(fixture.repo, "0.20.0")
 
             with mock.patch.dict(
                 os.environ,
@@ -178,7 +204,11 @@ class PreparationTests(unittest.TestCase):
                     "OPENAI_API_KEY": "untrusted",
                 },
             ):
-                candidate = prepare.prepare(fixture.repo, "0.20.0")
+                candidate = prepare.materialize(
+                    fixture.repo,
+                    "0.20.0",
+                    release_input.base_commit,
+                )
 
             self.assertEqual(candidate.base_commit, fixture.base_commit)
             self.assertEqual(candidate.branch, "release/v0.20.0")
@@ -206,7 +236,7 @@ class PreparationTests(unittest.TestCase):
             self.assertEqual(contract["baseline"], "v0.20.0")
             self.assertEqual(contract["baseline_commit"], fixture.base_commit)
 
-    def test_prepare_rejects_dirty_main_without_creating_branch(self) -> None:
+    def test_preflight_rejects_dirty_main_without_creating_branch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             fixture = ReleaseRepository(Path(directory))
             (fixture.repo / "dirty.txt").write_text("dirty\n", encoding="utf-8")
@@ -215,28 +245,28 @@ class PreparationTests(unittest.TestCase):
                 prepare.ReleasePreparationError,
                 "clean working tree",
             ):
-                prepare.prepare(fixture.repo, "0.20.0")
+                prepare.preflight(fixture.repo, "0.20.0")
 
             self.assertEqual(
                 run(fixture.repo, "git", "branch", "--show-current").stdout.strip(),
                 "main",
             )
 
-    def test_prepare_fast_forwards_to_refreshed_origin_main(self) -> None:
+    def test_preflight_fast_forwards_to_refreshed_origin_main(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             fixture = ReleaseRepository(Path(directory))
             refreshed_base = fixture.advance_origin()
 
-            candidate = prepare.prepare(fixture.repo, "0.20.0")
+            release_input = prepare.preflight(fixture.repo, "0.20.0")
 
-            self.assertEqual(candidate.base_commit, refreshed_base)
+            self.assertEqual(release_input.base_commit, refreshed_base)
             self.assertEqual(
                 run(fixture.repo, "git", "rev-parse", "HEAD").stdout.strip(),
                 refreshed_base,
             )
             self.assertTrue((fixture.repo / "new-source.txt").is_file())
 
-    def test_prepare_rejects_existing_remote_release_branch(self) -> None:
+    def test_preflight_rejects_existing_remote_release_branch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             fixture = ReleaseRepository(Path(directory))
             run(
@@ -251,11 +281,38 @@ class PreparationTests(unittest.TestCase):
                 prepare.ReleasePreparationError,
                 "Remote branch 'release/v0.20.0' already exists",
             ):
-                prepare.prepare(fixture.repo, "0.20.0")
+                prepare.preflight(fixture.repo, "0.20.0")
 
             self.assertEqual(
                 run(fixture.repo, "git", "branch", "--show-current").stdout.strip(),
                 "main",
+            )
+
+    def test_materialize_rejects_stale_preflight_before_creating_branch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = ReleaseRepository(Path(directory))
+            release_input = prepare.preflight(fixture.repo, "0.20.0")
+            refreshed_base = fixture.advance_origin()
+
+            with self.assertRaisesRegex(
+                prepare.ReleasePreparationError,
+                f"Preflight reviewed {release_input.base_commit}, but refreshed origin/main is "
+                f"{refreshed_base}",
+            ):
+                prepare.materialize(fixture.repo, "0.20.0", release_input.base_commit)
+
+            self.assertEqual(
+                run(fixture.repo, "git", "branch", "--show-current").stdout.strip(),
+                "main",
+            )
+            self.assertEqual(
+                run(fixture.repo, "git", "rev-parse", "HEAD").stdout.strip(),
+                refreshed_base,
+            )
+            self.assertEqual(run(fixture.repo, "git", "status", "--porcelain").stdout, "")
+            self.assertNotIn(
+                "release/v0.20.0",
+                run(fixture.repo, "git", "branch", "--format=%(refname:short)").stdout.splitlines(),
             )
 
 
