@@ -14,11 +14,11 @@ from unittest import mock
 import prepare
 
 
-def run(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+def run(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         list(args),
         cwd=repo,
-        check=True,
+        check=check,
         capture_output=True,
         text=True,
     )
@@ -31,6 +31,7 @@ class ReleaseRepository:
         self.root = root
         self.repo = root / "repo"
         self.origin = root / "origin.git"
+        self.worktree_root = root / "worktrees"
         self.repo.mkdir()
         run(self.repo, "git", "init", "--initial-branch=main")
         run(self.repo, "git", "config", "user.name", "Release Test")
@@ -177,7 +178,12 @@ class PreparationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             fixture = ReleaseRepository(Path(directory))
 
-            release_input = prepare.preflight(fixture.repo, "0.20.0")
+            source_head = fixture.base_commit
+            release_input = prepare.preflight(
+                fixture.repo,
+                "0.20.0",
+                fixture.worktree_root,
+            )
 
             self.assertEqual(release_input.base_commit, fixture.base_commit)
             self.assertEqual(release_input.branch, "release/v0.20.0")
@@ -186,6 +192,30 @@ class PreparationTests(unittest.TestCase):
                 "main",
             )
             self.assertEqual(run(fixture.repo, "git", "status", "--porcelain").stdout, "")
+            self.assertEqual(
+                run(fixture.repo, "git", "rev-parse", "HEAD").stdout.strip(),
+                source_head,
+            )
+            self.assertEqual(
+                run(release_input.worktree, "git", "rev-parse", "HEAD").stdout.strip(),
+                fixture.base_commit,
+            )
+            self.assertEqual(
+                run(
+                    release_input.worktree,
+                    "git",
+                    "symbolic-ref",
+                    "--quiet",
+                    "--short",
+                    "HEAD",
+                    check=False,
+                ).returncode,
+                1,
+            )
+            self.assertEqual(
+                run(release_input.worktree, "git", "status", "--porcelain").stdout,
+                "",
+            )
             self.assertNotIn(
                 "release/v0.20.0",
                 run(fixture.repo, "git", "branch", "--format=%(refname:short)").stdout.splitlines(),
@@ -194,7 +224,11 @@ class PreparationTests(unittest.TestCase):
     def test_materialize_creates_branch_and_exact_uncommitted_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             fixture = ReleaseRepository(Path(directory))
-            release_input = prepare.preflight(fixture.repo, "0.20.0")
+            release_input = prepare.preflight(
+                fixture.repo,
+                "0.20.0",
+                fixture.worktree_root,
+            )
 
             with mock.patch.dict(
                 os.environ,
@@ -208,19 +242,32 @@ class PreparationTests(unittest.TestCase):
                     fixture.repo,
                     "0.20.0",
                     release_input.base_commit,
+                    release_input.source_commit,
+                    release_input.worktree,
                 )
 
             self.assertEqual(candidate.base_commit, fixture.base_commit)
             self.assertEqual(candidate.branch, "release/v0.20.0")
             self.assertEqual(set(candidate.changed_paths), prepare.RELEASE_PATHS)
             self.assertEqual(
-                run(fixture.repo, "git", "branch", "--show-current").stdout.strip(),
+                run(release_input.worktree, "git", "branch", "--show-current").stdout.strip(),
                 "release/v0.20.0",
             )
             self.assertEqual(
-                run(fixture.repo, "git", "rev-list", "--count", "origin/main..HEAD").stdout.strip(),
+                run(
+                    release_input.worktree,
+                    "git",
+                    "rev-list",
+                    "--count",
+                    "origin/main..HEAD",
+                ).stdout.strip(),
                 "0",
             )
+            self.assertEqual(
+                run(fixture.repo, "git", "branch", "--show-current").stdout.strip(),
+                "main",
+            )
+            self.assertEqual(run(fixture.repo, "git", "status", "--porcelain").stdout, "")
             remote_heads = run(
                 fixture.repo,
                 "git",
@@ -231,7 +278,7 @@ class PreparationTests(unittest.TestCase):
             ).stdout
             self.assertEqual(remote_heads, "")
             contract = json.loads(
-                (fixture.repo / "tests/fixtures/released_api_contract.json").read_text()
+                (release_input.worktree / "tests/fixtures/released_api_contract.json").read_text()
             )
             self.assertEqual(contract["baseline"], "v0.20.0")
             self.assertEqual(contract["baseline_commit"], fixture.base_commit)
@@ -245,26 +292,36 @@ class PreparationTests(unittest.TestCase):
                 prepare.ReleasePreparationError,
                 "clean working tree",
             ):
-                prepare.preflight(fixture.repo, "0.20.0")
+                prepare.preflight(fixture.repo, "0.20.0", fixture.worktree_root)
 
             self.assertEqual(
                 run(fixture.repo, "git", "branch", "--show-current").stdout.strip(),
                 "main",
             )
 
-    def test_preflight_fast_forwards_to_refreshed_origin_main(self) -> None:
+    def test_preflight_keeps_source_main_and_checks_out_refreshed_origin_in_worktree(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             fixture = ReleaseRepository(Path(directory))
+            source_head = fixture.base_commit
             refreshed_base = fixture.advance_origin()
 
-            release_input = prepare.preflight(fixture.repo, "0.20.0")
+            release_input = prepare.preflight(
+                fixture.repo,
+                "0.20.0",
+                fixture.worktree_root,
+            )
 
             self.assertEqual(release_input.base_commit, refreshed_base)
             self.assertEqual(
                 run(fixture.repo, "git", "rev-parse", "HEAD").stdout.strip(),
+                source_head,
+            )
+            self.assertFalse((fixture.repo / "new-source.txt").exists())
+            self.assertEqual(
+                run(release_input.worktree, "git", "rev-parse", "HEAD").stdout.strip(),
                 refreshed_base,
             )
-            self.assertTrue((fixture.repo / "new-source.txt").is_file())
+            self.assertTrue((release_input.worktree / "new-source.txt").is_file())
 
     def test_preflight_rejects_existing_remote_release_branch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -281,7 +338,7 @@ class PreparationTests(unittest.TestCase):
                 prepare.ReleasePreparationError,
                 "Remote branch 'release/v0.20.0' already exists",
             ):
-                prepare.preflight(fixture.repo, "0.20.0")
+                prepare.preflight(fixture.repo, "0.20.0", fixture.worktree_root)
 
             self.assertEqual(
                 run(fixture.repo, "git", "branch", "--show-current").stdout.strip(),
@@ -291,7 +348,11 @@ class PreparationTests(unittest.TestCase):
     def test_materialize_rejects_stale_preflight_before_creating_branch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             fixture = ReleaseRepository(Path(directory))
-            release_input = prepare.preflight(fixture.repo, "0.20.0")
+            release_input = prepare.preflight(
+                fixture.repo,
+                "0.20.0",
+                fixture.worktree_root,
+            )
             refreshed_base = fixture.advance_origin()
 
             with self.assertRaisesRegex(
@@ -299,7 +360,13 @@ class PreparationTests(unittest.TestCase):
                 f"Preflight reviewed {release_input.base_commit}, but refreshed origin/main is "
                 f"{refreshed_base}",
             ):
-                prepare.materialize(fixture.repo, "0.20.0", release_input.base_commit)
+                prepare.materialize(
+                    fixture.repo,
+                    "0.20.0",
+                    release_input.base_commit,
+                    release_input.source_commit,
+                    release_input.worktree,
+                )
 
             self.assertEqual(
                 run(fixture.repo, "git", "branch", "--show-current").stdout.strip(),
@@ -307,9 +374,158 @@ class PreparationTests(unittest.TestCase):
             )
             self.assertEqual(
                 run(fixture.repo, "git", "rev-parse", "HEAD").stdout.strip(),
-                refreshed_base,
+                fixture.base_commit,
             )
             self.assertEqual(run(fixture.repo, "git", "status", "--porcelain").stdout, "")
+            self.assertEqual(
+                run(release_input.worktree, "git", "rev-parse", "HEAD").stdout.strip(),
+                fixture.base_commit,
+            )
+            self.assertEqual(
+                run(
+                    release_input.worktree,
+                    "git",
+                    "symbolic-ref",
+                    "--quiet",
+                    "--short",
+                    "HEAD",
+                    check=False,
+                ).returncode,
+                1,
+            )
+            self.assertNotIn(
+                "release/v0.20.0",
+                run(fixture.repo, "git", "branch", "--format=%(refname:short)").stdout.splitlines(),
+            )
+
+    def test_preflight_chooses_a_new_path_without_reusing_a_worktree_collision(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = ReleaseRepository(Path(directory))
+            collision = fixture.worktree_root / f"{fixture.repo.name}-release-v0.20.0"
+            collision.parent.mkdir(parents=True)
+            run(
+                fixture.repo,
+                "git",
+                "worktree",
+                "add",
+                "--detach",
+                str(collision),
+                fixture.base_commit,
+            )
+
+            release_input = prepare.preflight(
+                fixture.repo,
+                "0.20.0",
+                fixture.worktree_root,
+            )
+
+            self.assertEqual(
+                release_input.worktree,
+                (fixture.worktree_root / f"{fixture.repo.name}-release-v0.20.0-2").resolve(),
+            )
+            self.assertTrue(collision.is_dir())
+            self.assertEqual(
+                run(collision, "git", "rev-parse", "HEAD").stdout.strip(),
+                fixture.base_commit,
+            )
+
+    def test_preflight_rejects_a_worktree_root_inside_the_source_checkout(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = ReleaseRepository(Path(directory))
+            nested_root = fixture.repo / ".release-worktrees"
+
+            with self.assertRaisesRegex(
+                prepare.ReleasePreparationError,
+                "must be outside the source checkout",
+            ):
+                prepare.preflight(fixture.repo, "0.20.0", nested_root)
+
+            self.assertFalse(nested_root.exists())
+            self.assertEqual(run(fixture.repo, "git", "status", "--porcelain").stdout, "")
+
+    def test_materialize_failure_preserves_worktree_evidence_and_source_checkout(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = ReleaseRepository(Path(directory))
+            release_input = prepare.preflight(
+                fixture.repo,
+                "0.20.0",
+                fixture.worktree_root,
+            )
+            real_run_command = prepare.run_command
+
+            def fail_sync(
+                repo: Path,
+                args: list[str] | tuple[str, ...],
+                **kwargs: object,
+            ) -> subprocess.CompletedProcess[str]:
+                if list(args) == ["make", "sync"]:
+                    raise prepare.ReleasePreparationError("simulated make sync failure")
+                return real_run_command(repo, args, **kwargs)
+
+            with mock.patch.object(prepare, "run_command", side_effect=fail_sync):
+                with self.assertRaisesRegex(
+                    prepare.ReleasePreparationError,
+                    "simulated make sync failure",
+                ):
+                    prepare.materialize(
+                        fixture.repo,
+                        "0.20.0",
+                        release_input.base_commit,
+                        release_input.source_commit,
+                        release_input.worktree,
+                    )
+
+            self.assertEqual(
+                run(fixture.repo, "git", "branch", "--show-current").stdout.strip(),
+                "main",
+            )
+            self.assertEqual(run(fixture.repo, "git", "status", "--porcelain").stdout, "")
+            self.assertEqual(
+                run(release_input.worktree, "git", "branch", "--show-current").stdout.strip(),
+                "release/v0.20.0",
+            )
+            self.assertIn(
+                "pyproject.toml",
+                run(release_input.worktree, "git", "status", "--porcelain").stdout,
+            )
+            self.assertEqual(prepare.project_version(release_input.worktree), "0.20.0")
+
+    def test_materialize_rejects_a_source_checkout_head_change(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = ReleaseRepository(Path(directory))
+            release_input = prepare.preflight(
+                fixture.repo,
+                "0.20.0",
+                fixture.worktree_root,
+            )
+            (fixture.repo / "local-only.txt").write_text("local\n", encoding="utf-8")
+            run(fixture.repo, "git", "add", "local-only.txt")
+            run(fixture.repo, "git", "commit", "-m", "Move source checkout")
+
+            with self.assertRaisesRegex(
+                prepare.ReleasePreparationError,
+                "Source checkout HEAD changed",
+            ):
+                prepare.materialize(
+                    fixture.repo,
+                    "0.20.0",
+                    release_input.base_commit,
+                    release_input.source_commit,
+                    release_input.worktree,
+                )
+
+            self.assertEqual(
+                run(
+                    release_input.worktree,
+                    "git",
+                    "symbolic-ref",
+                    "--quiet",
+                    "--short",
+                    "HEAD",
+                    check=False,
+                ).returncode,
+                1,
+            )
             self.assertNotIn(
                 "release/v0.20.0",
                 run(fixture.repo, "git", "branch", "--format=%(refname:short)").stdout.splitlines(),

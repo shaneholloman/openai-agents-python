@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Preflight and materialize a local release candidate from exact origin/main."""
+"""Preflight and materialize an isolated release candidate from exact origin/main."""
 
 from __future__ import annotations
 
@@ -39,21 +39,25 @@ class ReleasePreparationError(RuntimeError):
 
 @dataclass(frozen=True)
 class ReleasePreflight:
-    """Describe a branch-free release readiness input."""
+    """Describe an isolated branch-free release readiness input."""
 
     base_commit: str
     branch: str
+    source_commit: str
     version: str
+    worktree: Path
 
 
 @dataclass(frozen=True)
 class PreparedCandidate:
-    """Describe the successfully prepared local candidate."""
+    """Describe the successfully prepared isolated candidate."""
 
     base_commit: str
     branch: str
     changed_paths: tuple[str, ...]
+    source_commit: str
     version: str
+    worktree: Path
 
 
 def _release_environment() -> dict[str, str]:
@@ -139,6 +143,17 @@ def project_version(repo: Path) -> str:
     return version
 
 
+def project_version_at(repo: Path, commit: str) -> str:
+    """Read the project version from one exact commit without changing a checkout."""
+
+    text = git(repo, "show", f"{commit}:pyproject.toml").stdout
+    data = tomllib.loads(text)
+    version = data.get("project", {}).get("version")
+    if not isinstance(version, str):
+        raise ReleasePreparationError("pyproject.toml is missing project.version.")
+    return version
+
+
 def replace_project_version_text(text: str, version: str) -> str:
     """Replace the repository's single project version declaration."""
 
@@ -187,6 +202,79 @@ def _require_clean_main(repo: Path) -> None:
         )
     if _status(repo):
         raise ReleasePreparationError("Release preparation requires a clean working tree.")
+
+
+def _require_source_head(repo: Path, expected_source_head: str) -> None:
+    """Require the user's source checkout to remain at its preflight commit."""
+
+    source_head = git(repo, "rev-parse", "HEAD").stdout.strip()
+    if source_head != expected_source_head:
+        raise ReleasePreparationError(
+            f"Source checkout HEAD changed from {expected_source_head} to {source_head}; "
+            "leave both checkouts intact and restart release preparation."
+        )
+
+
+def _registered_worktrees(repo: Path) -> set[Path]:
+    """Return canonical paths registered in the repository worktree inventory."""
+
+    paths: set[Path] = set()
+    for line in git(repo, "worktree", "list", "--porcelain").stdout.splitlines():
+        if line.startswith("worktree "):
+            paths.add(Path(line.removeprefix("worktree ")).resolve())
+    return paths
+
+
+def _choose_worktree_path(repo: Path, worktree_root: Path, version: str) -> Path:
+    """Choose a unique release worktree path without reusing or deleting collisions."""
+
+    worktree_root = worktree_root.expanduser().resolve()
+    if worktree_root == repo or worktree_root.is_relative_to(repo):
+        raise ReleasePreparationError(
+            "The release worktree root must be outside the source checkout."
+        )
+
+    registered = _registered_worktrees(repo)
+    stem = f"{repo.name}-release-v{version}"
+    suffix = 1
+    while True:
+        name = stem if suffix == 1 else f"{stem}-{suffix}"
+        candidate = worktree_root / name
+        if not candidate.exists() and candidate.resolve() not in registered:
+            return candidate
+        suffix += 1
+
+
+def _require_registered_detached_worktree(
+    source_repo: Path,
+    worktree: Path,
+    expected_base: str,
+) -> None:
+    """Require a clean registered detached worktree at the reviewed base."""
+
+    worktree = worktree.expanduser().resolve()
+    if worktree not in _registered_worktrees(source_repo):
+        raise ReleasePreparationError(
+            f"Release worktree {worktree} is not registered for this repository."
+        )
+    if not worktree.is_dir():
+        raise ReleasePreparationError(f"Release worktree path does not exist: {worktree}.")
+    _require_repository_root(worktree)
+    branch = git(worktree, "symbolic-ref", "--quiet", "--short", "HEAD", check=False)
+    if branch.returncode == 0:
+        raise ReleasePreparationError(
+            f"Release worktree must remain detached before materialization, found "
+            f"{branch.stdout.strip()!r}."
+        )
+    if branch.returncode != 1:
+        raise ReleasePreparationError("Unable to inspect the release worktree branch state.")
+    head = git(worktree, "rev-parse", "HEAD").stdout.strip()
+    if head != expected_base:
+        raise ReleasePreparationError(
+            f"Release worktree HEAD is {head}, expected reviewed base {expected_base}."
+        )
+    if _status(worktree):
+        raise ReleasePreparationError("Release worktree must be clean before materialization.")
 
 
 def _require_branch_absent(repo: Path, branch: str) -> None:
@@ -266,16 +354,14 @@ def _validate_prepared_files(repo: Path, version: str, base_commit: str) -> tupl
     return tuple(sorted(changed))
 
 
-def preflight(repo: Path, version: str) -> ReleasePreflight:
-    """Refresh exact main and validate release inputs without creating a branch."""
+def preflight(repo: Path, version: str, worktree_root: Path) -> ReleasePreflight:
+    """Refresh exact main and create an isolated branch-free readiness checkout."""
 
     repo = repo.resolve()
     version = validate_version(version)
     _require_repository_root(repo)
     _require_clean_main(repo)
-    if project_version(repo) == version:
-        raise ReleasePreparationError(f"Project version is already {version}.")
-
+    source_commit = git(repo, "rev-parse", "HEAD").stdout.strip()
     branch = f"release/v{version}"
     _require_branch_absent(repo, branch)
     env = _release_environment()
@@ -291,71 +377,113 @@ def preflight(repo: Path, version: str) -> ReleasePreflight:
         env=env,
         announce=True,
     )
-    run_command(repo, ["git", "merge", "--ff-only", "origin/main"], env=env, announce=True)
     base_commit = git(repo, "rev-parse", "origin/main").stdout.strip()
-    head_commit = git(repo, "rev-parse", "HEAD").stdout.strip()
-    if head_commit != base_commit:
-        raise ReleasePreparationError(
-            f"Local main is {head_commit}, but refreshed origin/main is {base_commit}; "
-            "refusing to release."
-        )
-    if project_version(repo) == version:
+    if project_version_at(repo, base_commit) == version:
         raise ReleasePreparationError(f"Refreshed origin/main already declares version {version}.")
 
     _require_branch_absent(repo, branch)
     if _status(repo):
         raise ReleasePreparationError(
-            "Release preflight must leave the refreshed main working tree clean."
+            "Release preflight must leave the source main working tree clean."
         )
+    worktree = _choose_worktree_path(repo, worktree_root, version)
+    worktree.parent.mkdir(parents=True, exist_ok=True)
+    run_command(
+        repo,
+        ["git", "worktree", "add", "--detach", str(worktree), base_commit],
+        env=env,
+        announce=True,
+    )
+    _require_registered_detached_worktree(repo, worktree, base_commit)
+    _require_clean_main(repo)
+    _require_source_head(repo, source_commit)
     return ReleasePreflight(
         base_commit=base_commit,
         branch=branch,
+        source_commit=source_commit,
         version=version,
+        worktree=worktree,
     )
 
 
-def materialize(repo: Path, version: str, expected_base: str) -> PreparedCandidate:
-    """Create the three-file candidate only from the reviewed preflight commit."""
+def materialize(
+    repo: Path,
+    version: str,
+    expected_base: str,
+    expected_source_head: str,
+    worktree: Path,
+) -> PreparedCandidate:
+    """Create the three-file candidate in the reviewed isolated worktree."""
 
     expected_base = validate_commit(expected_base)
-    release_input = preflight(repo, version)
-    if release_input.base_commit != expected_base:
-        raise ReleasePreparationError(
-            f"Preflight reviewed {expected_base}, but refreshed origin/main is "
-            f"{release_input.base_commit}; rerun release preflight and planning review."
-        )
-
+    expected_source_head = validate_commit(expected_source_head)
     repo = repo.resolve()
+    version = validate_version(version)
+    worktree = worktree.expanduser().resolve()
+    _require_repository_root(repo)
+    _require_clean_main(repo)
+    _require_source_head(repo, expected_source_head)
+    _require_registered_detached_worktree(repo, worktree, expected_base)
+
     env = _release_environment()
-    branch = release_input.branch
-    base_commit = release_input.base_commit
-    run_command(repo, ["git", "switch", "-c", branch], env=env, announce=True)
-    replace_project_version(repo, version)
-    run_command(repo, ["make", "sync"], env=env, announce=True)
+    branch = f"release/v{version}"
+    _require_branch_absent(repo, branch)
     run_command(
         repo,
+        [
+            "git",
+            "fetch",
+            "origin",
+            "refs/heads/main:refs/remotes/origin/main",
+            "--prune",
+        ],
+        env=env,
+        announce=True,
+    )
+    base_commit = git(repo, "rev-parse", "origin/main").stdout.strip()
+    if base_commit != expected_base:
+        raise ReleasePreparationError(
+            f"Preflight reviewed {expected_base}, but refreshed origin/main is {base_commit}; "
+            "leave the detached worktree intact and rerun preflight plus both readiness gates."
+        )
+    _require_clean_main(repo)
+    _require_source_head(repo, expected_source_head)
+    _require_branch_absent(repo, branch)
+    _require_registered_detached_worktree(repo, worktree, expected_base)
+    if project_version(worktree) == version:
+        raise ReleasePreparationError(f"Project version is already {version}.")
+
+    run_command(worktree, ["git", "switch", "-c", branch], env=env, announce=True)
+    replace_project_version(worktree, version)
+    run_command(worktree, ["make", "sync"], env=env, announce=True)
+    run_command(
+        worktree,
         ["make", "update-released-api-contract", f"VERSION={version}"],
         env=env,
         announce=True,
     )
     run_command(
-        repo,
+        worktree,
         ["make", "check-released-api-contract", f"VERSION={version}"],
         env=env,
         announce=True,
     )
-    changed_paths = _validate_prepared_files(repo, version, base_commit)
+    changed_paths = _validate_prepared_files(worktree, version, base_commit)
+    _require_clean_main(repo)
+    _require_source_head(repo, expected_source_head)
     return PreparedCandidate(
         base_commit=base_commit,
         branch=branch,
         changed_paths=changed_paths,
+        source_commit=expected_source_head,
         version=version,
+        worktree=worktree,
     )
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Preflight or materialize a local release candidate from exact origin/main."
+        description="Preflight or materialize an isolated release candidate from exact origin/main."
     )
     subparsers = parser.add_subparsers(dest="phase", required=True)
     preflight_parser = subparsers.add_parser(
@@ -366,6 +494,12 @@ def parse_args() -> argparse.Namespace:
         "--version",
         required=True,
         help="Release version without a leading v, for example 0.20.1.",
+    )
+    preflight_parser.add_argument(
+        "--worktree-root",
+        type=Path,
+        default=Path(os.environ.get("CODEX_WORKTREE_ROOT", Path.home() / ".codex/worktrees")),
+        help="Directory under which to create a unique detached release worktree.",
     )
     materialize_parser = subparsers.add_parser(
         "materialize",
@@ -381,6 +515,17 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Exact 40-character origin/main commit approved by release preflight.",
     )
+    materialize_parser.add_argument(
+        "--expected-source-head",
+        required=True,
+        help="Exact source-checkout HEAD recorded by release preflight.",
+    )
+    materialize_parser.add_argument(
+        "--worktree",
+        type=Path,
+        required=True,
+        help="Detached worktree created by the matching preflight.",
+    )
     return parser.parse_args()
 
 
@@ -388,25 +533,35 @@ def main() -> int:
     args = parse_args()
     try:
         if args.phase == "preflight":
-            release_input = preflight(ROOT, args.version)
+            release_input = preflight(ROOT, args.version, args.worktree_root)
         else:
-            candidate = materialize(ROOT, args.version, args.expected_base)
+            candidate = materialize(
+                ROOT,
+                args.version,
+                args.expected_base,
+                args.expected_source_head,
+                args.worktree,
+            )
     except (OSError, ReleasePreparationError, tomllib.TOMLDecodeError, json.JSONDecodeError) as exc:
         print(f"Release preparation failed: {exc}", file=sys.stderr)
         return 1
 
     if args.phase == "preflight":
-        print("Release preflight passed on clean main without creating a branch.")
+        print("Release preflight passed without changing the source main checkout.")
         print(f"Base commit: {release_input.base_commit}")
+        print(f"Source commit: {release_input.source_commit}")
         print(f"Planned branch: {release_input.branch}")
         print(f"Version: {release_input.version}")
-        print("Run the prospective contract and planning-review gates against this commit.")
+        print(f"Worktree: {release_input.worktree}")
+        print("Run both readiness gates from this detached worktree against the base commit.")
         return 0
 
-    print("Release candidate prepared locally and left uncommitted.")
+    print("Release candidate prepared in its dedicated worktree and left uncommitted.")
     print(f"Base commit: {candidate.base_commit}")
+    print(f"Source commit: {candidate.source_commit}")
     print(f"Branch: {candidate.branch}")
     print(f"Version: {candidate.version}")
+    print(f"Worktree: {candidate.worktree}")
     print("Changed paths:")
     for path in candidate.changed_paths:
         print(f"- {path}")

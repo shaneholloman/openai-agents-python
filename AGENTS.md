@@ -57,9 +57,9 @@ Producing the PR draft block is part of the local final handoff. It is required 
 
 #### `$release-candidate-prep`
 
-Use `$release-candidate-prep` only when the user explicitly invokes it with a release version. It fast-forwards a clean local `main`, creates `release/v<version>`, updates `pyproject.toml` and `uv.lock`, freezes and checks `tests/fixtures/released_api_contract.json`, creates one local release commit, invokes `$final-release-review` against that commit, and returns the fixed release PR title plus the complete final-candidate report as the PR description.
+Use `$release-candidate-prep` only when the user explicitly invokes it with a release version. It keeps the user's clean `main` checkout unchanged, creates a dedicated detached worktree at refreshed `origin/main`, runs the readiness gates there, creates `release/v<version>` in that worktree, updates `pyproject.toml` and `uv.lock`, freezes and checks `tests/fixtures/released_api_contract.json`, and creates one local release commit. It invokes `$final-release-review` as the controlling checker against both the pre-release source and the materialized candidate; a blocked release call stops the workflow, while a green final-candidate report becomes the release-specific PR description.
 
-The skill replaces the former GitHub Actions release-PR creator. It must never push, open or edit a pull request, create a release, or mutate any other GitHub state. Release tag creation and PyPI publication remain owned by their post-merge workflows. The release commit may contain only `pyproject.toml`, `uv.lock`, and `tests/fixtures/released_api_contract.json`; all runtime and documentation changes must land on `main` before preparation.
+The skill replaces the former GitHub Actions release-PR creator. It must never push, open or edit a pull request, create a release, or mutate any other GitHub state. It leaves the dedicated worktree in place for green handoff, blocked review, or recoverable failure. Release tag creation and PyPI publication remain owned by their post-merge workflows. The release commit may contain only `pyproject.toml`, `uv.lock`, and `tests/fixtures/released_api_contract.json`; all runtime and documentation changes must land on `main` before preparation.
 
 ### Work Status Reporting
 
