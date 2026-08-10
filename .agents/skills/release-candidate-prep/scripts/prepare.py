@@ -1,0 +1,337 @@
+#!/usr/bin/env python3
+"""Prepare an uncommitted local release candidate from exact origin/main."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import shlex
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
+
+from collections.abc import Sequence
+
+ROOT = Path(__file__).resolve().parents[4]
+VERSION_PATTERN = re.compile(r"\d+\.\d+(?:\.\d+)*(?:[A-Za-z0-9.-]+)?\Z")
+PROJECT_VERSION_PATTERN = re.compile(r'(?m)^version\s*=\s*"[^"]+"')
+RELEASE_PATHS = frozenset(
+    {
+        "pyproject.toml",
+        "tests/fixtures/released_api_contract.json",
+        "uv.lock",
+    }
+)
+
+
+class ReleasePreparationError(RuntimeError):
+    """Report a safe, actionable release preparation failure."""
+
+
+@dataclass(frozen=True)
+class PreparedCandidate:
+    """Describe the successfully prepared local candidate."""
+
+    base_commit: str
+    branch: str
+    changed_paths: tuple[str, ...]
+    version: str
+
+
+def _release_environment() -> dict[str, str]:
+    env = os.environ.copy()
+    for name in ("GH_TOKEN", "GITHUB_TOKEN", "OPENAI_API_KEY"):
+        env.pop(name, None)
+    env["UV_DEFAULT_INDEX"] = "https://pypi.org/simple"
+    return env
+
+
+def _command_text(args: Sequence[str]) -> str:
+    return shlex.join(str(arg) for arg in args)
+
+
+def run_command(
+    repo: Path,
+    args: Sequence[str],
+    *,
+    env: dict[str, str] | None = None,
+    announce: bool = False,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    """Run one command and preserve useful output for failures."""
+
+    if announce:
+        print(f"+ {_command_text(args)}", flush=True)
+    effective_env = _release_environment() if env is None else env.copy()
+    for name in ("GH_TOKEN", "GITHUB_TOKEN", "OPENAI_API_KEY"):
+        effective_env.pop(name, None)
+    effective_env["UV_DEFAULT_INDEX"] = "https://pypi.org/simple"
+    result = subprocess.run(
+        [str(arg) for arg in args],
+        cwd=repo,
+        env=effective_env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if announce:
+        if result.stdout:
+            print(result.stdout, end="")
+        if result.stderr:
+            print(result.stderr, end="", file=sys.stderr)
+    if check and result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "unknown command failure"
+        raise ReleasePreparationError(f"{_command_text(args)} failed: {detail}")
+    return result
+
+
+def git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    """Run a Git inspection command."""
+
+    return run_command(repo, ["git", *args], check=check)
+
+
+def validate_version(version: str) -> str:
+    """Validate the release version accepted by the existing contract updater."""
+
+    if version.startswith("v") or ".." in version or VERSION_PATTERN.fullmatch(version) is None:
+        raise ReleasePreparationError(
+            "Version must be semver-like without a leading v, for example 0.20.1 or 0.21.0-rc1."
+        )
+    return version
+
+
+def project_version(repo: Path) -> str:
+    """Read the project version from pyproject.toml."""
+
+    data = tomllib.loads((repo / "pyproject.toml").read_text(encoding="utf-8"))
+    version = data.get("project", {}).get("version")
+    if not isinstance(version, str):
+        raise ReleasePreparationError("pyproject.toml is missing project.version.")
+    return version
+
+
+def replace_project_version_text(text: str, version: str) -> str:
+    """Replace the repository's single project version declaration."""
+
+    updated, count = PROJECT_VERSION_PATTERN.subn(f'version = "{version}"', text)
+    if count != 1:
+        raise ReleasePreparationError(
+            f"Expected exactly one version declaration in pyproject.toml, found {count}."
+        )
+    if updated == text:
+        raise ReleasePreparationError(f"pyproject.toml already declares version {version}.")
+    return updated
+
+
+def replace_project_version(repo: Path, version: str) -> None:
+    """Update pyproject.toml while preserving all unrelated text."""
+
+    path = repo / "pyproject.toml"
+    text = path.read_text(encoding="utf-8")
+    path.write_text(replace_project_version_text(text, version), encoding="utf-8")
+
+
+def _current_branch(repo: Path) -> str:
+    result = git(repo, "symbolic-ref", "--quiet", "--short", "HEAD", check=False)
+    if result.returncode != 0:
+        raise ReleasePreparationError("Release preparation requires a named main branch.")
+    return result.stdout.strip()
+
+
+def _status(repo: Path) -> str:
+    return git(repo, "status", "--porcelain=v1", "--untracked-files=all").stdout
+
+
+def _require_repository_root(repo: Path) -> None:
+    top_level = Path(git(repo, "rev-parse", "--show-toplevel").stdout.strip()).resolve()
+    if top_level != repo.resolve():
+        raise ReleasePreparationError(
+            f"Run release preparation from the repository root {top_level}, not {repo.resolve()}."
+        )
+
+
+def _require_clean_main(repo: Path) -> None:
+    branch = _current_branch(repo)
+    if branch != "main":
+        raise ReleasePreparationError(
+            f"Release preparation requires branch 'main', found {branch!r}."
+        )
+    if _status(repo):
+        raise ReleasePreparationError("Release preparation requires a clean working tree.")
+
+
+def _require_branch_absent(repo: Path, branch: str) -> None:
+    local = git(repo, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}", check=False)
+    if local.returncode == 0:
+        raise ReleasePreparationError(f"Local branch {branch!r} already exists.")
+    if local.returncode not in (0, 1):
+        raise ReleasePreparationError(f"Unable to inspect local branch {branch!r}.")
+
+    remote = git(repo, "ls-remote", "--exit-code", "--heads", "origin", branch, check=False)
+    if remote.returncode == 0:
+        raise ReleasePreparationError(f"Remote branch {branch!r} already exists.")
+    if remote.returncode != 2:
+        detail = remote.stderr.strip() or remote.stdout.strip() or "unknown remote error"
+        raise ReleasePreparationError(f"Unable to inspect remote branch {branch!r}: {detail}")
+
+
+def _changed_paths(repo: Path) -> set[str]:
+    changed: set[str] = set()
+    for args in (
+        ("diff", "--name-only"),
+        ("diff", "--name-only", "--cached"),
+        ("ls-files", "--others", "--exclude-standard"),
+    ):
+        changed.update(line for line in git(repo, *args).stdout.splitlines() if line)
+    return changed
+
+
+def _locked_project_version(repo: Path) -> str:
+    data = tomllib.loads((repo / "uv.lock").read_text(encoding="utf-8"))
+    packages = data.get("package", [])
+    matches = [
+        package
+        for package in packages
+        if package.get("name") == "openai-agents" and package.get("source") == {"editable": "."}
+    ]
+    if len(matches) != 1 or not isinstance(matches[0].get("version"), str):
+        raise ReleasePreparationError(
+            "uv.lock must contain exactly one editable openai-agents package with a version."
+        )
+    return matches[0]["version"]
+
+
+def _validate_prepared_files(repo: Path, version: str, base_commit: str) -> tuple[str, ...]:
+    changed = _changed_paths(repo)
+    if changed != RELEASE_PATHS:
+        missing = sorted(RELEASE_PATHS - changed)
+        unexpected = sorted(changed - RELEASE_PATHS)
+        raise ReleasePreparationError(
+            "Prepared release paths do not match the required manifest; "
+            f"missing={missing!r}, unexpected={unexpected!r}."
+        )
+    if project_version(repo) != version:
+        raise ReleasePreparationError("pyproject.toml does not contain the requested version.")
+    if _locked_project_version(repo) != version:
+        raise ReleasePreparationError("uv.lock does not contain the requested project version.")
+
+    contract = json.loads(
+        (repo / "tests/fixtures/released_api_contract.json").read_text(encoding="utf-8")
+    )
+    if contract.get("baseline") != f"v{version}":
+        raise ReleasePreparationError(
+            "The released API contract baseline does not match the version."
+        )
+    if contract.get("baseline_commit") != base_commit:
+        raise ReleasePreparationError(
+            "The released API contract baseline_commit does not match "
+            "the origin/main source commit."
+        )
+    if git(repo, "diff", "--cached", "--quiet", check=False).returncode != 0:
+        raise ReleasePreparationError("The helper must leave all release changes unstaged.")
+    return tuple(sorted(changed))
+
+
+def prepare(repo: Path, version: str) -> PreparedCandidate:
+    """Prepare the three-file release candidate and leave it uncommitted."""
+
+    repo = repo.resolve()
+    version = validate_version(version)
+    _require_repository_root(repo)
+    _require_clean_main(repo)
+    if project_version(repo) == version:
+        raise ReleasePreparationError(f"Project version is already {version}.")
+
+    branch = f"release/v{version}"
+    _require_branch_absent(repo, branch)
+    env = _release_environment()
+    run_command(
+        repo,
+        [
+            "git",
+            "fetch",
+            "origin",
+            "refs/heads/main:refs/remotes/origin/main",
+            "--prune",
+        ],
+        env=env,
+        announce=True,
+    )
+    run_command(repo, ["git", "merge", "--ff-only", "origin/main"], env=env, announce=True)
+    base_commit = git(repo, "rev-parse", "origin/main").stdout.strip()
+    head_commit = git(repo, "rev-parse", "HEAD").stdout.strip()
+    if head_commit != base_commit:
+        raise ReleasePreparationError(
+            f"Local main is {head_commit}, but refreshed origin/main is {base_commit}; "
+            "refusing to release."
+        )
+    if project_version(repo) == version:
+        raise ReleasePreparationError(f"Refreshed origin/main already declares version {version}.")
+
+    _require_branch_absent(repo, branch)
+    run_command(repo, ["git", "switch", "-c", branch], env=env, announce=True)
+    replace_project_version(repo, version)
+    run_command(repo, ["make", "sync"], env=env, announce=True)
+    run_command(
+        repo,
+        ["make", "update-released-api-contract", f"VERSION={version}"],
+        env=env,
+        announce=True,
+    )
+    run_command(
+        repo,
+        ["make", "check-released-api-contract", f"VERSION={version}"],
+        env=env,
+        announce=True,
+    )
+    changed_paths = _validate_prepared_files(repo, version, base_commit)
+    return PreparedCandidate(
+        base_commit=base_commit,
+        branch=branch,
+        changed_paths=changed_paths,
+        version=version,
+    )
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Prepare an uncommitted local release candidate from exact origin/main."
+    )
+    parser.add_argument(
+        "--version",
+        required=True,
+        help="Release version without a leading v, for example 0.20.1.",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    try:
+        candidate = prepare(ROOT, args.version)
+    except (OSError, ReleasePreparationError, tomllib.TOMLDecodeError, json.JSONDecodeError) as exc:
+        print(f"Release preparation failed: {exc}", file=sys.stderr)
+        return 1
+
+    print("Release candidate prepared locally and left uncommitted.")
+    print(f"Base commit: {candidate.base_commit}")
+    print(f"Branch: {candidate.branch}")
+    print(f"Version: {candidate.version}")
+    print("Changed paths:")
+    for path in candidate.changed_paths:
+        print(f"- {path}")
+    print("Review the diff before staging the three release-owned files.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
