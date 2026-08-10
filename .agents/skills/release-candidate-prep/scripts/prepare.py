@@ -277,17 +277,38 @@ def _require_registered_detached_worktree(
         raise ReleasePreparationError("Release worktree must be clean before materialization.")
 
 
-def _require_branch_absent(repo: Path, branch: str) -> None:
+def _worktrees_using_branch(repo: Path, branch: str) -> tuple[Path, ...]:
+    """Return registered worktrees that currently check out one local branch."""
+
+    matches: list[Path] = []
+    worktree: Path | None = None
+    for line in [*git(repo, "worktree", "list", "--porcelain").stdout.splitlines(), ""]:
+        if line.startswith("worktree "):
+            worktree = Path(line.removeprefix("worktree ")).resolve()
+        elif line == f"branch refs/heads/{branch}" and worktree is not None:
+            matches.append(worktree)
+        elif not line:
+            worktree = None
+    return tuple(matches)
+
+
+def _require_branch_replaceable(repo: Path, branch: str) -> None:
+    """Require an existing release branch to be safe to replace locally."""
+
     local = git(repo, "show-ref", "--verify", "--quiet", f"refs/heads/{branch}", check=False)
-    if local.returncode == 0:
-        raise ReleasePreparationError(f"Local branch {branch!r} already exists.")
     if local.returncode not in (0, 1):
         raise ReleasePreparationError(f"Unable to inspect local branch {branch!r}.")
+    if local.returncode == 0:
+        worktrees = _worktrees_using_branch(repo, branch)
+        if worktrees:
+            locations = ", ".join(str(path) for path in worktrees)
+            raise ReleasePreparationError(
+                f"Local branch {branch!r} is checked out in {locations}; switch that worktree "
+                "away from the branch before replacing the release candidate."
+            )
 
     remote = git(repo, "ls-remote", "--exit-code", "--heads", "origin", branch, check=False)
-    if remote.returncode == 0:
-        raise ReleasePreparationError(f"Remote branch {branch!r} already exists.")
-    if remote.returncode != 2:
+    if remote.returncode not in (0, 2):
         detail = remote.stderr.strip() or remote.stdout.strip() or "unknown remote error"
         raise ReleasePreparationError(f"Unable to inspect remote branch {branch!r}: {detail}")
 
@@ -363,7 +384,7 @@ def preflight(repo: Path, version: str, worktree_root: Path) -> ReleasePreflight
     _require_clean_main(repo)
     source_commit = git(repo, "rev-parse", "HEAD").stdout.strip()
     branch = f"release/v{version}"
-    _require_branch_absent(repo, branch)
+    _require_branch_replaceable(repo, branch)
     env = _release_environment()
     run_command(
         repo,
@@ -381,7 +402,7 @@ def preflight(repo: Path, version: str, worktree_root: Path) -> ReleasePreflight
     if project_version_at(repo, base_commit) == version:
         raise ReleasePreparationError(f"Refreshed origin/main already declares version {version}.")
 
-    _require_branch_absent(repo, branch)
+    _require_branch_replaceable(repo, branch)
     if _status(repo):
         raise ReleasePreparationError(
             "Release preflight must leave the source main working tree clean."
@@ -427,7 +448,7 @@ def materialize(
 
     env = _release_environment()
     branch = f"release/v{version}"
-    _require_branch_absent(repo, branch)
+    _require_branch_replaceable(repo, branch)
     run_command(
         repo,
         [
@@ -448,12 +469,11 @@ def materialize(
         )
     _require_clean_main(repo)
     _require_source_head(repo, expected_source_head)
-    _require_branch_absent(repo, branch)
+    _require_branch_replaceable(repo, branch)
     _require_registered_detached_worktree(repo, worktree, expected_base)
     if project_version(worktree) == version:
         raise ReleasePreparationError(f"Project version is already {version}.")
 
-    run_command(worktree, ["git", "switch", "-c", branch], env=env, announce=True)
     replace_project_version(worktree, version)
     run_command(worktree, ["make", "sync"], env=env, announce=True)
     run_command(
@@ -471,6 +491,13 @@ def materialize(
     changed_paths = _validate_prepared_files(worktree, version, base_commit)
     _require_clean_main(repo)
     _require_source_head(repo, expected_source_head)
+    _require_branch_replaceable(repo, branch)
+    run_command(
+        worktree,
+        ["git", "switch", "--no-track", "-C", branch, expected_base],
+        env=env,
+        announce=True,
+    )
     return PreparedCandidate(
         base_commit=base_commit,
         branch=branch,
