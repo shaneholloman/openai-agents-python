@@ -46,11 +46,11 @@ lint:
 
 .PHONY: mypy
 mypy: 
-	uv run mypy $(if $(TYPECHECK_SRC_ONLY),src,.) --exclude site
+	uv run mypy src
 
 .PHONY: pyright
 pyright:
-	uv run pyright --project pyrightconfig.json --threads "$${PYRIGHT_THREADS:-4}" $(if $(TYPECHECK_SRC_ONLY),src,)
+	uv run pyright --project pyrightconfig.json --threads "$${PYRIGHT_THREADS:-4}"
 
 .PHONY: typecheck
 typecheck:
@@ -64,11 +64,6 @@ typecheck:
 	wait $$mypy_pid; \
 	wait $$pyright_pid; \
 	trap - EXIT
-
-.PHONY: typecheck-src
-typecheck-src:
-	@$(MAKE) typecheck TYPECHECK_SRC_ONLY=1
-
 .PHONY: tests
 tests: tests-parallel
 	$(MAKE) tests-serial

@@ -16,7 +16,7 @@ The `serial` marker means that a test needs exclusive execution after every xdis
 
 Choose review-round coverage by impact. For a leaf subsystem change, run `make tests-review` plus the owning subsystem's complete test file or directory without a marker filter, so its `review_optional` cases are restored. For cross-cutting runtime changes such as runner orchestration, agent or item flow, shared persistence, or test infrastructure, run `make tests` during review. Prefer the full suite whenever the affected boundary is ambiguous. This selection changes only iterative feedback; the final verification always runs `make tests`.
 
-`make typecheck` runs mypy and pyright concurrently. Pyright uses four analysis threads by default; set `PYRIGHT_THREADS` to a positive integer to override the local thread count. The speedup does not remove either analyzer or narrow its selected project or source scope.
+`make typecheck` runs mypy and pyright concurrently. Mypy checks `src`, while Pyright checks the `src` and `tests` paths configured in `pyrightconfig.json`. Pyright uses four analysis threads by default; set `PYRIGHT_THREADS` to a positive integer to override the local thread count.
 
 ## Performance and determinism
 
