@@ -2,6 +2,8 @@
 
 Use this template to prepare one self-contained, factual snapshot packet per fingerprint round. Fill every field or mark it explicitly `none` or `not applicable`; do not dispatch an incomplete packet. Fill it once, reuse the shared body byte-for-byte for every reviewer, and vary only the final specialty assignment. Keep this control-plane brief near 12 KB when practical. Store larger evidence in indexed files and reference each file by exact path and SHA-256 digest. Do not omit decision-relevant evidence merely to meet the soft size target. Do not include implementer conclusions, suspected bugs, prior findings, or intended fixes.
 
+The verified final-gate type-erasure closure defined in `SKILL.md` step 20 does not create a fingerprint round, reviewer packet, or reviewer assignment. Record its exact delta, before and after fingerprints, final-gate failure, runtime-identity basis, and focused verification in the task-global ledger and final verification evidence. If any condition for that exception is not mechanically established, prepare the normal delta-review packet instead.
+
 ## Shared evidence
 
 - Original requirement:
