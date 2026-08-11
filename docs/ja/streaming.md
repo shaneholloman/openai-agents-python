@@ -4,19 +4,19 @@ search:
 ---
 # ストリーミング
 
-ストリーミングを使用すると、進行中のエージェント実行の更新を購読できます。これは、エンドユーザーに進捗状況の更新や部分的なレスポンスを表示する場合に便利です。
+ストリーミングを使用すると、エージェントの実行中に更新を受け取れます。これは、エンドユーザーに進捗状況や部分的な応答を表示する場合に役立ちます。
 
-ストリーミングするには、[`Runner.run_streamed()`][agents.run.Runner.run_streamed] を呼び出します。これにより、[`RunResultStreaming`][agents.result.RunResultStreaming] が得られます。`result.stream_events()` を呼び出すと、以下で説明する [`StreamEvent`][agents.stream_events.StreamEvent] オブジェクトの非同期ストリームが得られます。
+ストリーミングするには、[`Runner.run_streamed()`][agents.run.Runner.run_streamed] を呼び出します。これにより、[`RunResultStreaming`][agents.result.RunResultStreaming] が返されます。`result.stream_events()` を呼び出すと、以下で説明する [`StreamEvent`][agents.stream_events.StreamEvent] オブジェクトの非同期ストリームが得られます。
 
-非同期イテレーターが終了するまで、`result.stream_events()` を消費し続けてください。ストリーミング実行は、イテレーターが終了するまで完了しません。また、セッションの永続化、承認情報の記録、履歴の圧縮などの後処理は、最後に表示されるトークンが到着した後に完了する場合があります。ループを抜けると、`result.is_complete` は最終的な実行状態を反映します。
+非同期イテレーターが終了するまで、`result.stream_events()` を受け取り続けてください。ストリーミング実行はイテレーターが終了するまで完了しません。また、セッションの永続化、承認の記録管理、履歴の圧縮などの後処理は、最後に表示されるトークンが到着した後に完了する場合があります。ループが終了すると、`result.is_complete` に最終的な実行状態が反映されます。
 
 ## Raw レスポンスイベント
 
-[`RawResponsesStreamEvent`][agents.stream_events.RawResponsesStreamEvent] オブジェクトは、LLM から直接渡される raw イベントをラップします。各オブジェクトの `data` フィールドには、`response.created` や `response.output_text.delta` などの型を持つ OpenAI Responses API イベントが格納されます。これらのイベントは、レスポンスメッセージを生成され次第ユーザーにストリーミングする場合に便利です。
+[`RawResponsesStreamEvent`][agents.stream_events.RawResponsesStreamEvent] オブジェクトは、LLM から直接渡される raw イベントをラップします。各オブジェクトの `data` フィールドには、`response.created` や `response.output_text.delta` などの型を持つ OpenAI Responses API イベントが含まれます。これらのイベントは、応答メッセージが生成され次第、ユーザーにストリーミングする場合に役立ちます。
 
-コンピュータツールの raw イベントでは、保存済みの結果と同様に、プレビュー版と GA 版の区別が維持されます。プレビューのフローでは、1 つの `action` を持つ `computer_call` アイテムをストリーミングします。一方、`gpt-5.5` では、バッチ化された `actions[]` を持つ `computer_call` アイテムをストリーミングできます。上位レベルの [`RunItemStreamEvent`][agents.stream_events.RunItemStreamEvent] インターフェースでは、このためにコンピュータ専用の特別なイベント名は追加されません。どちらの形式も引き続き `tool_called` として公開され、スクリーンショットの結果は `computer_call_output` アイテムをラップする `tool_output` として返されます。
+コンピュータツールの raw イベントでは、保存された結果と同じく、プレビュー版と GA 版の区別が維持されます。プレビューフローでは、1 つの `action` を含む `computer_call` 項目がストリーミングされます。一方、`gpt-5.5` では、バッチ化された `actions[]` を含む `computer_call` 項目をストリーミングできます。上位レベルの [`RunItemStreamEvent`][agents.stream_events.RunItemStreamEvent] インターフェースでは、これに対してコンピュータ専用の特別なイベント名は追加されません。どちらの形式も引き続き `tool_called` として公開され、スクリーンショットの結果は `computer_call_output` 項目をラップする `tool_output` として返されます。
 
-たとえば、次の例では LLM が生成したテキストをトークン単位で出力します。
+たとえば、次のコードは LLM が生成したテキストをトークン単位で出力します。
 
 ```python
 import asyncio
@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
 ## ストリーミングと承認
 
-ストリーミングは、ツールの承認のために一時停止する実行にも対応しています。ツールに承認が必要な場合、`result.stream_events()` が終了し、保留中の承認が [`RunResultStreaming.interruptions`][agents.result.RunResultStreaming.interruptions] に公開されます。`result.to_state()` を使用して実行結果を [`RunState`][agents.run_state.RunState] に変換し、中断を承認または拒否してから、`Runner.run_streamed(...)` で再開します。
+ストリーミングは、ツールの承認待ちで一時停止する実行にも対応しています。ツールに承認が必要な場合、`result.stream_events()` が終了し、保留中の承認が [`RunResultStreaming.interruptions`][agents.result.RunResultStreaming.interruptions] に公開されます。`result.to_state()` を使用して実行結果を [`RunState`][agents.run_state.RunState] に変換し、中断を承認または拒否してから、`Runner.run_streamed(...)` で再開します。
 
 ```python
 result = Runner.run_streamed(agent, "Delete temporary files if they are no longer needed.")
@@ -57,25 +57,27 @@ if result.interruptions:
         pass
 ```
 
-一時停止と再開の完全な手順については、[人間参加型のガイド](human_in_the_loop.md)を参照してください。
+一時停止と再開の手順全体については、[Human-in-the-loop ガイド](human_in_the_loop.md)を参照してください。
 
-## 現在のターン完了後のストリーミング停止
+## 現在のターン後のストリーミング停止
 
-ストリーミング実行を途中で停止する必要がある場合は、[`result.cancel()`][agents.result.RunResultStreaming.cancel] を呼び出します。デフォルトでは、実行はすぐに停止します。現在のターンを正常に完了させてから停止するには、代わりに `result.cancel(mode="after_turn")` を呼び出します。
+ストリーミング実行を途中で停止する必要がある場合は、[`result.cancel()`][agents.result.RunResultStreaming.cancel] を呼び出します。デフォルトでは、実行は直ちに停止します。停止する前に現在のターンを正常に完了させるには、代わりに `result.cancel(mode="after_turn")` を呼び出します。
 
-ストリーミング実行は、`result.stream_events()` が終了するまで完了しません。最後に表示されるトークンの後も、SDK ではセッションアイテムの永続化、承認状態の確定、履歴の圧縮が続いている可能性があります。
+ストリーミング実行は、`result.stream_events()` が終了するまで完了しません。最後に表示されるトークンの後も、SDK がセッション項目の永続化、承認状態の確定、または履歴の圧縮を行っている場合があります。
 
-[`result.to_input_list(mode="normalized")`][agents.result.RunResultBase.to_input_list] から手動で続行している場合に、`cancel(mode="after_turn")` がツールのターン後に停止したときは、新しいユーザーターンをすぐに追加するのではなく、その正規化済み入力を指定して `result.last_agent` を再実行し、未完了の既存ユーザーターンを続行してください。
-- ストリーミング実行がツールの承認のために停止した場合、それを新しいターンとして扱わないでください。ストリームを最後まで消費し、`result.interruptions` を確認して、`result.to_state()` から再開してください。
-- [`RunConfig.session_input_callback`][agents.run.RunConfig.session_input_callback] を使用すると、取得したセッション履歴と新しいユーザー入力を、次回のモデル呼び出し前にどのように統合するかをカスタマイズできます。そこで新しいターンのアイテムを書き換えると、そのターンでは書き換え後のバージョンが永続化されます。
+[`result.to_input_list(mode="normalized")`][agents.result.RunResultBase.to_input_list] から手動で続行していて、ツールターンの後に `cancel(mode="after_turn")` が停止した場合は、すぐに新しいユーザーターンを追加するのではなく、正規化された入力を使用して `result.last_agent` を再実行し、未完了の既存ユーザーターンを続行します。
 
-## 実行アイテムイベントとエージェントイベント
+- 未完了の実行を再開する前に新しいユーザー入力が届いた場合は、受け取りを完了した実行結果を `result.to_state()` で変換し、[`state.add_input(...)`][agents.run_state.RunState.add_input] を呼び出して、その状態から再開します。Runner は次のモデル呼び出しの直前に、準備済みの入力を取り込みます。[再開前の入力追加](results.md#add-input-before-resuming)を参照してください。
+- ストリーミング実行がツールの承認待ちで停止した場合、それを新しいターンとして扱わないでください。ストリームを最後まで受け取り、`result.interruptions` を確認して、代わりに `result.to_state()` から再開します。
+- 次のモデル呼び出しの前に、取得したセッション履歴と新しいユーザー入力をどのように統合するかをカスタマイズするには、[`RunConfig.session_input_callback`][agents.run.RunConfig.session_input_callback] を使用します。そこで新しいターンの項目を書き換えた場合、その書き換え後のバージョンがそのターンについて永続化されます。
 
-[`RunItemStreamEvent`][agents.stream_events.RunItemStreamEvent] は、より上位レベルのイベントです。アイテムの生成が完全に完了したときに通知されます。これにより、各トークン単位ではなく、「メッセージが生成された」「ツールが実行された」などの単位で進捗状況の更新を送信できます。同様に、[`AgentUpdatedStreamEvent`][agents.stream_events.AgentUpdatedStreamEvent] は、現在のエージェントが変更されたとき（たとえば、ハンドオフの結果として）に更新を提供します。
+## 実行項目イベントとエージェントイベント
 
-### 実行アイテムイベント名
+[`RunItemStreamEvent`][agents.stream_events.RunItemStreamEvent] は、より上位レベルのイベントです。項目の生成が完全に完了した時点で通知されます。これにより、トークンごとではなく、「メッセージが生成された」「ツールが実行された」などの単位で進捗状況を通知できます。同様に、[`AgentUpdatedStreamEvent`][agents.stream_events.AgentUpdatedStreamEvent] は、現在のエージェントが変更されたとき（たとえば、ハンドオフの結果として）に更新を提供します。
 
-`RunItemStreamEvent.name` は、固定のセマンティックイベント名を使用します。
+### 実行項目イベント名
+
+`RunItemStreamEvent.name` では、次の固定されたセマンティックイベント名を使用します。
 
 - `message_output_created`
 - `handoff_requested`
@@ -89,15 +91,15 @@ if result.interruptions:
 - `mcp_approval_response`
 - `mcp_list_tools`
 
-`handoff_occured` は、後方互換性のために意図的にスペルが誤っています。
+`handoff_occured` は、後方互換性のため意図的にスペルが誤っています。
 
 ハンドオフ呼び出しは `handoff_requested` としてのみ発行され、`tool_called` として重複して発行されることはありません。同じターン内の通常の関数ツール呼び出しでは、引き続き `tool_called` が発行されます。
 
 ホスト型ツール検索を使用する場合、モデルがツール検索リクエストを発行すると `tool_search_called` が発行され、Responses API が読み込まれたサブセットを返すと `tool_search_output_created` が発行されます。
 
-プログラムによるツール呼び出しでは、生成された `program` と、通常のプログラム所有の子ツール呼び出しに対して `tool_called` が発行されます。子ツールの出力と、生成された `program` に対応する `program_output` に対しては、`tool_output` が発行されます。プログラム所有のホスト型 MCP の `mcp_approval_request` アイテムと `mcp_list_tools` アイテムは例外です。それぞれ、[`MCPApprovalRequestItem`][agents.items.MCPApprovalRequestItem] をラップする `mcp_approval_requested` と、[`MCPListToolsItem`][agents.items.MCPListToolsItem] をラップする `mcp_list_tools` として発行されます。残りのアイテムを区別するには、raw アイテムの `type` を確認してください。プログラム所有の子呼び出しには `caller` も含まれ、その型は `program` で、呼び出し元 ID によって親プログラムが識別されます。
+Programmatic Tool Calling では、生成された `program` と、プログラムが所有する通常の子ツール呼び出しに対して `tool_called` が発行されます。子ツールの出力と、生成された `program` に対応する `program_output` に対しては、`tool_output` が発行されます。プログラムが所有するホスト型 MCP の `mcp_approval_request` 項目と `mcp_list_tools` 項目は例外です。これらはそれぞれ、[`MCPApprovalRequestItem`][agents.items.MCPApprovalRequestItem] と [`MCPListToolsItem`][agents.items.MCPListToolsItem] をラップする `mcp_approval_requested` および `mcp_list_tools` として発行されます。残りの項目を区別するには、raw 項目の `type` を確認してください。プログラムが所有する子呼び出しには、型が `program` で、呼び出し元 ID が親プログラムを識別する `caller` も含まれます。
 
-たとえば、次の例では raw イベントを無視し、更新をユーザーにストリーミングします。
+たとえば、次のコードは raw イベントを無視し、更新をユーザーにストリーミングします。
 
 ```python
 import asyncio
