@@ -119,6 +119,24 @@ Hosted sandbox clients expose provider-specific mount strategies. Choose the bac
 
 </div>
 
+The mount tables describe which storage types each backend can execute. A check mark does not bypass the credential boundary for a mount helper that runs inside a model-controlled sandbox, and it does not mean that every strategy can operate without credentials. The Agents SDK accepts an in-container mount without an acknowledgement only when the selected helper can operate without protected authority. It rejects a mount that requires protected authority before starting the sandbox or mount helper unless trusted application code explicitly acknowledges the exposure for the exact mount path.
+
+Credentialless `rclone` mounts are limited to S3, GCS, R2, and Azure Blob. An in-container Box mount requires a non-interactive authentication source and the acknowledgement that matches that source. `FuseMountPattern` requires broad acknowledgement because `blobfuse2` discovers ambient Azure authority, even when no inline credential is configured. `S3FilesMountPattern` likewise requires broad acknowledgement because `mount.s3files` uses ambient IAM authority. These requirements also apply when Docker is the backend; the check marks below indicate that Docker can execute the mount after the applicable authority boundary is satisfied.
+
+For a mount entry named `"data"`, retain the copied `Manifest` returned by the acknowledgement that matches the configured authority:
+
+```python
+# Mount-scoped values such as inline access keys.
+manifest = manifest.with_in_container_mount_credential_exposure_acknowledged("data")
+
+# Broader authority such as managed or workload identity and external credential files.
+manifest = manifest.with_in_container_mount_broad_credential_exposure_acknowledged("data")
+```
+
+Pass every exact mount path that needs the acknowledgement. A mount that uses both authority classes requires both acknowledgements. The acknowledgements are runtime-only, are not serialized, and permit the helper to receive credentials without confining credential use to the mounted path. Prefer an external or provider-native strategy when available, and otherwise use sandbox-scoped, short-lived, least-privilege credentials.
+
+`VercelSandboxClientOptions(allow_s3_credential_exposure=True)` remains a compatibility option for create-time Vercel S3 mounts with inline mount-scoped credentials. It does not authorize broad credential authority.
+
 The table below summarizes which remote storage entries each backend can mount directly.
 
 <div class="sandbox-nowrap-first-column-table" markdown="1">

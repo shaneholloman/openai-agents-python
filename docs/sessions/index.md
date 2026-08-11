@@ -284,6 +284,8 @@ If your agent runs with `ModelSettings(store=False)`, the Responses API does not
 
 Compaction clears and rewrites the session history, so the SDK waits for compaction to finish before considering the run complete. In streaming mode, this means `run.stream_events()` can stay open for a few seconds after the last output token if compaction is heavy.
 
+`OpenAIResponsesCompactionSession.run_compaction()` treats the clear-and-rewrite operation as a recoverable replacement at the wrapper boundary. If replacement fails or is cancelled after the underlying history changes, the wrapper attempts to restore the previous history and waits for that recovery attempt to settle before the original exception or cancellation reaches the caller. If the underlying backend also fails during recovery, the previous history can remain unrestored and the SDK logs the recovery failure. The wrapper serializes calls to `add_items()`, `pop_item()`, and `clear_session()` with the locked replacement and recovery phase, but a mutation can complete while the remote compaction request is still in flight and then be overwritten by successful replacement. Run manual compaction between turns without concurrent wrapper mutations, and do not mutate the underlying session directly while compaction is running.
+
 If you want low-latency streaming or fast turn-taking, disable auto-compaction and call `run_compaction()` yourself between turns (or during idle time). You can decide when to force compaction based on your own criteria.
 
 ```python
@@ -641,39 +643,38 @@ if __name__ == "__main__":
 
 ## Custom session implementations
 
-You can implement your own session memory by creating a class that follows the [`Session`][agents.memory.session.Session] protocol:
+You can implement your own session memory by creating a class that structurally follows the [`Session`][agents.memory.session.Session] protocol. You do not need to inherit from `SessionABC`; define `session_id` and `session_settings`, and implement the four history methods directly:
 
 ```python
-from agents.memory.session import SessionABC
+from agents import Agent, Runner, SessionSettings
 from agents.items import TResponseInputItem
-from typing import List
 
-class MyCustomSession(SessionABC):
+
+class MyCustomSession:
     """Custom session implementation following the Session protocol."""
 
-    def __init__(self, session_id: str):
+    session_settings: SessionSettings | None = None
+
+    def __init__(self, session_id: str) -> None:
         self.session_id = session_id
-        # Your initialization here
+        self.items: list[TResponseInputItem] = []
 
-    async def get_items(self, limit: int | None = None) -> List[TResponseInputItem]:
-        """Retrieve conversation history for this session."""
-        # Your implementation here
-        pass
+    async def get_items(self, limit: int | None = None) -> list[TResponseInputItem]:
+        if limit is None:
+            return list(self.items)
+        if limit <= 0:
+            return []
+        return list(self.items[-limit:])
 
-    async def add_items(self, items: List[TResponseInputItem]) -> None:
-        """Store new items for this session."""
-        # Your implementation here
-        pass
+    async def add_items(self, items: list[TResponseInputItem]) -> None:
+        self.items.extend(items)
 
     async def pop_item(self) -> TResponseInputItem | None:
-        """Remove and return the most recent item from this session."""
-        # Your implementation here
-        pass
+        return self.items.pop() if self.items else None
 
     async def clear_session(self) -> None:
-        """Clear all items for this session."""
-        # Your implementation here
-        pass
+        self.items.clear()
+
 
 # Use your custom session
 agent = Agent(name="Assistant")
@@ -683,6 +684,47 @@ result = await Runner.run(
     session=MyCustomSession("my_session")
 )
 ```
+
+### Accessing run context from a custom session
+
+The Agents SDK can pass the active [`RunContextWrapper`][agents.run_context.RunContextWrapper] to a custom session for tenant routing, authorization, or other app-specific storage decisions. For the Agents SDK to pass the wrapper, add an explicitly named, keyword-compatible `wrapper` parameter to all four history methods:
+
+```python
+from typing import Any
+
+from agents import RunContextWrapper
+from agents.items import TResponseInputItem
+
+
+class ContextAwareSession:
+    async def get_items(
+        self,
+        limit: int | None = None,
+        *,
+        wrapper: RunContextWrapper[Any] | None = None,
+    ) -> list[TResponseInputItem]: ...
+
+    async def add_items(
+        self,
+        items: list[TResponseInputItem],
+        *,
+        wrapper: RunContextWrapper[Any] | None = None,
+    ) -> None: ...
+
+    async def pop_item(
+        self,
+        *,
+        wrapper: RunContextWrapper[Any] | None = None,
+    ) -> TResponseInputItem | None: ...
+
+    async def clear_session(
+        self,
+        *,
+        wrapper: RunContextWrapper[Any] | None = None,
+    ) -> None: ...
+```
+
+The Agents SDK enables this integration only when `get_items`, `add_items`, `pop_item`, and `clear_session` all declare `wrapper`. A generic `**kwargs` parameter does not satisfy this signature check. Existing session implementations that omit `wrapper` keep their released call shape and continue to work without changes.
 
 ## Community session implementations
 

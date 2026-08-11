@@ -649,6 +649,8 @@ Use this when sandbox state lives in your own storage or job system and you want
 
 Session-state serialization omits native `host_path` values. To resume host-backed grants, provide the current trusted manifest through `SandboxRunConfig.manifest` or `agent.default_manifest`; otherwise resume fails before the sandbox starts. Never derive host paths from serialized or other untrusted input.
 
+Session-state and `RunState` serialization also remove cloud mount credentials, credential-bearing helper configuration, and in-container credential-exposure acknowledgements. For a backend that supports resuming mounted sessions, provide the current trusted manifest through `SandboxRunConfig.manifest` or `agent.default_manifest` when the state contains redacted mount authority. When the mount entry named `"data"` needs mount-scoped acknowledgement, retain the copied manifest with `trusted_manifest = trusted_manifest.with_in_container_mount_credential_exposure_acknowledged("data")` before resuming. Use `trusted_manifest = trusted_manifest.with_in_container_mount_broad_credential_exposure_acknowledged("data")` for broad authority, and call both methods when the mount uses both authority classes. Pass every exact mount path that needs an acknowledgement. The Agents SDK restores credentials only when the current trusted manifest has exactly the same credential-free mount topology as the persisted state. Missing or mismatched trusted configuration causes resume to fail before the sandbox starts; serialized state never grants authority by itself. `VercelSandboxClient` cannot resume a mounted session, so start a new sandbox with the trusted manifest instead.
+
 ### Start from a snapshot
 
 Seed a new sandbox from saved files and artifacts:

@@ -23,7 +23,7 @@ Start with the simplest path that fits your setup:
 
 For most OpenAI-only apps, the recommended path is to use string model names with the default OpenAI provider and stay on the Responses model path.
 
-When you don't specify a model when initializing an `Agent`, the default model will be used. The default is currently [`gpt-5.4-mini`](https://developers.openai.com/api/docs/models/gpt-5.4-mini) with `reasoning.effort="none"` and `verbosity="low"` for low-latency agent workflows. If you have access, we recommend setting your agents to `gpt-5.6-sol` for higher quality while keeping explicit `model_settings`.
+When an [`Agent`][agents.agent.Agent] does not specify a model, the Agents SDK uses [`gpt-5.6-luna`](https://developers.openai.com/api/docs/models/gpt-5.6-luna) with `reasoning.effort="none"` and `verbosity="low"` by default for cost-sensitive, high-volume agent workflows. Applications that need frontier capability can explicitly set `model="gpt-5.6-sol"` and choose `model_settings` that are appropriate for the workload.
 
 If you want to switch to other models like `gpt-5.6-sol`, there are two ways to configure your agents.
 
@@ -545,11 +545,12 @@ A retry policy receives a [`RetryPolicyContext`][agents.retry.RetryPolicyContext
 - `error` for raw inspection.
 - `normalized` facts such as `status_code`, `retry_after`, `error_code`, `is_network_error`, `is_timeout`, and `is_abort`.
 - `provider_advice` when the underlying model adapter can supply retry guidance.
+- `response_started`, `replay_safety`, and `stateful_request` as stable replay-safety facts captured before the policy runs. `replay_safety` is `"safe"`, `"unsafe"`, or `"unknown"`; `stateful_request` is true when the request uses `previous_response_id` or `conversation_id`.
 
 The policy can return either:
 
 - `True` / `False` for a simple retry decision.
-- A [`RetryDecision`][agents.retry.RetryDecision] when you want to override the delay or attach a diagnostic reason.
+- A [`RetryDecision`][agents.retry.RetryDecision] when you want to override the delay, attach a diagnostic reason, or explicitly approve a narrowly scoped unsafe replay.
 
 The SDK exports ready-made helpers on `retry_policies`:
 
@@ -567,13 +568,15 @@ When you compose policies, `provider_suggested()` is the safest first building b
 
 ##### Safety boundaries
 
-Some failures are never retried automatically:
+Some failures are never retried:
 
 - Abort errors.
-- Requests where provider advice marks replay as unsafe.
 - Streamed runs after output has already started in a way that would make replay unsafe.
+- Requests with a separate local-side-effect replay veto, including Programmatic Tool Calling requests, unless the provider has independently marked the replay safe.
 
-Stateful follow-up requests using `previous_response_id` or `conversation_id` are also treated more conservatively. For those requests, non-provider predicates such as `network_error()` or `http_status([500])` are not enough by themselves. The retry policy should include a replay-safe approval from the provider, typically via `retry_policies.provider_suggested()`.
+Provider-marked unsafe failures are also blocked by default. For a non-streaming request without a separate local-side-effect veto, an application can accept the provider-side replay risk by returning `RetryDecision(retry=True, approve_unsafe_replay=True)`. Check `context.response_started`, `context.replay_safety`, and `context.stateful_request` before granting this approval, and grant it only when repeating provider-side work is acceptable. An ordinary `RetryDecision(retry=True)` never bypasses replay protection, and `approve_unsafe_replay=True` cannot authorize streamed retries or local side effects.
+
+Stateful follow-up requests using `previous_response_id` or `conversation_id` fail closed when replay safety is unknown. For those requests, non-provider predicates such as `network_error()` or `http_status([500])` are not enough by themselves. Include a replay-safe approval from the provider, typically via `retry_policies.provider_suggested()`, or explicitly approve a non-streaming failure that the provider marked unsafe as described above.
 
 ##### Runner and agent merge behavior
 
@@ -623,6 +626,8 @@ result = await Runner.run(
 ```
 
 If you use [`MultiProvider`][agents.MultiProvider], pass `openai_strict_feature_validation=True` instead.
+
+The OpenAI Chat Completions API can return audio output, but [`OpenAIChatCompletionsModel`][agents.models.openai_chatcompletions.OpenAIChatCompletionsModel] does not currently convert audio output into Agents SDK run items. If a non-streaming message or streaming delta contains audio output, the adapter raises `AgentsException("Audio is not currently supported")` instead of returning a partial or empty result. Use [Realtime agents](../realtime/guide.md) or [Voice agents](../voice/quickstart.md) for SDK-managed audio workflows.
 
 Some OpenAI-compatible Chat Completions providers stream tool-call deltas in chunks that are not reliable enough for incremental SDK processing. In that case, enable streamed tool-call buffering so the SDK emits tool calls only after the provider stream finishes:
 
