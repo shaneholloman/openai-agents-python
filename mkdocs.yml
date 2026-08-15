@@ -54,7 +54,6 @@ plugins:
             - Configuration: config.md
             - Documentation:
                 - Agents: agents.md
-                - Testing: testing.md
                 - Sandbox agents:
                     - Quickstart: sandbox_agents.md
                     - Concepts: sandbox/guide.md
@@ -86,6 +85,7 @@ plugins:
                 - Usage: usage.md
                 - Model context protocol (MCP): mcp.md
                 - Tracing: tracing.md
+                - Testing: testing.md
                 - Agent visualization: visualization.md
                 - REPL utility: repl.md
                 - Examples: examples.md
@@ -238,6 +238,7 @@ plugins:
                 - usage.md
                 - mcp.md
                 - tracing.md
+                - テスト: testing.md
                 - visualization.md
                 - repl.md
                 - コード例: examples.md
@@ -281,6 +282,7 @@ plugins:
                 - usage.md
                 - mcp.md
                 - tracing.md
+                - 테스트: testing.md
                 - visualization.md
                 - repl.md
                 - 코드 예제: examples.md
@@ -324,6 +326,7 @@ plugins:
                 - usage.md
                 - mcp.md
                 - tracing.md
+                - 测试: testing.md
                 - visualization.md
                 - repl.md
                 - 示例: examples.md
