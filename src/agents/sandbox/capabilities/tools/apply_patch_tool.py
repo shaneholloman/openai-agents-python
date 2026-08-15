@@ -18,6 +18,7 @@ from ...apply_patch import WorkspaceEditor
 from ...errors import ApplyPatchPathError
 from ...session.base_sandbox_session import BaseSandboxSession
 from ...types import User
+from ...workspace_paths import SandboxWorkspaceScope
 
 _APPLY_PATCH_CUSTOM_TOOL_GRAMMAR = r"""
 start: begin_patch hunk+ end_patch
@@ -137,18 +138,37 @@ _MOVE_TO = "*** Move to: "
 
 
 class SandboxApplyPatchEditor(ApplyPatchEditor):
-    def __init__(self, session: BaseSandboxSession, *, user: str | User | None = None) -> None:
+    def __init__(
+        self,
+        session: BaseSandboxSession,
+        *,
+        user: str | User | None = None,
+        workspace_scope: SandboxWorkspaceScope | None = None,
+    ) -> None:
         self.session = session
         self.user = user
+        self.workspace_scope = workspace_scope or SandboxWorkspaceScope()
 
     async def create_file(self, operation: ApplyPatchOperation) -> ApplyPatchResult:
-        return await WorkspaceEditor(self.session, user=self.user).apply_operation(operation)
+        return await WorkspaceEditor(
+            self.session,
+            user=self.user,
+            workspace_scope=self.workspace_scope,
+        ).apply_operation(operation)
 
     async def update_file(self, operation: ApplyPatchOperation) -> ApplyPatchResult:
-        return await WorkspaceEditor(self.session, user=self.user).apply_operation(operation)
+        return await WorkspaceEditor(
+            self.session,
+            user=self.user,
+            workspace_scope=self.workspace_scope,
+        ).apply_operation(operation)
 
     async def delete_file(self, operation: ApplyPatchOperation) -> ApplyPatchResult:
-        return await WorkspaceEditor(self.session, user=self.user).apply_operation(operation)
+        return await WorkspaceEditor(
+            self.session,
+            user=self.user,
+            workspace_scope=self.workspace_scope,
+        ).apply_operation(operation)
 
 
 class SandboxApplyPatchTool(CustomTool):
@@ -164,9 +184,15 @@ class SandboxApplyPatchTool(CustomTool):
         user: str | User | None = None,
         needs_approval: bool | ApplyPatchApprovalFunction = False,
         on_approval: ApplyPatchOnApprovalFunction | None = None,
+        workspace_scope: SandboxWorkspaceScope | None = None,
     ) -> None:
         self.session = session
-        self.editor = SandboxApplyPatchEditor(session, user=user)
+        self.workspace_scope = workspace_scope or SandboxWorkspaceScope()
+        self.editor = SandboxApplyPatchEditor(
+            session,
+            user=user,
+            workspace_scope=self.workspace_scope,
+        )
         super().__init__(
             name="apply_patch",
             description=_APPLY_PATCH_CUSTOM_TOOL_DESCRIPTION,
@@ -193,7 +219,10 @@ class SandboxApplyPatchTool(CustomTool):
         return _parse_custom_tool_input(raw_input)
 
     def _normalize_operation(self, operation: ApplyPatchOperation) -> ApplyPatchOperation:
-        return WorkspaceEditor(self.session).normalize_operation(operation)
+        return WorkspaceEditor(
+            self.session,
+            workspace_scope=self.workspace_scope,
+        ).normalize_operation(operation)
 
     def _parse_and_normalize_input(self, raw_input: str) -> list[ApplyPatchOperation]:
         return [
@@ -223,9 +252,12 @@ class SandboxApplyPatchTool(CustomTool):
         return False
 
     async def _on_invoke_tool(self, ctx: ToolContext[Any], raw_input: str) -> str:
-        # Normalize every operation before executing any of them. This prevents a valid
-        # prefix from mutating the workspace when a later path is invalid.
-        operations = self._parse_and_normalize_input(raw_input)
+        operations = self.parse_custom_input(raw_input)
+        # Validate every operation before executing any of them. Keep the raw paths for
+        # execution so an absolute model path does not lose its identity before the scoped
+        # editor applies the run cwd.
+        for operation in operations:
+            self._normalize_operation(operation)
 
         operation_outputs: list[str] = []
         for operation in operations:
