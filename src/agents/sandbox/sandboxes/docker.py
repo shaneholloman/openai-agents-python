@@ -25,6 +25,8 @@ from docker.api.container import DEFAULT_DATA_CHUNK_SIZE  # type: ignore[import-
 from docker.models.containers import Container  # type: ignore[import-untyped]
 from docker.types import DriverConfig, Mount as DockerSDKMount  # type: ignore[import-untyped]
 from docker.utils import parse_repository_tag
+from pydantic import model_validator
+from typing_extensions import Self
 
 from .._mount_security import (
     _manifest_has_configured_mount_authority,
@@ -169,10 +171,28 @@ _PREPARE_USER_PTY_PID_SCRIPT = (
 )
 
 
+def _validate_docker_network_configuration(
+    *,
+    network_mode: Literal["none"] | None,
+    exposed_ports: tuple[int, ...],
+) -> None:
+    if network_mode == "none" and exposed_ports:
+        raise ValueError("exposed_ports cannot be used when network_mode='none'")
+
+
 class DockerSandboxSessionState(SandboxSessionState):
     type: Literal["docker"] = "docker"
     image: str
     container_id: str
+    network_mode: Literal["none"] | None = None
+
+    @model_validator(mode="after")
+    def _validate_network_configuration(self) -> Self:
+        _validate_docker_network_configuration(
+            network_mode=self.network_mode,
+            exposed_ports=self.exposed_ports,
+        )
+        return self
 
     def _sanitize_persisted_provider_identity(
         self,
@@ -193,6 +213,15 @@ class DockerSandboxClientOptions(BaseSandboxClientOptions):
     type: Literal["docker"] = "docker"
     image: str
     exposed_ports: tuple[int, ...] = ()
+    network_mode: Literal["none"] | None = None
+
+    @model_validator(mode="after")
+    def _validate_network_configuration(self) -> Self:
+        _validate_docker_network_configuration(
+            network_mode=self.network_mode,
+            exposed_ports=self.exposed_ports,
+        )
+        return self
 
     def __init__(
         self,
@@ -200,11 +229,13 @@ class DockerSandboxClientOptions(BaseSandboxClientOptions):
         exposed_ports: tuple[int, ...] = (),
         *,
         type: Literal["docker"] = "docker",
+        network_mode: Literal["none"] | None = None,
     ) -> None:
         super().__init__(
             type=type,
             image=image,
             exposed_ports=exposed_ports,
+            network_mode=network_mode,
         )
 
 
@@ -1502,6 +1533,7 @@ class DockerSandboxClient(BaseSandboxClient[DockerSandboxClientOptions]):
                 image,
                 manifest=manifest,
                 exposed_ports=options.exposed_ports,
+                network_mode=options.network_mode,
                 session_id=session_id,
             )
             container.start()
@@ -1516,6 +1548,7 @@ class DockerSandboxClient(BaseSandboxClient[DockerSandboxClientOptions]):
                 snapshot=snapshot_instance,
                 container_id=container_id,
                 exposed_ports=options.exposed_ports,
+                network_mode=options.network_mode,
             )
             inner = DockerSandboxSession(
                 docker_client=self.docker_client,
@@ -1616,6 +1649,10 @@ class DockerSandboxClient(BaseSandboxClient[DockerSandboxClientOptions]):
         reused_existing_container = container is not None
         if container is not None:
             _assert_existing_container_path_grants_match(container, state.manifest)
+            _assert_existing_container_network_configuration_matches(
+                container,
+                state.network_mode,
+            )
         owns_replacement = container is None
         replacement_session_id = (
             uuid.uuid4()
@@ -1642,6 +1679,7 @@ class DockerSandboxClient(BaseSandboxClient[DockerSandboxClientOptions]):
                     state.image,
                     manifest=state.manifest,
                     exposed_ports=state.exposed_ports,
+                    network_mode=state.network_mode,
                     session_id=replacement_session_id,
                 )
                 container_id = container.id
@@ -1675,6 +1713,7 @@ class DockerSandboxClient(BaseSandboxClient[DockerSandboxClientOptions]):
         *,
         manifest: Manifest | None = None,
         exposed_ports: tuple[int, ...] = (),
+        network_mode: Literal["none"] | None = None,
         session_id: uuid.UUID | None = None,
     ) -> Container:
         if manifest is not None:
@@ -1695,6 +1734,8 @@ class DockerSandboxClient(BaseSandboxClient[DockerSandboxClientOptions]):
             "command": ["-f", "/dev/null"],
             "environment": environment,
         }
+        if network_mode is not None:
+            create_kwargs["network_mode"] = network_mode
         if manifest is not None:
             docker_mounts = _build_docker_volume_mounts(manifest, session_id=session_id)
             if docker_mounts:
@@ -1830,6 +1871,28 @@ def _validate_docker_path_grants(manifest: Manifest) -> None:
             raise ValueError(
                 f"Docker sandbox path grant target conflicts with a manifest mount: {grant.path}"
             )
+
+
+def _assert_existing_container_network_configuration_matches(
+    container: Container,
+    network_mode: Literal["none"] | None,
+) -> None:
+    if network_mode is None:
+        return
+
+    container.reload()
+    attrs = getattr(container, "attrs", {}) or {}
+    host_config = attrs.get("HostConfig")
+    network_settings = attrs.get("NetworkSettings")
+    actual_network_mode = host_config.get("NetworkMode") if isinstance(host_config, dict) else None
+    networks = network_settings.get("Networks") if isinstance(network_settings, dict) else None
+    attached_networks = set(networks) if isinstance(networks, dict) else None
+
+    if actual_network_mode != "none" or attached_networks is None or attached_networks - {"none"}:
+        raise ValueError(
+            "Existing Docker sandbox network configuration does not match persisted "
+            "network_mode='none'; create a fresh sandbox session"
+        )
 
 
 def _assert_existing_container_path_grants_match(
