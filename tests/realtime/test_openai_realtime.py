@@ -18,6 +18,7 @@ from agents.realtime import RealtimeSessionModelSettings
 from agents.realtime.model import RealtimeModelConfig, RealtimePlaybackTracker
 from agents.realtime.model_events import (
     RealtimeModelAudioEvent,
+    RealtimeModelAudioInterruptedEvent,
     RealtimeModelErrorEvent,
     RealtimeModelOutputTextDeltaEvent,
     RealtimeModelRawServerEvent,
@@ -1926,6 +1927,73 @@ class TestSendEventAndConfig(TestOpenAIRealtimeWebSocketModel):
 
         send_raw.assert_not_awaited()
         emit_event.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_interrupt_truncates_at_zero_when_no_time_has_elapsed(self, model, monkeypatch):
+        """An interrupt inside one clock tick still truncates, at position 0.
+
+        Both readings are pinned to the same value, so ``elapsed_ms`` is exactly
+        0. That is a real state rather than a contrived one: ``time.monotonic()``
+        advances in ~15.6ms steps on Windows, so an interrupt arriving in the same
+        tick as the audio it interrupts produces it. Treating 0 as "nothing to
+        truncate" left the item holding audio the user never heard.
+        """
+        model._audio_state_tracker.set_audio_format("pcm16")
+        with patch("agents.realtime._default_tracker.time.monotonic", return_value=1000.0):
+            model._audio_state_tracker.on_audio_delta("item_1", 0, b"\x00" * 4800)
+
+        send_raw = AsyncMock()
+        emit_event = AsyncMock()
+        monkeypatch.setattr(model, "_send_raw_message", send_raw)
+        monkeypatch.setattr(model, "_emit_event", emit_event)
+
+        with patch("agents.realtime.openai_realtime.time.monotonic", return_value=1000.0):
+            await model._send_interrupt(RealtimeModelSendInterrupt())
+
+        interrupted = [
+            call.args[0]
+            for call in emit_event.await_args_list
+            if isinstance(call.args[0], RealtimeModelAudioInterruptedEvent)
+        ]
+        assert len(interrupted) == 1
+        assert interrupted[0].item_id == "item_1"
+        assert interrupted[0].content_index == 0
+
+        truncates = [
+            call.args[0]
+            for call in send_raw.await_args_list
+            if getattr(call.args[0], "type", None) == "conversation.item.truncate"
+        ]
+        assert len(truncates) == 1
+        assert truncates[0].item_id == "item_1"
+        assert truncates[0].content_index == 0
+        assert truncates[0].audio_end_ms == 0
+
+    @pytest.mark.asyncio
+    async def test_interrupt_skips_truncate_when_elapsed_is_negative(self, model, monkeypatch):
+        """A clock that went backwards is still not a truncation position."""
+        model._audio_state_tracker.set_audio_format("pcm16")
+        with patch("agents.realtime._default_tracker.time.monotonic", return_value=1000.0):
+            model._audio_state_tracker.on_audio_delta("item_1", 0, b"\x00" * 4800)
+
+        send_raw = AsyncMock()
+        emit_event = AsyncMock()
+        monkeypatch.setattr(model, "_send_raw_message", send_raw)
+        monkeypatch.setattr(model, "_emit_event", emit_event)
+
+        with patch("agents.realtime.openai_realtime.time.monotonic", return_value=999.0):
+            await model._send_interrupt(RealtimeModelSendInterrupt())
+
+        assert not [
+            call.args[0]
+            for call in send_raw.await_args_list
+            if getattr(call.args[0], "type", None) == "conversation.item.truncate"
+        ]
+        assert not [
+            call.args[0]
+            for call in emit_event.await_args_list
+            if isinstance(call.args[0], RealtimeModelAudioInterruptedEvent)
+        ]
 
     @pytest.mark.asyncio
     async def test_interrupt_respects_auto_cancellation_when_not_forced(self, model, monkeypatch):
