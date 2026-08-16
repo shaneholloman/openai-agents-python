@@ -5,7 +5,7 @@ import logging
 import os
 import uuid
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import pytest
 from openai.types.responses import (
@@ -156,12 +156,14 @@ async def test_runner_owned_local_sandbox_cannot_inspect_trusted_client_credenti
                 *,
                 manifest: Manifest | None = None,
                 exposed_ports: tuple[int, ...] = (),
+                network_mode: Literal["none"] | None = None,
                 session_id: uuid.UUID | None = None,
             ) -> Any:
                 container = await super()._create_container(
                     image,
                     manifest=manifest,
                     exposed_ports=exposed_ports,
+                    network_mode=network_mode,
                     session_id=session_id,
                 )
                 container_id = container.id
