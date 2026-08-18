@@ -23,6 +23,154 @@ def _run_suite() -> Callable[..., None]:
     return cast(Callable[..., None], runpy.run_path(str(RUNNER))["run_suite"])
 
 
+def test_every_integration_profile_has_exactly_one_credential_class() -> None:
+    namespace = runpy.run_path(str(RUNNER))
+    profile_classes = namespace["PROFILE_CREDENTIAL_CLASSES"]
+
+    assert tuple(profile_classes) == namespace["PROFILES"]
+    assert set(profile_classes.values()) == {
+        namespace["LIVE_CREDENTIAL_CLASS"],
+        namespace["LOCAL_ONLY_CREDENTIAL_CLASS"],
+    }
+    assert {
+        profile
+        for profile, credential_class in profile_classes.items()
+        if credential_class == namespace["LOCAL_ONLY_CREDENTIAL_CLASS"]
+    } == {
+        "packaging",
+        "prospective-contract",
+        "prospective-platform",
+        "security",
+        "mcp-v1",
+        "extras",
+    }
+    assert {
+        profile
+        for profile, credential_class in profile_classes.items()
+        if credential_class == namespace["LIVE_CREDENTIAL_CLASS"]
+    } == {
+        "core",
+        "providers",
+        "realtime",
+        "voice",
+        "hosted",
+        "full",
+        "release",
+        "nightly",
+        "manual",
+    }
+
+
+@pytest.mark.parametrize(
+    "profile",
+    ["core", "providers", "realtime", "voice", "hosted", "full", "release", "nightly", "manual"],
+)
+def test_live_profiles_refuse_untrusted_credentials_before_side_effects(
+    profile: str,
+) -> None:
+    namespace = runpy.run_path(str(RUNNER))
+    bootstrap_in_uv = cast(Callable[..., None], namespace["bootstrap_in_uv"])
+    child_processes: list[str] = []
+
+    with pytest.raises(
+        RuntimeError,
+        match="requires OPENAI_API_KEY_SOURCE=service-account before any build or subprocess",
+    ):
+        bootstrap_in_uv(
+            ["--profile", profile],
+            {"OPENAI_API_KEY": "inherited-employee-key"},
+            lambda *args: child_processes.append("uv"),
+        )
+
+    assert child_processes == []
+
+
+@pytest.mark.parametrize(
+    "profile",
+    ["packaging", "prospective-contract", "prospective-platform", "security", "mcp-v1", "extras"],
+)
+def test_local_only_profiles_remove_key_before_uv_child_process(profile: str) -> None:
+    namespace = runpy.run_path(str(RUNNER))
+    bootstrap_in_uv = cast(Callable[..., None], namespace["bootstrap_in_uv"])
+    environment = {
+        "OPENAI_API_KEY": "inherited-employee-key",
+        "OPENAI_API_KEY_SOURCE": "employee",
+    }
+    captured: list[tuple[str, list[str], dict[str, str]]] = []
+
+    def capture_exec(file: str, command: list[str], child_env: dict[str, str]) -> None:
+        captured.append((file, command, child_env))
+
+    with pytest.raises(RuntimeError, match="bootstrap returned unexpectedly"):
+        bootstrap_in_uv(["--profile", profile], environment, capture_exec)
+
+    assert len(captured) == 1
+    assert captured[0][0] == "uv"
+    assert captured[0][1][0:3] == ["uv", "run", "python"]
+    assert "OPENAI_API_KEY" not in captured[0][2]
+    assert captured[0][2][namespace["BOOTSTRAPPED_ENV"]] == "1"
+    assert "OPENAI_API_KEY" not in environment
+
+
+def test_local_only_profile_removes_key_before_cleanup_build_and_children(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    namespace = runpy.run_path(str(RUNNER))
+    main = cast(Callable[[], None], namespace["main"])
+    observed_steps: list[str] = []
+
+    def assert_sanitized(step: str) -> None:
+        assert "OPENAI_API_KEY" not in os.environ
+        observed_steps.append(step)
+
+    def fake_build_distributions() -> tuple[Path, Path]:
+        assert_sanitized("build")
+        return tmp_path / "candidate.whl", tmp_path / "candidate.tar.gz"
+
+    def fake_create_environment(
+        name: str,
+        distribution: Path,
+        *,
+        extras: bool = False,
+        optional_extra: str | None = None,
+        additional_requirements: tuple[str, ...] = (),
+    ) -> Path:
+        _ = (name, distribution, extras, optional_extra, additional_requirements)
+        assert_sanitized("create-environment")
+        return tmp_path / "python"
+
+    def fake_run_suite(*args: object, **kwargs: Any) -> None:
+        _ = (args, kwargs)
+        assert_sanitized("run-suite")
+
+    monkeypatch.setenv("OPENAI_API_KEY", "inherited-employee-key")
+    monkeypatch.setenv("OPENAI_API_KEY_SOURCE", "employee")
+    monkeypatch.setattr(sys, "argv", [str(RUNNER), "--profile", "packaging"])
+    monkeypatch.setitem(main.__globals__, "build_distributions", fake_build_distributions)
+    monkeypatch.setitem(main.__globals__, "create_environment", fake_create_environment)
+    monkeypatch.setitem(main.__globals__, "run_suite", fake_run_suite)
+    monkeypatch.setattr(
+        main.__globals__["shutil"],
+        "rmtree",
+        lambda *args, **kwargs: assert_sanitized("cleanup"),
+    )
+
+    main()
+
+    assert observed_steps[0:2] == ["cleanup", "build"]
+    assert "create-environment" in observed_steps
+    assert "run-suite" in observed_steps
+
+
+def test_unknown_profile_fails_closed_during_credential_classification() -> None:
+    namespace = runpy.run_path(str(RUNNER))
+    prepare_profile_environment = cast(Callable[..., str], namespace["prepare_profile_environment"])
+
+    with pytest.raises(RuntimeError, match="has no credential class"):
+        prepare_profile_environment("unclassified", {"OPENAI_API_KEY": "inherited"})
+
+
 def test_junit_sanitizer_removes_failure_details_and_captured_output(tmp_path: Path) -> None:
     sentinel = "JUNIT_SECRET_SENTINEL_42"
     report = tmp_path / "results.xml"
@@ -345,6 +493,8 @@ def test_code_change_detection_includes_packaged_contract_inputs() -> None:
     assert "integration_tests/" in detector
     assert "detect-changes\\.sh" in detector
     assert "run_integration_tests\\.py" in detector
+    assert "run_examples\\.sh" in detector
+    assert "examples-run-analysis" in detector
     assert "update_released_api_contract\\.py" in detector
     assert "\\.github/workflows/tests\\.yml" in detector
 
@@ -440,6 +590,7 @@ def test_release_profile_enforces_strict_security_for_wheel_and_sdist(
         suites.append(kwargs)
 
     monkeypatch.setenv("OPENAI_AGENTS_INTEGRATION_STRICT", "0")
+    monkeypatch.setenv("OPENAI_API_KEY_SOURCE", "service-account")
     monkeypatch.setattr(sys, "argv", [str(RUNNER), "--profile", "release"])
     monkeypatch.setitem(main.__globals__, "build_distributions", fake_build_distributions)
     monkeypatch.setitem(main.__globals__, "create_environment", fake_create_environment)

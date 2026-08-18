@@ -7,16 +7,10 @@ import shutil
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
+from collections.abc import Callable, MutableMapping, Sequence
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT))
-
-from integration_tests._contract_support import (  # noqa: E402
-    SubmoduleExportPolicy,
-    load_submodule_export_policy,
-)
-
 WORKSPACE = ROOT / ".tmp" / "integration-tests"
 DIST = WORKSPACE / "dist"
 RESULTS = WORKSPACE / "results"
@@ -36,22 +30,89 @@ OPTIONAL_EXTRAS = (
     "s3",
 )
 STRICT_PROFILES = frozenset({"release", "security"})
-PROFILES = (
-    "packaging",
-    "prospective-contract",
-    "prospective-platform",
-    "security",
-    "mcp-v1",
-    "core",
-    "providers",
-    "realtime",
-    "voice",
-    "hosted",
-    "extras",
-    "full",
-    "release",
-    "nightly",
-    "manual",
+LOCAL_ONLY_CREDENTIAL_CLASS = "local-only"
+LIVE_CREDENTIAL_CLASS = "live"
+PROFILE_CREDENTIAL_CLASSES = {
+    "packaging": LOCAL_ONLY_CREDENTIAL_CLASS,
+    "prospective-contract": LOCAL_ONLY_CREDENTIAL_CLASS,
+    "prospective-platform": LOCAL_ONLY_CREDENTIAL_CLASS,
+    "security": LOCAL_ONLY_CREDENTIAL_CLASS,
+    "mcp-v1": LOCAL_ONLY_CREDENTIAL_CLASS,
+    "extras": LOCAL_ONLY_CREDENTIAL_CLASS,
+    "core": LIVE_CREDENTIAL_CLASS,
+    "providers": LIVE_CREDENTIAL_CLASS,
+    "realtime": LIVE_CREDENTIAL_CLASS,
+    "voice": LIVE_CREDENTIAL_CLASS,
+    "hosted": LIVE_CREDENTIAL_CLASS,
+    "full": LIVE_CREDENTIAL_CLASS,
+    "release": LIVE_CREDENTIAL_CLASS,
+    "nightly": LIVE_CREDENTIAL_CLASS,
+    "manual": LIVE_CREDENTIAL_CLASS,
+}
+PROFILES = tuple(PROFILE_CREDENTIAL_CLASSES)
+BOOTSTRAPPED_ENV = "OPENAI_AGENTS_INTEGRATION_RUNNER_BOOTSTRAPPED"
+
+
+def parse_args(arguments: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run packaged openai-agents integration tests.")
+    parser.add_argument("--profile", choices=PROFILES, default="full")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Include configured direct Anthropic and Gemini providers alongside OpenRouter.",
+    )
+    return parser.parse_args(arguments)
+
+
+def prepare_profile_environment(
+    profile: str,
+    environ: MutableMapping[str, str] | None = None,
+) -> str:
+    environment = os.environ if environ is None else environ
+    try:
+        credential_class = PROFILE_CREDENTIAL_CLASSES[profile]
+    except KeyError as error:
+        raise RuntimeError(f"Integration profile {profile!r} has no credential class.") from error
+
+    if credential_class == LIVE_CREDENTIAL_CLASS:
+        if environment.get("OPENAI_API_KEY_SOURCE") != "service-account":
+            raise RuntimeError(
+                f"Live integration profile {profile!r} requires "
+                "OPENAI_API_KEY_SOURCE=service-account before any build or subprocess starts. "
+                "Load the approved service-account environment and retry the Make target."
+            )
+    elif credential_class == LOCAL_ONLY_CREDENTIAL_CLASS:
+        environment.pop("OPENAI_API_KEY", None)
+    else:
+        raise RuntimeError(
+            f"Integration profile {profile!r} has unknown credential class {credential_class!r}."
+        )
+    return credential_class
+
+
+def bootstrap_in_uv(
+    arguments: Sequence[str],
+    environ: MutableMapping[str, str],
+    exec_function: Callable[[str, list[str], dict[str, str]], object] = os.execvpe,
+) -> None:
+    args = parse_args(arguments)
+    prepare_profile_environment(args.profile, environ)
+    child_env = dict(environ)
+    child_env[BOOTSTRAPPED_ENV] = "1"
+    command = ["uv", "run", "python", str(Path(__file__).resolve()), *arguments]
+    exec_function(command[0], command, child_env)
+    raise RuntimeError("The uv integration runner bootstrap returned unexpectedly.")
+
+
+if __name__ == "__main__" and os.environ.get(BOOTSTRAPPED_ENV) != "1":
+    bootstrap_in_uv(sys.argv[1:], os.environ)
+
+
+sys.path.insert(0, str(ROOT))
+
+from integration_tests._contract_support import (  # noqa: E402
+    SubmoduleExportPolicy,
+    load_submodule_export_policy,
 )
 
 
@@ -355,14 +416,8 @@ def _sanitize_and_load_junit(result_path: Path) -> ET.Element | None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run packaged openai-agents integration tests.")
-    parser.add_argument("--profile", choices=PROFILES, default="full")
-    parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Include configured direct Anthropic and Gemini providers alongside OpenRouter.",
-    )
-    args = parser.parse_args()
+    args = parse_args()
+    prepare_profile_environment(args.profile)
     prospective_policy: SubmoduleExportPolicy | None = None
     if args.profile in {"prospective-contract", "prospective-platform"}:
         prospective_contract = os.environ.get(PROSPECTIVE_CONTRACT_ENV)

@@ -6,7 +6,6 @@ Features:
 * Auto mode (``EXAMPLES_INTERACTIVE_MODE=auto``) enables deterministic inputs,
   auto-approvals, and turns on interactive examples by default.
 * Writes per-example logs to ``.tmp/examples-start-logs`` and a main summary log.
-* Generates a rerun list of failures at ``.tmp/examples-rerun.txt``.
 """
 
 from __future__ import annotations
@@ -36,7 +35,6 @@ MAIN_PATTERN = re.compile(r"__name__\s*==\s*['\"]__main__['\"]")
 
 LOG_DIR_DEFAULT = ROOT_DIR / ".tmp" / "examples-start-logs"
 ARTIFACTS_DIR_DEFAULT = ROOT_DIR / ".tmp" / "examples-artifacts"
-RERUN_FILE_DEFAULT = ROOT_DIR / ".tmp" / "examples-rerun.txt"
 DEFAULT_MAIN_LOG = LOG_DIR_DEFAULT / f"main_{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.log"
 REDIS_SESSION_EXAMPLE = "examples/memory/redis_session_example.py"
 DAPR_SESSION_EXAMPLE = "examples/memory/dapr_session_example.py"
@@ -423,23 +421,6 @@ def parse_args() -> argparse.Namespace:
         help="Directory for example-generated artifacts.",
     )
     parser.add_argument(
-        "--rerun-file",
-        help="Only run examples listed in this file (one relative path per line).",
-    )
-    parser.add_argument(
-        "--write-rerun",
-        action="store_true",
-        help="Write failures to .tmp/examples-rerun.txt after the run.",
-    )
-    parser.add_argument(
-        "--collect",
-        help="Parse a previous main log to emit a rerun list instead of running examples.",
-    )
-    parser.add_argument(
-        "--output",
-        help="Output path for --collect rerun list (defaults to stdout).",
-    )
-    parser.add_argument(
         "--print-auto-skip",
         action="store_true",
         help="Show the current auto-skip list and exit.",
@@ -592,24 +573,6 @@ def artifact_dir_for_example(relpath: str, artifacts_dir: Path) -> Path:
     return artifacts_dir / stem.replace("/", "__")
 
 
-def parse_rerun_from_log(log_path: Path) -> list[str]:
-    if not log_path.exists():
-        raise FileNotFoundError(log_path)
-    rerun: list[str] = []
-    with log_path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-            parts = stripped.split()
-            if len(parts) < 2:
-                continue
-            status, relpath = parts[0].upper(), parts[1]
-            if status in {"FAILED", "ERROR", "UNKNOWN"}:
-                rerun.append(normalize_relpath(relpath))
-    return rerun
-
-
 def run_examples(examples: Sequence[ExampleScript], args: argparse.Namespace) -> int:
     overrides: set[str] = set()
     if args.include_interactive or env_flag("EXAMPLES_INCLUDE_INTERACTIVE"):
@@ -633,8 +596,6 @@ def run_examples(examples: Sequence[ExampleScript], args: argparse.Namespace) ->
     ensure_dirs(logs_dir, is_file=False)
     ensure_dirs(artifacts_dir, is_file=False)
     ensure_dirs(main_log_path, is_file=True)
-    rerun_entries: list[str] = []
-
     if not examples:
         print("No example entry points found that match the filters.")
         return 0
@@ -841,17 +802,7 @@ def run_examples(examples: Sequence[ExampleScript], args: argparse.Namespace) ->
                 executed += 1
             elif result.status == "failed":
                 failed += 1
-                rerun_entries.append(ex.relpath)
         safe_write_main(f"# summary executed={executed} skipped={skipped} failed={failed}")
-
-    if args.write_rerun:
-        ensure_dirs(RERUN_FILE_DEFAULT, is_file=True)
-        if rerun_entries:
-            contents = "\n".join(rerun_entries) + "\n"
-        else:
-            contents = ""
-        RERUN_FILE_DEFAULT.write_text(contents, encoding="utf-8")
-        print(f"Wrote rerun list to {RERUN_FILE_DEFAULT}")
 
     print(f"Main log: {main_log_path}")
     print(f"Done. Ran {executed} example(s), skipped {skipped}, failed {failed}.")
@@ -882,31 +833,7 @@ def main() -> int:
             print(entry)
         return 0
 
-    if args.collect:
-        paths = parse_rerun_from_log(Path(args.collect))
-        if args.output:
-            out = Path(args.output)
-            ensure_dirs(out, is_file=True)
-            out.write_text("\n".join(paths) + "\n", encoding="utf-8")
-            print(f"Wrote {len(paths)} entries to {out}")
-        else:
-            for p in paths:
-                print(p)
-        return 0
-
     examples = discover_examples(args.filter)
-    if args.rerun_file:
-        rerun_set = {
-            line.strip()
-            for line in Path(args.rerun_file).read_text(encoding="utf-8").splitlines()
-            if line.strip()
-        }
-        examples = [ex for ex in examples if ex.relpath in rerun_set]
-        if not examples:
-            print("Rerun list is empty; nothing to do.")
-            return 0
-        print(f"Rerun mode: {len(examples)} example(s) from {args.rerun_file}")
-
     return run_examples(examples, args)
 
 

@@ -20,7 +20,8 @@ PROSPECTIVE_RELEASED_API_CONTRACT ?= .tmp/prospective_released_api_contract.json
 
 .PHONY: prepare-prospective-released-api-contract
 prepare-prospective-released-api-contract:
-	@version="$$(uv run python -c 'from importlib.metadata import version; print(version("openai-agents"))')"; \
+	@unset OPENAI_API_KEY; \
+	version="$$(uv run python -c 'from importlib.metadata import version; print(version("openai-agents"))')"; \
 	uv run python .github/scripts/update_released_api_contract.py \
 		--version "$$version" \
 		--output "$(PROSPECTIVE_RELEASED_API_CONTRACT)"
@@ -92,53 +93,86 @@ tests-serial:
 tests-serial-review:
 	uv run python .github/scripts/run_serial_tests.py --exclude-review-optional
 
+EXAMPLES_RUNNER := bash .github/scripts/run_examples.sh
+EXAMPLES_ARGS ?=
+EXAMPLES_LOG ?=
+INTEGRATION_TEST_RUNNER := python .github/scripts/run_integration_tests.py
+
+.PHONY: examples-run
+examples-run:
+	$(EXAMPLES_RUNNER) start $(EXAMPLES_ARGS)
+
+.PHONY: examples-run-background
+examples-run-background:
+	$(EXAMPLES_RUNNER) start --background $(EXAMPLES_ARGS)
+
+.PHONY: examples-status
+examples-status:
+	$(EXAMPLES_RUNNER) status
+
+.PHONY: examples-stop
+examples-stop:
+	$(EXAMPLES_RUNNER) stop
+
+.PHONY: examples-logs
+examples-logs:
+	$(EXAMPLES_RUNNER) logs
+
+.PHONY: examples-tail
+examples-tail:
+	$(EXAMPLES_RUNNER) tail $(EXAMPLES_LOG)
+
 .PHONY: integration-tests
 integration-tests:
-	uv run python .github/scripts/run_integration_tests.py --profile full $(filter --all,$(MAKECMDGOALS))
+	$(INTEGRATION_TEST_RUNNER) --profile full $(filter --all,$(MAKECMDGOALS))
 
 .PHONY: integration-tests-release
 integration-tests-release:
-	uv run python .github/scripts/run_integration_tests.py --profile release $(filter --all,$(MAKECMDGOALS))
+	$(INTEGRATION_TEST_RUNNER) --profile release $(filter --all,$(MAKECMDGOALS))
 
 .PHONY: integration-tests-nightly
 integration-tests-nightly:
-	uv run python .github/scripts/run_integration_tests.py --profile nightly $(filter --all,$(MAKECMDGOALS))
+	$(INTEGRATION_TEST_RUNNER) --profile nightly $(filter --all,$(MAKECMDGOALS))
 
 .PHONY: integration-tests-manual
 integration-tests-manual:
-	uv run python .github/scripts/run_integration_tests.py --profile manual $(filter --all,$(MAKECMDGOALS))
+	$(INTEGRATION_TEST_RUNNER) --profile manual $(filter --all,$(MAKECMDGOALS))
 
 .PHONY: integration-tests-packaging
 integration-tests-packaging:
-	uv run python .github/scripts/run_integration_tests.py --profile packaging
+	$(INTEGRATION_TEST_RUNNER) --profile packaging
 
 .PHONY: integration-tests-prospective-contract
 integration-tests-prospective-contract:
-	uv run python .github/scripts/run_integration_tests.py --profile prospective-contract
+	$(INTEGRATION_TEST_RUNNER) --profile prospective-contract
+
+.PHONY: integration-tests-prospective-platform
+integration-tests-prospective-platform:
+	$(INTEGRATION_TEST_RUNNER) --profile prospective-platform
 
 .PHONY: integration-tests-security
 integration-tests-security:
-	uv run python .github/scripts/run_integration_tests.py --profile security
+	$(INTEGRATION_TEST_RUNNER) --profile security
 
 .PHONY: integration-tests-mcp-v1
 integration-tests-mcp-v1:
-	uv run python .github/scripts/run_integration_tests.py --profile mcp-v1
+	$(INTEGRATION_TEST_RUNNER) --profile mcp-v1
 
 .PHONY: integration-tests-core
 integration-tests-core:
-	uv run python .github/scripts/run_integration_tests.py --profile core
+	$(INTEGRATION_TEST_RUNNER) --profile core
 
 .PHONY: integration-tests-providers
 integration-tests-providers:
-	uv run python .github/scripts/run_integration_tests.py --profile providers $(filter --all,$(MAKECMDGOALS))
+	$(INTEGRATION_TEST_RUNNER) --profile providers $(filter --all,$(MAKECMDGOALS))
 
 .PHONY: integration-tests-providers-external
 integration-tests-providers-external:
-	OPENAI_AGENTS_INTEGRATION_EXTERNAL_PROVIDERS=1 uv run python .github/scripts/run_integration_tests.py --profile providers $(filter --all,$(MAKECMDGOALS))
+	OPENAI_AGENTS_INTEGRATION_EXTERNAL_PROVIDERS=1 $(INTEGRATION_TEST_RUNNER) --profile providers $(filter --all,$(MAKECMDGOALS))
 
 .PHONY: integration-tests-providers-all
 integration-tests-providers-all:
-	uv run python .github/scripts/run_integration_tests.py --profile providers --all
+	$(INTEGRATION_TEST_RUNNER) --profile providers --all
 
 .PHONY: --all
 --all:
@@ -146,19 +180,19 @@ integration-tests-providers-all:
 
 .PHONY: integration-tests-realtime
 integration-tests-realtime:
-	uv run python .github/scripts/run_integration_tests.py --profile realtime
+	$(INTEGRATION_TEST_RUNNER) --profile realtime
 
 .PHONY: integration-tests-voice
 integration-tests-voice:
-	uv run python .github/scripts/run_integration_tests.py --profile voice
+	$(INTEGRATION_TEST_RUNNER) --profile voice
 
 .PHONY: integration-tests-hosted
 integration-tests-hosted:
-	uv run python .github/scripts/run_integration_tests.py --profile hosted
+	$(INTEGRATION_TEST_RUNNER) --profile hosted
 
 .PHONY: integration-tests-extras
 integration-tests-extras:
-	uv run python .github/scripts/run_integration_tests.py --profile extras
+	$(INTEGRATION_TEST_RUNNER) --profile extras
 
 .PHONY: coverage
 coverage:

@@ -257,7 +257,7 @@ jobs:
         if: steps.changes.outputs.run == 'true'
         env:
           OPENAI_AGENTS_PROSPECTIVE_RELEASE_CONTRACT: ${{ github.workspace }}/.tmp/prospective_released_api_contract.json
-        run: uv run python .github/scripts/run_integration_tests.py --profile prospective-platform
+        run: make integration-tests-prospective-platform
       - name: Skip Windows prospective contract smoke test
         if: steps.changes.outputs.run != 'true'
         run: echo "Skipping Windows prospective contract smoke test for non-code changes."

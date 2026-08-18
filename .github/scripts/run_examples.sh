@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PID_FILE="$ROOT/.tmp/examples-auto-run.pid"
 LOG_DIR="$ROOT/.tmp/examples-start-logs"
-RERUN_FILE="$ROOT/.tmp/examples-rerun.txt"
 DEFAULT_UV_EXTRAS="litellm any-llm sqlalchemy redis blaxel modal runloop temporal"
 
 build_uv_prefix() {
@@ -49,7 +48,6 @@ cmd_start() {
   local run_cmd=(
     "${UV_RUN[@]}" examples/run_examples.py
     --auto-mode
-    --write-rerun
     --main-log "$main_log"
     --logs-dir "$LOG_DIR"
   )
@@ -81,7 +79,7 @@ cmd_start() {
     echo "Started run_examples.py (pid=$pid)"
     echo "Main log: $main_log"
     echo "Stdout log: $stdout_log"
-    echo "Run '.agents/skills/examples-auto-run/scripts/run.sh validate \"$main_log\"' after it finishes."
+    echo "After the run completes, use examples-run-analysis to inspect its artifacts."
     return 0
   fi
 
@@ -159,78 +157,31 @@ cmd_tail() {
   tail -f "$LOG_DIR/$file"
 }
 
-collect_rerun() {
-  ensure_dirs
-  local log_file="${1:-}"
-  if [[ -z "$log_file" ]]; then
-    log_file="$(ls -1t "$LOG_DIR"/main_*.log 2>/dev/null | head -n1)"
-  fi
-  if [[ -z "$log_file" ]] || [[ ! -f "$log_file" ]]; then
-    echo "No main log file found."
-    exit 1
-  fi
-  cd "$ROOT"
-  build_uv_prefix
-  "${UV_RUN[@]}" examples/run_examples.py --collect "$log_file" --output "$RERUN_FILE"
-}
-
-cmd_rerun() {
-  ensure_dirs
-  local file="${1:-$RERUN_FILE}"
-  if [[ ! -s "$file" ]]; then
-    echo "Rerun list is empty: $file"
-    exit 0
-  fi
-  local ts main_log stdout_log
-  ts="$(date +%Y%m%d-%H%M%S)"
-  main_log="$LOG_DIR/main_${ts}.log"
-  stdout_log="$LOG_DIR/stdout_${ts}.log"
-  cd "$ROOT"
-  export EXAMPLES_INTERACTIVE_MODE="${EXAMPLES_INTERACTIVE_MODE:-auto}"
-  export APPLY_PATCH_AUTO_APPROVE="${APPLY_PATCH_AUTO_APPROVE:-1}"
-  export SHELL_AUTO_APPROVE="${SHELL_AUTO_APPROVE:-1}"
-  export AUTO_APPROVE_MCP="${AUTO_APPROVE_MCP:-1}"
-  build_uv_prefix
-  set +e
-  "${UV_RUN[@]}" examples/run_examples.py --auto-mode --rerun-file "$file" --write-rerun --main-log "$main_log" --logs-dir "$LOG_DIR" 2>&1 | tee "$stdout_log"
-  local run_status=${PIPESTATUS[0]}
-  set -e
-  return "$run_status"
-}
-
 usage() {
   cat <<'EOF'
-Usage: run.sh <start|stop|status|logs|tail|collect|rerun> [args...]
+Usage: run_examples.sh <start|stop|status|logs|tail> [args...]
 
 Commands:
   start [--filter ... | other args]   Run examples in auto mode (foreground). Pass --background to run detached.
-  stop                                Kill the running auto-run (if any).
-  status                              Show whether it is running.
+  stop                                Kill the running examples job (if any).
+  status                              Show whether an examples job is running.
   logs                                List log files (.tmp/examples-start-logs).
   tail [logfile]                      Tail the latest (or specified) log.
-  collect [main_log]                  Parse a main log and write failed examples to .tmp/examples-rerun.txt.
-  rerun [rerun_file]                  Run only the examples listed in .tmp/examples-rerun.txt.
 
 Environment overrides:
   EXAMPLES_INTERACTIVE_MODE (default auto)
   EXAMPLES_INCLUDE_SERVER/INTERACTIVE/AUDIO/EXTERNAL (defaults: 0/1/0/0)
-  EXAMPLES_UV_EXTRAS (default: litellm any-llm sqlalchemy redis blaxel modal runloop; set empty to disable)
+  EXAMPLES_UV_EXTRAS (default: litellm any-llm sqlalchemy redis blaxel modal runloop temporal; set empty to disable)
   APPLY_PATCH_AUTO_APPROVE, SHELL_AUTO_APPROVE, AUTO_APPROVE_MCP (default 1 in auto mode)
 EOF
 }
 
-default_cmd="start"
-if [[ $# -eq 0 && -s "$RERUN_FILE" ]]; then
-  default_cmd="rerun"
-fi
-
-case "${1:-$default_cmd}" in
+case "${1:-start}" in
   start) shift || true; cmd_start "$@" ;;
   stop) shift || true; cmd_stop ;;
   status) shift || true; cmd_status ;;
   logs) shift || true; cmd_logs ;;
   tail) shift; cmd_tail "${1:-}" ;;
-  collect) shift || true; collect_rerun "${1:-}" ;;
-  rerun) shift || true; cmd_rerun "${1:-}" ;;
+  help | --help | -h) usage ;;
   *) usage; exit 1 ;;
 esac
