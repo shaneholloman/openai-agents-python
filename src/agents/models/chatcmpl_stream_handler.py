@@ -445,11 +445,11 @@ class ChatCmplStreamHandler:
 
                 if has_passthrough_output:
                     passthrough_choices.append(choice)
-                elif choice.finish_reason == "content_filter":
-                    # A content-filtered choice ends the stream with an empty delta, so it
-                    # would otherwise be dropped here and the handler would never see the
-                    # finish_reason it needs to synthesize the refusal. Forward a
-                    # delta-stripped copy so buffering semantics are unchanged.
+                elif choice.finish_reason in {"content_filter", "length"}:
+                    # A content-filtered or truncated choice ends the stream with an empty
+                    # delta, so it would otherwise be dropped here and the handler would
+                    # never see the finish_reason it needs to act on.
+                    # Forward a delta-stripped copy so buffering semantics are unchanged.
                     passthrough_choices.append(choice.model_copy(update={"delta": ChoiceDelta()}))
 
             if passthrough_choices or chunk.usage is not None:
@@ -609,6 +609,7 @@ class ChatCmplStreamHandler:
         model: str | None = None,
         strict_feature_validation: bool = False,
         preserve_raw_usage: bool = False,
+        raise_on_length_truncation: bool = False,
     ) -> AsyncIterator[TResponseStreamEvent]:
         """
         Handle a streaming chat completion response and yield response events.
@@ -620,6 +621,11 @@ class ChatCmplStreamHandler:
                 provider-specific stream processing.
             preserve_raw_usage: Whether to retain the last provider usage payload before
                 converting it to the Responses usage shape.
+            raise_on_length_truncation: Whether to raise ModelBehaviorError when the
+                stream terminates with finish_reason == "length" and no visible output.
+                This is an internal option enabled only by OpenAIChatCompletionsModel:
+                the shared handler also serves LiteLLM and AnyLLM, whose streaming
+                behavior must remain unchanged.
         """
         usage: CompletionUsage | None = None
         raw_usage: dict[str, Any] | None = None
@@ -630,7 +636,11 @@ class ChatCmplStreamHandler:
         # safety block only through finish_reason == "content_filter" with an
         # empty delta and no refusal field. Track it so we can synthesize an
         # explicit refusal after the stream if nothing else was emitted.
+        # A completion truncated before any visible token (finish_reason ==
+        # "length") has the same shape; track it too so we can surface a model
+        # behavior error instead of collapsing into an empty turn.
         saw_content_filter = False
+        saw_length = False
         async for chunk in stream:
             if not state.started:
                 state.started = True
@@ -675,6 +685,8 @@ class ChatCmplStreamHandler:
 
             if choice.finish_reason == "content_filter":
                 saw_content_filter = True
+            elif choice.finish_reason == "length":
+                saw_length = True
 
             if not choice.delta:
                 continue
@@ -1174,6 +1186,34 @@ class ChatCmplStreamHandler:
                 sequence_number=sequence_number.get_and_increment(),
             )
 
+        # A completion truncated before any visible token (finish_reason ==
+        # "length") is a token- or reasoning-budget exhaustion, not a policy
+        # refusal. Surface it as a model behavior error rather than manufacturing
+        # a refusal that would route through model_refusal handlers. This is an
+        # internal behavior enabled only by OpenAIChatCompletionsModel: the
+        # shared handler also serves LiteLLM and AnyLLM, whose streaming behavior
+        # must remain unchanged.
+        if (
+            saw_length
+            and raise_on_length_truncation
+            and state.text_content_index_and_output is None
+            and state.refusal_content_index_and_output is None
+            and not state.function_calls
+        ):
+            # Preserve the request and any reported token usage on the response
+            # so the caller can attach it to the generation span before the
+            # error propagates.
+            if usage is not None:
+                response.usage = cls._build_response_usage(usage)
+            else:
+                _mark_request_completed_without_usage(response)
+            if preserve_raw_usage and raw_usage is not None:
+                _attach_raw_usage_snapshot(response, raw_usage)
+            raise ModelBehaviorError(
+                "Chat Completions stream terminated with finish_reason='length' "
+                "but produced no assistant text, tool call, or refusal."
+            )
+
         cls._finalize_thinking_blocks(state)
         for event in cls._finish_reasoning_item(state, sequence_number):
             yield event
@@ -1294,27 +1334,7 @@ class ChatCmplStreamHandler:
         final_response = response.model_copy()
         final_response.output = outputs
 
-        final_response.usage = (
-            ResponseUsage(
-                input_tokens=usage.prompt_tokens or 0,
-                output_tokens=usage.completion_tokens or 0,
-                total_tokens=usage.total_tokens or 0,
-                output_tokens_details=OutputTokensDetails(
-                    reasoning_tokens=usage.completion_tokens_details.reasoning_tokens
-                    if usage.completion_tokens_details
-                    and usage.completion_tokens_details.reasoning_tokens
-                    else 0
-                ),
-                input_tokens_details=_make_input_tokens_details(
-                    cached_tokens=usage.prompt_tokens_details.cached_tokens
-                    if usage.prompt_tokens_details and usage.prompt_tokens_details.cached_tokens
-                    else 0,
-                    cache_write_tokens=_cache_write_tokens(usage.prompt_tokens_details),
-                ),
-            )
-            if usage
-            else None
-        )
+        final_response.usage = cls._build_response_usage(usage)
         if preserve_raw_usage:
             _attach_raw_usage_snapshot(final_response, raw_usage)
         if usage is None:
@@ -1327,4 +1347,27 @@ class ChatCmplStreamHandler:
             response=final_response,
             type="response.completed",
             sequence_number=sequence_number.get_and_increment(),
+        )
+
+    @staticmethod
+    def _build_response_usage(usage: CompletionUsage | None) -> ResponseUsage | None:
+        """Convert the streamed provider usage into a Responses usage payload."""
+        if usage is None:
+            return None
+        return ResponseUsage(
+            input_tokens=usage.prompt_tokens or 0,
+            output_tokens=usage.completion_tokens or 0,
+            total_tokens=usage.total_tokens or 0,
+            output_tokens_details=OutputTokensDetails(
+                reasoning_tokens=usage.completion_tokens_details.reasoning_tokens
+                if usage.completion_tokens_details
+                and usage.completion_tokens_details.reasoning_tokens
+                else 0
+            ),
+            input_tokens_details=_make_input_tokens_details(
+                cached_tokens=usage.prompt_tokens_details.cached_tokens
+                if usage.prompt_tokens_details and usage.prompt_tokens_details.cached_tokens
+                else 0,
+                cache_write_tokens=_cache_write_tokens(usage.prompt_tokens_details),
+            ),
         )

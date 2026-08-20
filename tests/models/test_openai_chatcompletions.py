@@ -50,7 +50,7 @@ from agents import (
     generation_span,
     trace,
 )
-from agents.exceptions import UserError
+from agents.exceptions import ModelBehaviorError, UserError
 from agents.models._retry_runtime import provider_managed_retries_disabled
 from agents.models.chatcmpl_helpers import HEADERS_OVERRIDE, ChatCmplHelpers
 from agents.models.fake_id import FAKE_RESPONSES_ID
@@ -424,6 +424,171 @@ async def test_get_response_preserves_empty_nonfiltered_output(monkeypatch) -> N
     )
 
     assert resp.output == []
+
+
+@pytest.mark.allow_call_model_methods
+@pytest.mark.asyncio
+async def test_get_response_raises_on_truncated_empty_turn(monkeypatch) -> None:
+    with pytest.raises(ModelBehaviorError, match="finish_reason='length'"):
+        await _get_response_for_choice(
+            monkeypatch,
+            Choice(
+                index=0,
+                finish_reason="length",
+                message=ChatCompletionMessage(role="assistant", content=None),
+            ),
+        )
+
+
+@pytest.mark.allow_call_model_methods
+@pytest.mark.asyncio
+async def test_get_response_raises_on_truncated_empty_string_turn(monkeypatch) -> None:
+    with pytest.raises(ModelBehaviorError, match="finish_reason='length'"):
+        await _get_response_for_choice(
+            monkeypatch,
+            Choice(
+                index=0,
+                finish_reason="length",
+                message=ChatCompletionMessage(role="assistant", content=""),
+            ),
+        )
+
+
+@pytest.mark.allow_call_model_methods
+@pytest.mark.asyncio
+async def test_get_response_traces_error_on_truncated_empty_turn(monkeypatch) -> None:
+    with trace(workflow_name="truncation-error"):
+        with pytest.raises(ModelBehaviorError, match="finish_reason='length'"):
+            await _get_response_for_choice(
+                monkeypatch,
+                Choice(
+                    index=0,
+                    finish_reason="length",
+                    message=ChatCompletionMessage(role="assistant", content=None),
+                ),
+                tracing=ModelTracing.ENABLED,
+            )
+
+    generation_spans = [
+        span for span in fetch_ordered_spans() if span.span_data.type == "generation"
+    ]
+    assert len(generation_spans) == 1
+    generation = generation_spans[0]
+    exported_span = generation.export()
+    assert exported_span is not None
+    assert exported_span["error"] is not None
+    # The request (and any reported tokens) must be preserved on the span even though
+    # the call raised, so the run's usage accounting does not lose the request.
+    assert generation.span_data.usage is not None
+    assert generation.span_data.usage["requests"] == 1
+
+
+@pytest.mark.allow_call_model_methods
+@pytest.mark.asyncio
+async def test_get_response_traces_usage_on_truncated_empty_turn(monkeypatch) -> None:
+    """The token usage reported before a truncated empty completion raises must be
+    preserved on the generation span, alongside the request."""
+    chat = ChatCompletion(
+        id="resp-id",
+        created=0,
+        model="fake",
+        object="chat.completion",
+        choices=[
+            Choice(
+                index=0,
+                finish_reason="length",
+                message=ChatCompletionMessage(role="assistant", content=None),
+            )
+        ],
+        usage=CompletionUsage(
+            completion_tokens=0,
+            prompt_tokens=7,
+            total_tokens=7,
+            prompt_tokens_details=PromptTokensDetails(cached_tokens=2),
+        ),
+    )
+
+    async def patched_fetch_response(self, *args, **kwargs):
+        return chat
+
+    monkeypatch.setattr(OpenAIChatCompletionsModel, "_fetch_response", patched_fetch_response)
+    model = OpenAIProvider(use_responses=False).get_model("gpt-4")
+
+    with trace(workflow_name="truncation-usage"):
+        with pytest.raises(ModelBehaviorError, match="finish_reason='length'"):
+            await model.get_response(
+                system_instructions=None,
+                input="",
+                model_settings=ModelSettings(),
+                tools=[],
+                output_schema=None,
+                handoffs=[],
+                tracing=ModelTracing.ENABLED,
+                previous_response_id=None,
+                conversation_id=None,
+                prompt=None,
+            )
+
+    generation = next(span for span in fetch_ordered_spans() if span.span_data.type == "generation")
+    assert generation.span_data.usage is not None
+    assert generation.span_data.usage["requests"] == 1
+    assert generation.span_data.usage["input_tokens"] == 7
+    assert generation.span_data.usage["total_tokens"] == 7
+
+
+@pytest.mark.allow_call_model_methods
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("message", "expected_output_type", "expected_content_type"),
+    [
+        (
+            ChatCompletionMessage(role="assistant", content="partial"),
+            ResponseOutputMessage,
+            ResponseOutputText,
+        ),
+        (
+            ChatCompletionMessage(role="assistant", content=None, refusal="provider refusal"),
+            ResponseOutputMessage,
+            ResponseOutputRefusal,
+        ),
+        (
+            ChatCompletionMessage(
+                role="assistant",
+                content=None,
+                tool_calls=[
+                    ChatCompletionMessageFunctionToolCall(
+                        id="call-1",
+                        type="function",
+                        function=Function(name="do_thing", arguments="{}"),
+                    )
+                ],
+            ),
+            ResponseFunctionToolCall,
+            None,
+        ),
+    ],
+)
+async def test_get_response_preserves_nonempty_truncated_output(
+    monkeypatch,
+    message: ChatCompletionMessage,
+    expected_output_type: type[object],
+    expected_content_type: type[object] | None,
+) -> None:
+    resp = await _get_response_for_choice(
+        monkeypatch,
+        Choice(index=0, finish_reason="length", message=message),
+    )
+
+    assert len(resp.output) == 1
+    assert isinstance(resp.output[0], expected_output_type)
+    if expected_content_type is not None:
+        assert isinstance(resp.output[0], ResponseOutputMessage)
+        assert len(resp.output[0].content) == 1
+        assert isinstance(resp.output[0].content[0], expected_content_type)
+    if isinstance(resp.output[0], ResponseOutputMessage) and isinstance(
+        resp.output[0].content[0], ResponseOutputRefusal
+    ):
+        assert resp.output[0].content[0].refusal == "provider refusal"
 
 
 @pytest.mark.allow_call_model_methods
