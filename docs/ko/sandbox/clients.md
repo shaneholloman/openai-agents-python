@@ -10,7 +10,7 @@ search:
 
     샌드박스 에이전트는 베타 버전입니다. 정식 출시 전까지 API 세부 정보, 기본값, 지원 기능이 변경될 수 있으며, 시간이 지남에 따라 더 고급 기능이 추가될 예정입니다.
 
-## 의사 결정 가이드
+## 의사 결정 가이드 {#decision-guide}
 
 <div class="sandbox-nowrap-first-column-table" markdown="1">
 
@@ -22,7 +22,7 @@ search:
 
 </div>
 
-## 로컬 클라이언트
+## 로컬 클라이언트 {#local-clients}
 
 대부분의 사용자는 다음 두 샌드박스 클라이언트 중 하나로 시작하는 것이 좋습니다.
 
@@ -58,7 +58,7 @@ run_config = RunConfig(
 
 컨테이너 격리가 필요하거나 샌드박스 이미지를 다른 환경에서 사용하는 이미지와 일치시키려는 경우 이 방법을 사용합니다. [examples/sandbox/docker/docker_runner.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/docker/docker_runner.py)를 참조하세요.
 
-### Docker 네트워킹 비활성화
+### Docker 네트워킹 비활성화 {#disable-docker-networking}
 
 Docker 샌드박스에서 네트워크 액세스를 차단해야 하는 경우 `network_mode="none"`을 설정합니다.
 
@@ -71,7 +71,7 @@ options = DockerSandboxClientOptions(
 
 명시적으로 지원되는 유일한 네트워크 모드는 `"none"`입니다. Docker의 기본 동작을 유지하려면 `network_mode`을 생략합니다. 네트워크가 비활성화된 샌드박스는 포트를 노출할 수 없으므로 `network_mode="none"`과 비어 있지 않은 `exposed_ports` 튜플을 함께 사용하면 옵션 검증 중 실패합니다. 이 설정은 샌드박스 세션 상태에 저장되며, SDK가 해당 상태를 재개하는 동안 대체 컨테이너를 생성해야 하는 경우 다시 적용됩니다.
 
-## 마운트 및 원격 스토리지
+## 마운트 및 원격 스토리지 {#mounts-and-remote-storage}
 
 마운트 항목은 노출할 스토리지를 설명하고, 마운트 전략은 샌드박스 백엔드가 해당 스토리지를 연결하는 방식을 설명합니다. 기본 제공 마운트 항목과 범용 전략은 `agents.sandbox.entries`에서 가져옵니다. 호스티드 공급자 전략은 `agents.extensions.sandbox` 또는 공급자별 확장 패키지에서 사용할 수 있습니다.
 
@@ -97,7 +97,7 @@ options = DockerSandboxClientOptions(
 
 </div>
 
-## 지원되는 호스티드 플랫폼
+## 지원되는 호스티드 플랫폼 {#supported-hosted-platforms}
 
 호스티드 환경이 필요한 경우 일반적으로 동일한 `SandboxAgent` 정의를 그대로 사용하고 [`SandboxRunConfig`][agents.run_config.SandboxRunConfig]에서 샌드박스 클라이언트만 변경합니다.
 
@@ -119,7 +119,7 @@ options = DockerSandboxClientOptions(
 
 </div>
 
-### Modal 샌드박스 크기 지정
+### Modal 샌드박스 크기 지정 {#size-modal-sandboxes}
 
 새 Modal 샌드박스의 리소스를 요청하려면 `ModalSandboxClientOptions.cpu`와 `ModalSandboxClientOptions.memory`를 사용합니다. 단일 값은 해당 양을 요청합니다. 항목이 두 개인 `(request, limit)` 튜플에서는 첫 번째 항목을 요청값으로, 두 번째 항목을 제한값으로 사용합니다. 메모리 값의 단위는 MiB입니다.
 

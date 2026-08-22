@@ -9,7 +9,7 @@ search:
 1. 코드에서 로컬로 사용할 수 있는 컨텍스트: 도구 함수가 실행될 때, `on_handoff` 같은 콜백이나 수명 주기 훅 등에서 필요할 수 있는 데이터와 종속성입니다.
 2. LLM에서 사용할 수 있는 컨텍스트: 응답을 생성할 때 LLM이 확인하는 데이터입니다.
 
-## 로컬 컨텍스트
+## 로컬 컨텍스트 {#local-context}
 
 이는 [`RunContextWrapper`][agents.run_context.RunContextWrapper] 클래스와 그 안의 [`context`][agents.run_context.RunContextWrapper.context] 속성으로 표현됩니다. 작동 방식은 다음과 같습니다.
 
@@ -33,7 +33,7 @@ search:
 
 단일 실행 내에서 파생된 래퍼는 동일한 기본 애플리케이션 컨텍스트, 승인 상태, 사용량 추적을 공유합니다. 중첩된 [`Agent.as_tool()`][agents.agent.Agent.as_tool] 실행에는 다른 `tool_input`가 연결될 수 있지만, 기본적으로 애플리케이션 상태의 격리된 사본이 제공되지는 않습니다.
 
-### `RunContextWrapper`에서 제공되는 항목
+### `RunContextWrapper`에서 제공되는 항목 {#what-runcontextwrapper-exposes}
 
 [`RunContextWrapper`][agents.run_context.RunContextWrapper]는 애플리케이션에서 정의한 컨텍스트 객체의 래퍼입니다. 실제로는 다음 항목을 가장 자주 사용합니다.
 
@@ -94,7 +94,7 @@ if __name__ == "__main__":
 
 ---
 
-### 고급: `ToolContext`
+### 고급: `ToolContext` {#advanced-toolcontext}
 
 경우에 따라 실행 중인 도구의 이름, 호출 ID 또는 가공되지 않은 인수 문자열 같은 추가 메타데이터에 액세스해야 할 수 있습니다.  
 이를 위해 `RunContextWrapper`를 확장한 [`ToolContext`][agents.tool_context.ToolContext] 클래스를 사용할 수 있습니다.
@@ -140,7 +140,7 @@ agent = Agent(
 
 ---
 
-## 에이전트/LLM 컨텍스트
+## 에이전트/LLM 컨텍스트 {#agentllm-context}
 
 LLM이 호출될 때 확인할 수 있는 데이터는 대화 기록에 있는 데이터**뿐**입니다. 따라서 LLM이 새로운 데이터를 사용할 수 있게 하려면 해당 데이터가 대화 기록에 포함되도록 해야 합니다. 이를 수행하는 방법은 몇 가지가 있습니다.
 

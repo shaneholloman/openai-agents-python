@@ -6,14 +6,14 @@ search:
 
 `EncryptedSession` 为任何会话实现提供透明加密，通过自动过期旧条目来保护对话数据。
 
-## 功能
+## 功能 {#features}
 
 - **透明加密**：使用 Fernet 加密包装任何会话
 - **每会话密钥**：使用 HKDF 密钥派生，为每个会话生成唯一加密
 - **自动过期**：TTL 过期时会静默跳过旧条目
 - **即插即用替代方案**：适用于任何现有会话实现
 
-## 安装
+## 安装 {#installation}
 
 加密会话需要 `encrypt` extra：
 
@@ -21,7 +21,7 @@ search:
 pip install openai-agents[encrypt]
 ```
 
-## 快速入门
+## 快速入门 {#quick-start}
 
 ```python
 import asyncio
@@ -53,9 +53,9 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## 配置
+## 配置 {#configuration}
 
-### 加密密钥
+### 加密密钥 {#encryption-key}
 
 加密密钥可以是 Fernet 密钥，也可以是任意字符串：
 
@@ -79,7 +79,7 @@ session = EncryptedSession(
 )
 ```
 
-### TTL（存活时间）
+### TTL（存活时间） {#ttl-time-to-live}
 
 设置加密条目的有效时长：
 
@@ -101,9 +101,9 @@ session = EncryptedSession(
 )
 ```
 
-## 与不同会话类型的搭配使用
+## 与不同会话类型的搭配使用 {#usage-with-different-session-types}
 
-### 与 SQLite 会话搭配使用
+### 与 SQLite 会话搭配使用 {#with-sqlite-sessions}
 
 ```python
 from agents import SQLiteSession
@@ -119,7 +119,7 @@ session = EncryptedSession(
 )
 ```
 
-### 与 SQLAlchemy 会话搭配使用
+### 与 SQLAlchemy 会话搭配使用 {#with-sqlalchemy-sessions}
 
 ```python
 from agents.extensions.memory import EncryptedSession, SQLAlchemySession
@@ -147,7 +147,7 @@ session = EncryptedSession(
 
 
 
-## 密钥派生
+## 密钥派生 {#key-derivation}
 
 EncryptedSession 使用 HKDF（基于 HMAC 的密钥派生函数）为每个会话派生唯一的加密密钥：
 
@@ -161,7 +161,7 @@ EncryptedSession 使用 HKDF（基于 HMAC 的密钥派生函数）为每个会�
 - 没有主密钥就无法派生密钥
 - 不同会话之间的会话数据无法相互解密
 
-## 自动过期
+## 自动过期 {#automatic-expiration}
 
 当条目超过 TTL 时，检索过程中会自动跳过它们：
 
@@ -173,7 +173,7 @@ items = await session.get_items()  # Only returns non-expired items
 result = await Runner.run(agent, "Continue conversation", session=session)
 ```
 
-## API 参考
+## API 参考 {#api-reference}
 
 - [`EncryptedSession`][agents.extensions.memory.encrypt_session.EncryptedSession] - 主类
 - [`Session`][agents.memory.session.Session] - 基础会话协议

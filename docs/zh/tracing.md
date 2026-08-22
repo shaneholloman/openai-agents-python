@@ -16,7 +16,7 @@ Agents SDK 内置了追踪功能，可收集智能体运行期间的完整事件
 
 ***对于根据零数据保留（ZDR）政策使用OpenAI API 的组织，追踪功能不可用。***
 
-## 追踪和跨度
+## 追踪和跨度 {#traces-and-spans}
 
 -   **追踪**表示一次“工作流”的端到端操作。它们由跨度组成。追踪具有以下属性：
     -   `workflow_name`：逻辑工作流或应用的名称。例如“代码生成”或“客户服务”。
@@ -30,7 +30,7 @@ Agents SDK 内置了追踪功能，可收集智能体运行期间的完整事件
     -   `parent_id`，指向此跨度的父跨度（如果有）
     -   `span_data`，即有关跨度的信息。例如，`AgentSpanData` 包含有关智能体的信息，`GenerationSpanData` 包含有关 LLM 生成的信息，依此类推。
 
-## 默认追踪
+## 默认追踪 {#default-tracing}
 
 默认情况下，SDK 会追踪以下内容：
 
@@ -62,7 +62,7 @@ result = await Runner.run(
 
 此外，你还可以设置[自定义追踪处理器](#custom-tracing-processors)，将追踪发送到其他目标位置（作为替代目标或辅助目标）。
 
-## 长时运行工作进程和即时导出
+## 长时运行工作进程和即时导出 {#long-running-workers-and-immediate-exports}
 
 默认的 [`BatchTraceProcessor`][agents.tracing.processors.BatchTraceProcessor] 每隔几秒在后台导出追踪；如果内存队列达到大小阈值，则会更早导出；进程退出时还会执行最终刷新。对于 Celery、RQ、Dramatiq 或 FastAPI 后台任务等长时运行的工作进程，这意味着通常无需任何额外代码即可自动导出追踪，但它们不一定会在每个作业完成后立即显示在追踪仪表板中。
 
@@ -105,7 +105,7 @@ async def run(prompt: str, background_tasks: BackgroundTasks):
 
 [`flush_traces()`][agents.tracing.flush_traces] 会阻塞，直到当前缓冲的追踪和跨度全部导出，因此请在 `trace()` 关闭后调用它，以免刷新尚未构建完成的追踪。如果可以接受默认的导出延迟，则可以跳过此调用。
 
-## 更高层级的追踪
+## 更高层级的追踪 {#higher-level-traces}
 
 有时，你可能希望多次调用 `run()` 时都归入同一个追踪。为此，可以将整个代码封装在 `trace()` 中。
 
@@ -124,7 +124,7 @@ async def main():
 
 1. 由于两次 `Runner.run` 调用都封装在 `with trace()` 中，因此两次运行会成为同一个整体追踪的一部分，而不是各自创建单独的追踪。
 
-## 追踪的创建
+## 追踪的创建 {#creating-traces}
 
 你可以使用 [`trace()`][agents.tracing.trace] 函数创建追踪。追踪需要启动和结束。你可以通过以下两种方式完成：
 
@@ -133,13 +133,13 @@ async def main():
 
 当前追踪通过 Python 的 [`contextvar`](https://docs.python.org/3/library/contextvars.html) 进行跟踪。这意味着它可自动支持并发。如果手动启动和结束追踪，请将 `mark_as_current` 传给 `start()`，并将 `reset_current` 传给 `finish()`，以更新当前追踪。
 
-## 跨度的创建
+## 跨度的创建 {#creating-spans}
 
 你可以使用各种 [`*_span()`][agents.tracing.create] 方法创建跨度。通常无需手动创建跨度。你可以使用 [`custom_span()`][agents.tracing.custom_span] 函数跟踪自定义跨度信息。
 
 跨度会自动成为当前追踪的一部分，并嵌套在距离最近的当前跨度下；当前跨度通过 Python 的 [`contextvar`](https://docs.python.org/3/library/contextvars.html) 进行跟踪。
 
-## 敏感数据
+## 敏感数据 {#sensitive-data}
 
 某些跨度可能会捕获潜在的敏感数据。
 
@@ -149,7 +149,7 @@ async def main():
 
 默认情况下，`trace_include_sensitive_data` 为 `True`。你可以在运行应用之前，将 `OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA` 环境变量导出为 `true/1` 或 `false/0`，从而无需编写代码即可设置默认值。
 
-## 自定义追踪处理器
+## 自定义追踪处理器 {#custom-tracing-processors}
 
 追踪功能的高层架构如下：
 
@@ -162,7 +162,7 @@ async def main():
 2. [`set_trace_processors()`][agents.tracing.set_trace_processors] 允许你使用自己的追踪处理器**替换**默认处理器。这意味着，除非你包含一个可将追踪发送到OpenAI后端的 `TracingProcessor`，否则追踪不会发送到该后端。
 
 
-## 非OpenAI模型的追踪
+## 非OpenAI模型的追踪 {#tracing-with-non-openai-models}
 
 使用非OpenAI模型时，你可以向追踪导出器提供 OpenAI API 密钥，从而无需禁用追踪，即可在OpenAI追踪仪表板中使用免费追踪功能。有关适配器的选择和设置注意事项，请参阅模型指南中的[第三方适配器](models/index.md#third-party-adapters)部分。
 
@@ -197,15 +197,15 @@ await Runner.run(
 )
 ```
 
-## 补充说明
+## 补充说明 {#additional-notes}
 - 可在OpenAI追踪仪表板中查看免费的追踪记录。
 
 
-## 生态系统集成
+## 生态系统集成 {#ecosystem-integrations}
 
 以下社区和供应商集成支持 OpenAI Agents SDK 的追踪 API 接口。
 
-### 外部追踪处理器列表
+### 外部追踪处理器列表 {#external-tracing-processors-list}
 
 -   [Weights & Biases](https://weave-docs.wandb.ai/guides/integrations/openai_agents)
 -   [Arize-Phoenix](https://docs.arize.com/phoenix/tracing/integrations-tracing/openai-agents-sdk)

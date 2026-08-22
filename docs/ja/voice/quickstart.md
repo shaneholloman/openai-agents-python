@@ -4,7 +4,7 @@ search:
 ---
 # クイックスタート
 
-## 前提条件
+## 前提条件 {#prerequisites}
 
 Agents SDKの基本的な[クイックスタート手順](../quickstart.md)に従い、仮想環境をセットアップしていることを確認してください。次に、SDK からオプションの音声依存関係をインストールします。
 
@@ -18,7 +18,7 @@ pip install 'openai-agents[voice]'
 pip install sounddevice
 ```
 
-## 概念
+## 概念 {#concepts}
 
 理解しておくべき主な概念は [`VoicePipeline`][agents.voice.pipeline.VoicePipeline] です。これは次の 3 ステップのプロセスです。
 
@@ -52,7 +52,7 @@ graph LR
 
 ```
 
-## エージェント
+## エージェント {#agents}
 
 まず、複数のエージェントをセットアップします。この SDK でエージェントを構築したことがあれば、見慣れた内容です。2 つのエージェント、設定済みのハンドオフ、ツールを 1 つ用意します。
 
@@ -92,7 +92,7 @@ agent = Agent(
 )
 ```
 
-## 音声パイプライン
+## 音声パイプライン {#voice-pipeline}
 
 ワークフローに [`SingleAgentVoiceWorkflow`][agents.voice.workflow.SingleAgentVoiceWorkflow] を使用して、シンプルな音声パイプラインをセットアップします。
 
@@ -101,7 +101,7 @@ from agents.voice import SingleAgentVoiceWorkflow, VoicePipeline
 pipeline = VoicePipeline(workflow=SingleAgentVoiceWorkflow(agent))
 ```
 
-## パイプラインの実行
+## パイプラインの実行 {#run-the-pipeline}
 
 ```python
 import numpy as np
@@ -126,7 +126,7 @@ async for event in result.stream():
 
 ```
 
-## 全体の統合
+## 全体の統合 {#put-it-all-together}
 
 ```python
 import asyncio

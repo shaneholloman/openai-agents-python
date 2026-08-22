@@ -16,7 +16,7 @@ search:
 -   [モデル](models/index.md)：モデルの選択とプロバイダーの設定。
 -   [トレーシング](tracing.md)：実行ごとのトレーシングメタデータとカスタムトレースプロセッサー。
 
-## 設定オブジェクトと辞書
+## 設定オブジェクトと辞書 {#configuration-objects-and-dictionaries}
 
 SDK で定義されている設定パラメーターは、通常、型付きの設定オブジェクト、または同じフィールドを含む辞書のいずれかを受け付けます。これは、型注釈に辞書が含まれる、エージェント、実行、モデル、セッション、サンドボックス、音声の各設定境界に適用されます。SDK で定義されたネストされた設定型でも辞書を使用できます。
 
@@ -35,7 +35,7 @@ agent = Agent(
 
 SDK はこれらの辞書を、対応する設定オブジェクトへ正規化します。SDK で定義されたデータクラス設定型に不明なフィールドがあると `TypeError` が発生するため、スペルを誤ったオプション名を早期に検出できます。特定の境界が辞書を受け付けるかどうかは、そのパラメーターの型注釈または API リファレンスで確認してください。
 
-## API キーとクライアント
+## API キーとクライアント {#api-keys-and-clients}
 
 デフォルトでは、SDK は LLM リクエストとトレーシングに `OPENAI_API_KEY` 環境変数を使用します。キーは、SDK が最初に OpenAI クライアントを作成するときに解決されるため（遅延初期化）、最初のモデル呼び出しより前に環境変数を設定してください。アプリの起動前にその環境変数を設定できない場合は、[set_default_openai_key()][agents.set_default_openai_key] 関数を使用してキーを設定できます。
 
@@ -57,7 +57,7 @@ set_default_openai_client(custom_client)
 
 明示的なクライアントを [`OpenAIProvider`][agents.models.openai_provider.OpenAIProvider] に渡すと、そのクライアントが接続とアカウントの設定を管理します。`api_key`、`base_url`、`websocket_base_url`、`organization`、`project` を `OpenAIProvider` に同時に渡さないでください。`openai_client` とこれらの引数のいずれかを組み合わせると、重複する値が暗黙に無視されるのではなく、[`UserError`][agents.exceptions.UserError] が発生します。目的の値は `AsyncOpenAI` の構築時に設定してください。
 
-### `openai` v3 でのカスタム HTTP クライアント
+### `openai` v3 でのカスタム HTTP クライアント {#custom-http-clients-with-openai-v3}
 
 バージョン 0.21.0 では `openai>=3.0.0,<4` が必要です。デフォルトの OpenAI プロバイダーは HTTPX2 を使用するため、ほとんどのアプリケーションでは HTTP クライアントを直接設定する必要はありません。アプリケーションが `http_client=` を `AsyncOpenAI` に渡す場合は、カスタムクライアントとそのトランスポート向けオプションに HTTPX2 型を使用してください。
 
@@ -96,7 +96,7 @@ from agents import set_default_openai_api
 set_default_openai_api("chat_completions")
 ```
 
-## OpenAI プロバイダーのデフォルト設定
+## OpenAI プロバイダーのデフォルト設定 {#openai-provider-defaults}
 
 SDK の OpenAI バックエンドを使用するプロバイダーも、モデル名の文字列をモデルにマッピングする際に SDK 全体のデフォルト設定を読み取ります。OpenAI Responses モデルで WebSocket トランスポートをデフォルトで使用するには、[`set_default_openai_responses_transport()`][agents.set_default_openai_responses_transport] を使用します。
 
@@ -128,7 +128,7 @@ set_default_openai_agent_registration(
 
 SDK のデフォルトが設定されていない場合、SDK の OpenAI バックエンドを使用するプロバイダーは `OPENAI_AGENT_HARNESS_ID` 環境変数にフォールバックします。ハーネス ID が設定されている場合、`RunConfig.trace_metadata` にそのキーがすでに存在しない限り、SDK はそれを `agent_harness_id` としてトレースメタデータに追加します。
 
-## トレーシング
+## トレーシング {#tracing}
 
 トレーシングはデフォルトで有効です。デフォルトでは、上記のセクションにあるモデルリクエストと同じ OpenAI API キー、つまり環境変数または設定したデフォルトキーを使用します。トレーシングに使用する API キーを個別に設定するには、[`set_tracing_export_api_key`][agents.set_tracing_export_api_key] 関数を使用します。
 
@@ -200,7 +200,7 @@ export OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA=0
 
 トレーシングのすべての制御項目については、[トレーシングガイド](tracing.md)を参照してください。
 
-## デバッグログ
+## デバッグログ {#debug-logging}
 
 SDK は 2 つの Python ロガー（`openai.agents` と `openai.agents.tracing`）を定義しますが、デフォルトではハンドラーを追加しません。ログには、アプリケーションの Python ログ設定が適用されます。
 
@@ -231,7 +231,7 @@ logger.setLevel(logging.WARNING)
 logger.addHandler(logging.StreamHandler())
 ```
 
-### ログと診断における機密データ
+### ログと診断における機密データ {#sensitive-data-in-logs-and-diagnostics}
 
 一部のログと診断例外には、機密データ（モデルまたはツールの入力と出力など）が含まれる場合があります。
 

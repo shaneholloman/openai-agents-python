@@ -9,7 +9,7 @@ search:
 1. 你的代码在本地可用的上下文：这是工具函数运行时、`on_handoff` 等回调中、生命周期钩子中可能需要的数据和依赖项。
 2. LLM 可用的上下文：这是 LLM 在生成响应时能够看到的数据。
 
-## 本地上下文
+## 本地上下文 {#local-context}
 
 本地上下文由 [`RunContextWrapper`][agents.run_context.RunContextWrapper] 类及其中的 [`context`][agents.run_context.RunContextWrapper.context] 属性表示。其工作方式如下：
 
@@ -33,7 +33,7 @@ search:
 
 在单次运行中，派生的包装器共享相同的底层应用上下文、审批状态和用量追踪。嵌套的 [`Agent.as_tool()`][agents.agent.Agent.as_tool] 运行可以附加不同的 `tool_input`，但默认情况下，它们不会获得应用状态的独立副本。
 
-### `RunContextWrapper` 提供的内容
+### `RunContextWrapper` 提供的内容 {#what-runcontextwrapper-exposes}
 
 [`RunContextWrapper`][agents.run_context.RunContextWrapper] 是应用自定义上下文对象的包装器。实际使用中，你最常用到的是：
 
@@ -94,7 +94,7 @@ if __name__ == "__main__":
 
 ---
 
-### 高级用法：`ToolContext`
+### 高级用法：`ToolContext` {#advanced-toolcontext}
 
 在某些情况下，你可能需要访问有关正在执行的工具的额外元数据，例如工具名称、调用 ID 或原始参数字符串。  
 为此，可以使用 [`ToolContext`][agents.tool_context.ToolContext] 类，它扩展了 `RunContextWrapper`。
@@ -140,7 +140,7 @@ agent = Agent(
 
 ---
 
-## 智能体/LLM 上下文
+## 智能体/LLM 上下文 {#agentllm-context}
 
 调用 LLM 时，它**唯一**能看到的数据来自对话历史记录。这意味着，如果希望 LLM 能够使用某些新数据，就必须以某种方式让这些数据出现在该历史记录中。具体有以下几种方式：
 

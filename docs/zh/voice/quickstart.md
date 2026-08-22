@@ -4,7 +4,7 @@ search:
 ---
 # 快速入门
 
-## 前提条件
+## 前提条件 {#prerequisites}
 
 请确保已按照 Agents SDK 的基础[快速入门说明](../quickstart.md)完成操作，并设置好虚拟环境。然后，从 SDK 安装可选的语音依赖项：
 
@@ -18,7 +18,7 @@ pip install 'openai-agents[voice]'
 pip install sounddevice
 ```
 
-## 概念
+## 概念 {#concepts}
 
 需要了解的主要概念是 [`VoicePipeline`][agents.voice.pipeline.VoicePipeline]，它包含三个步骤：
 
@@ -52,7 +52,7 @@ graph LR
 
 ```
 
-## 智能体
+## 智能体 {#agents}
 
 首先，我们来设置一些智能体。如果您曾使用此 SDK 构建过智能体，这些内容应该会很熟悉。我们将设置两个智能体、一项已配置的任务转移和一个工具。
 
@@ -92,7 +92,7 @@ agent = Agent(
 )
 ```
 
-## 语音管线
+## 语音管线 {#voice-pipeline}
 
 我们将设置一个简单的语音管线，并使用 [`SingleAgentVoiceWorkflow`][agents.voice.workflow.SingleAgentVoiceWorkflow] 作为工作流。
 
@@ -101,7 +101,7 @@ from agents.voice import SingleAgentVoiceWorkflow, VoicePipeline
 pipeline = VoicePipeline(workflow=SingleAgentVoiceWorkflow(agent))
 ```
 
-## 管线运行
+## 管线运行 {#run-the-pipeline}
 
 ```python
 import numpy as np
@@ -126,7 +126,7 @@ async for event in result.stream():
 
 ```
 
-## 完整整合
+## 完整整合 {#put-it-all-together}
 
 ```python
 import asyncio

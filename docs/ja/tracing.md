@@ -16,7 +16,7 @@ Agents SDK には組み込みのトレーシング機能があり、エージェ
 
 ***Zero Data Retention (ZDR) ポリシーの下で OpenAI の API を使用する組織では、トレーシングを利用できません。***
 
-## トレースとスパン
+## トレースとスパン {#traces-and-spans}
 
 -   **トレース** は、「ワークフロー」における単一のエンドツーエンド操作を表します。トレースは複数のスパンで構成されます。トレースには次のプロパティがあります。
     -   `workflow_name`: 論理的なワークフローまたはアプリの名前です。たとえば、「コード生成」や「カスタマーサービス」などです。
@@ -30,7 +30,7 @@ Agents SDK には組み込みのトレーシング機能があり、エージェ
     -   `parent_id`: このスパンの親スパンが存在する場合、その親スパンを指します
     -   `span_data`: スパンに関する情報です。たとえば、`AgentSpanData` にはエージェントに関する情報が含まれ、`GenerationSpanData` には LLM 生成に関する情報が含まれます。
 
-## デフォルトのトレーシング
+## デフォルトのトレーシング {#default-tracing}
 
 デフォルトでは、SDK は次の項目をトレーシングします。
 
@@ -62,7 +62,7 @@ result = await Runner.run(
 
 さらに、[カスタムトレースプロセッサー](#custom-tracing-processors)を設定して、別の送信先へトレースを送信できます。これは、既存の送信先の代替または追加の送信先として使用できます。
 
-## 長時間実行ワーカーと即時エクスポート
+## 長時間実行ワーカーと即時エクスポート {#long-running-workers-and-immediate-exports}
 
 デフォルトの [`BatchTraceProcessor`][agents.tracing.processors.BatchTraceProcessor] は、数秒ごと、またはインメモリキューがサイズのトリガー値に達した場合はそれより早く、バックグラウンドでトレースをエクスポートします。また、プロセスの終了時には最終フラッシュも実行します。Celery、RQ、Dramatiq、FastAPI のバックグラウンドタスクなどの長時間実行ワーカーでは、通常、追加のコードなしでトレースが自動的にエクスポートされますが、各ジョブの完了直後にはトレースダッシュボードに表示されない場合があります。
 
@@ -105,7 +105,7 @@ async def run(prompt: str, background_tasks: BackgroundTasks):
 
 [`flush_traces()`][agents.tracing.flush_traces] は、現在バッファリングされているトレースとスパンがエクスポートされるまで処理をブロックします。そのため、構築途中のトレースをフラッシュしないよう、`trace()` が閉じた後に呼び出してください。デフォルトのエクスポート遅延で問題ない場合は、この呼び出しを省略できます。
 
-## 上位レベルのトレース
+## 上位レベルのトレース {#higher-level-traces}
 
 複数回の `run()` 呼び出しを単一のトレースに含めたい場合があります。その場合は、コード全体を `trace()` でラップします。
 
@@ -124,7 +124,7 @@ async def main():
 
 1. 2 回の `Runner.run` 呼び出しが `with trace()` でラップされているため、それぞれが個別のトレースを作成するのではなく、両方の実行が 1 つの全体的なトレースに含まれます。
 
-## トレースの作成
+## トレースの作成 {#creating-traces}
 
 [`trace()`][agents.tracing.trace] 関数を使用してトレースを作成できます。トレースは開始および終了する必要があります。これには次の 2 つの方法があります。
 
@@ -133,13 +133,13 @@ async def main():
 
 現在のトレースは、Python の [`contextvar`](https://docs.python.org/3/library/contextvars.html) を介して追跡されます。つまり、並行処理でも自動的に機能します。トレースを手動で開始および終了する場合、現在のトレースを更新するには、`start()` に `mark_as_current` を渡し、`finish()` に `reset_current` を渡します。
 
-## スパンの作成
+## スパンの作成 {#creating-spans}
 
 さまざまな [`*_span()`][agents.tracing.create] メソッドを使用してスパンを作成できます。通常、スパンを手動で作成する必要はありません。カスタムスパン情報を追跡するための [`custom_span()`][agents.tracing.custom_span] 関数も利用できます。
 
 スパンは自動的に現在のトレースの一部となり、Python の [`contextvar`](https://docs.python.org/3/library/contextvars.html) を介して追跡される、最も近い現在のスパンの配下にネストされます。
 
-## 機密データ
+## 機密データ {#sensitive-data}
 
 一部のスパンでは、機密性の高い可能性があるデータがキャプチャされる場合があります。
 
@@ -149,7 +149,7 @@ async def main():
 
 デフォルトでは、`trace_include_sensitive_data` は `True` です。アプリを実行する前に、環境変数 `OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA` を `true/1` または `false/0` に設定してエクスポートすることで、コードを変更せずにデフォルト値を設定できます。
 
-## カスタムトレースプロセッサー
+## カスタムトレースプロセッサー {#custom-tracing-processors}
 
 トレーシングの高レベルアーキテクチャは次のとおりです。
 
@@ -162,7 +162,7 @@ async def main():
 2. [`set_trace_processors()`][agents.tracing.set_trace_processors] を使用すると、デフォルトのプロセッサーを独自のトレースプロセッサーで **置き換える** ことができます。この場合、送信を行う `TracingProcessor` を含めない限り、トレースは OpenAI バックエンドに送信されません。
 
 
-## OpenAI 以外のモデルによるトレーシング
+## OpenAI 以外のモデルによるトレーシング {#tracing-with-non-openai-models}
 
 OpenAI 以外のモデルを使用する場合、トレーシングを無効化することなく OpenAI Traces ダッシュボードで無料のトレーシングを有効にするため、トレーシングエクスポーターに OpenAI API キーを指定できます。アダプターの選択と設定に関する注意事項については、モデルガイドの[サードパーティーアダプター](models/index.md#third-party-adapters)セクションを参照してください。
 
@@ -197,15 +197,15 @@ await Runner.run(
 )
 ```
 
-## 補足事項
+## 補足事項 {#additional-notes}
 - OpenAI Traces ダッシュボードで無料のトレースを確認できます。
 
 
-## エコシステム統合
+## エコシステム統合 {#ecosystem-integrations}
 
 以下のコミュニティおよびベンダー統合は、OpenAI Agents SDK のトレーシング API サーフェスをサポートしています。
 
-### 外部トレースプロセッサーの一覧
+### 外部トレースプロセッサーの一覧 {#external-tracing-processors-list}
 
 -   [Weights & Biases](https://weave-docs.wandb.ai/guides/integrations/openai_agents)
 -   [Arize-Phoenix](https://docs.arize.com/phoenix/tracing/integrations-tracing/openai-agents-sdk)

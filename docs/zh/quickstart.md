@@ -4,7 +4,7 @@ search:
 ---
 # 快速入门
 
-## 项目与虚拟环境的创建
+## 项目与虚拟环境的创建 {#create-a-project-and-virtual-environment}
 
 你只需要执行一次。
 
@@ -14,7 +14,7 @@ cd my_project
 python -m venv .venv
 ```
 
-### 虚拟环境的激活
+### 虚拟环境的激活 {#activate-the-virtual-environment}
 
 每次启动新的终端会话时都需要执行此操作。
 
@@ -30,13 +30,13 @@ source .venv/bin/activate
 .venv\Scripts\activate
 ```
 
-### Agents SDK 的安装
+### Agents SDK 的安装 {#install-the-agents-sdk}
 
 ```bash
 pip install openai-agents # or `uv add openai-agents`, etc
 ```
 
-### OpenAI API 密钥的设置
+### OpenAI API 密钥的设置 {#set-an-openai-api-key}
 
 如果你还没有密钥，请按照[这些说明](https://platform.openai.com/docs/quickstart#create-and-export-an-api-key)创建 OpenAI API 密钥。
 
@@ -60,7 +60,7 @@ $env:OPENAI_API_KEY = "sk-..."
 set "OPENAI_API_KEY=sk-..."
 ```
 
-## 首个智能体的创建
+## 首个智能体的创建 {#create-your-first-agent}
 
 智能体由 instructions、名称以及特定模型等可选配置定义。
 
@@ -73,7 +73,7 @@ agent = Agent(
 )
 ```
 
-## 首个智能体的运行
+## 首个智能体的运行 {#run-your-first-agent}
 
 使用 [`Runner`][agents.run.Runner] 执行智能体，并获取返回的 [`RunResult`][agents.result.RunResult]。
 
@@ -108,7 +108,7 @@ if __name__ == "__main__":
 
 当任务主要存在于提示词、工具和对话状态中时，使用普通的 `Agent` 加 `Runner`。如果智能体需要在隔离的工作区中检查或修改真实文件，请转到[沙盒智能体快速入门](sandbox_agents.md)。
 
-## 智能体工具的提供
+## 智能体工具的提供 {#give-your-agent-tools}
 
 你可以为智能体提供工具，用于查找信息或执行操作。
 
@@ -143,7 +143,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## 更多智能体的添加
+## 更多智能体的添加 {#add-a-few-more-agents}
 
 在选择多智能体模式之前，请决定最终答案应由谁负责：
 
@@ -170,7 +170,7 @@ math_tutor_agent = Agent(
 )
 ```
 
-## 任务转移的定义
+## 任务转移的定义 {#define-your-handoffs}
 
 在智能体上，你可以定义一组可选的外部任务转移选项，供它在解决任务时选择。
 
@@ -182,7 +182,7 @@ triage_agent = Agent(
 )
 ```
 
-## 智能体编排的运行
+## 智能体编排的运行 {#run-the-agent-orchestration}
 
 运行器会处理各个智能体的执行、所有任务转移以及所有工具调用。
 
@@ -204,7 +204,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## 参考代码示例
+## 参考代码示例 {#reference-examples}
 
 仓库包含相同核心模式的完整脚本：
 
@@ -212,11 +212,11 @@ if __name__ == "__main__":
 -   [`examples/basic/tools.py`](https://github.com/openai/openai-agents-python/tree/main/examples/basic/tools.py) 用于工具调用。
 -   [`examples/agent_patterns/routing.py`](https://github.com/openai/openai-agents-python/tree/main/examples/agent_patterns/routing.py) 用于多智能体路由。
 
-## 追踪的查看
+## 追踪的查看 {#view-your-traces}
 
 若要回顾智能体运行期间发生的情况，请前往 [OpenAI Dashboard 中的追踪查看器](https://platform.openai.com/traces)，查看智能体运行的追踪。
 
-## 后续步骤
+## 后续步骤 {#next-steps}
 
 了解如何构建更复杂的智能体式流程：
 

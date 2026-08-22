@@ -10,7 +10,7 @@ search:
 
     如果要使用默认的 Python 路径，请先阅读[快速入门](quickstart.md)。如果正在决定应用应使用服务器端 WebSocket 还是 SIP，请阅读 [Realtime 传输方式](transport.md)。浏览器 WebRTC 传输不属于 Python SDK。
 
-## 概述
+## 概述 {#overview}
 
 Realtime 智能体会与 Realtime API 保持长期连接，使模型能够以增量方式处理文本和音频、以流式方式输出音频、调用工具并处理中断，而无需在每个轮次都重新发起请求。
 
@@ -21,7 +21,7 @@ Realtime 智能体会与 Realtime API 保持长期连接，使模型能够以增
 -   **RealtimeSession**：发送输入、接收事件、追踪历史记录并执行工具的实时会话
 -   **RealtimeModel**：传输抽象。默认实现是 OpenAI的服务器端 WebSocket。
 
-## 会话生命周期
+## 会话生命周期 {#session-lifecycle}
 
 典型的 Realtime 会话如下：
 
@@ -38,7 +38,7 @@ Realtime 智能体会与 Realtime API 保持长期连接，使模型能够以增
 
 当 Realtime API 服务器正常关闭默认 WebSocket 连接时，模型传输层会发出 `disconnected` [`RealtimeModelConnectionStatusEvent`][agents.realtime.model_events.RealtimeModelConnectionStatusEvent]，随后发出 [`RealtimeModelEndOfStreamEvent`][agents.realtime.model_events.RealtimeModelEndOfStreamEvent]。`RealtimeSession` 会在 `raw_model_event` 中转发这两个事件，处理完已进入队列的事件，然后结束异步迭代且不引发异常。由调用方发起的 `session.close()` 不会生成这些服务器断开连接事件。意外的 WebSocket 故障仍会进入会话的异常处理路径，而不会像服务器正常关闭一样结束迭代。
 
-## 智能体与会话配置
+## 智能体与会话配置 {#agent-and-session-configuration}
 
 `RealtimeAgent` 的功能范围有意设计得比常规 `Agent` 类型更窄：
 
@@ -91,7 +91,7 @@ runner = RealtimeRunner(
 
 有关完整的类型化接口，请参阅 [`RealtimeRunConfig`][agents.realtime.config.RealtimeRunConfig] 和 [`RealtimeSessionModelSettings`][agents.realtime.config.RealtimeSessionModelSettings]。
 
-### 输入转录设置
+### 输入转录设置 {#input-transcription-settings}
 
 在 `audio.input.transcription` 下配置输入转录。使用 `gpt-live-transcribe` 可获得低延迟的增量转录；如果应在提交一个音频轮次后开始转录，或应用需要输出检测到的语言，请通过 WebSocket 使用 `gpt-transcribe`。Agents SDK会在嵌套会话配置中转发特定于模型的 GA 转录设置：
 
@@ -145,9 +145,9 @@ runner = RealtimeRunner(
 
 将 `audio.input.turn_detection` 设置为 `None` 会禁用自动轮次检测。之后，应用必须按照[手动响应控制](#manual-response-control)中的说明提交音频轮次并控制响应创建。有关模型行为、验证规则和延迟指导，请参阅 OpenAI API 的 [Realtime 转录指南](https://developers.openai.com/api/docs/guides/realtime-transcription)。
 
-## 输入与输出
+## 输入与输出 {#inputs-and-outputs}
 
-### 文本与结构化用户消息
+### 文本与结构化用户消息 {#text-and-structured-user-messages}
 
 使用 [`session.send_message()`][agents.realtime.session.RealtimeSession.send_message] 发送纯文本或结构化 Realtime 消息。
 
@@ -169,7 +169,7 @@ await session.send_message(message)
 
 在 Realtime 对话中，结构化消息是加入图像输入的主要方式。[`examples/realtime/app/server.py`](https://github.com/openai/openai-agents-python/tree/main/examples/realtime/app/server.py) 中的 Web 演示代码示例会以这种方式转发 `input_image` 消息。
 
-### 音频输入
+### 音频输入 {#audio-input}
 
 使用 [`session.send_audio()`][agents.realtime.session.RealtimeSession.send_audio] 以流式方式发送原始音频字节：
 
@@ -185,7 +185,7 @@ await session.send_audio(audio_bytes, commit=True)
 
 如果需要更底层的控制，也可以通过底层模型传输对象直接发送 Realtime API 客户端事件，例如 `input_audio_buffer.commit`。
 
-### 手动响应控制
+### 手动响应控制 {#manual-response-control}
 
 `session.send_message()` 会通过高层路径发送用户输入，并自动开始响应。在某些配置中，原始音频缓冲**不会**自动执行相同操作。
 
@@ -213,7 +213,7 @@ await session.model.send_event(
 
 [`examples/realtime/twilio_sip/server.py`](https://github.com/openai/openai-agents-python/tree/main/examples/realtime/twilio_sip/server.py) 中的 SIP 代码示例使用原始 `response.create` 强制生成开场问候语。
 
-## 事件、历史记录与中断
+## 事件、历史记录与中断 {#events-history-and-interruptions}
 
 `RealtimeSession` 会发出更高层的 SDK 事件，同时仍会在需要时转发原始模型事件。
 
@@ -231,7 +231,7 @@ await session.model.send_event(
 
 对于 UI 状态而言，通常最有用的事件是 `history_added` 和 `history_updated`。它们将会话的本地历史记录公开为 `RealtimeItem` 对象，包括用户消息、助手消息和工具调用。
 
-### 用量统计
+### 用量统计 {#usage-accounting}
 
 当已完成的模型响应包含用量信息时，SDK 的 OpenAI `RealtimeModel` 传输层会在 `raw_model_event` 中发出 [`RealtimeModelUsageEvent`][agents.realtime.model_events.RealtimeModelUsageEvent]。其 `usage` 字段包含该响应的 token 数量，而 `input_tokens_details` 和 `output_tokens_details` 则提供可选的模态明细。
 
@@ -255,7 +255,7 @@ async for event in session:
 
 仅当模型提供方在已完成的响应中包含用量信息时，才会报告用量。累计值涵盖该 `RealtimeSession` 收到的响应；它不是跨会话总计。
 
-### 中断与播放进度追踪
+### 中断与播放进度追踪 {#interruptions-and-playback-tracking}
 
 当用户打断助手时，会话会发出 `audio_interrupted` 并更新历史记录，使服务器端对话与用户实际听到的内容保持一致。
 
@@ -263,9 +263,9 @@ async for event in session:
 
 [`examples/realtime/twilio/twilio_handler.py`](https://github.com/openai/openai-agents-python/tree/main/examples/realtime/twilio/twilio_handler.py) 中的 Twilio 代码示例展示了此模式。
 
-## 工具、批准、任务转移与安全防护措施
+## 工具、批准、任务转移与安全防护措施 {#tools-approvals-handoffs-and-guardrails}
 
-### 函数工具
+### 函数工具 {#function-tools}
 
 Realtime 智能体支持在实时对话期间使用函数工具：
 
@@ -286,7 +286,7 @@ agent = RealtimeAgent(
 )
 ```
 
-### 工具批准
+### 工具批准 {#tool-approvals}
 
 函数工具可以要求在执行前获得人工批准。发生这种情况时，会话会发出 `tool_approval_required` 并暂停工具运行，直到调用 `approve_tool_call()` 或 `reject_tool_call()`。
 
@@ -300,7 +300,7 @@ async for event in session:
 
 有关具体的服务器端批准循环，请参阅 [`examples/realtime/app/server.py`](https://github.com/openai/openai-agents-python/tree/main/examples/realtime/app/server.py)。人工参与流程文档中的[人工参与流程](../human_in_the_loop.md)也会指向此流程。
 
-### 任务转移
+### 任务转移 {#handoffs}
 
 Realtime 任务转移允许一个智能体将实时对话转交给另一个专用智能体：
 
@@ -326,7 +326,7 @@ main_agent = RealtimeAgent(
 
 直接用作任务转移的 `RealtimeAgent` 对象会被自动包装，而 `realtime_handoff(...)` 可用于自定义名称、描述、验证、回调和可用性。Realtime 任务转移**不**支持常规任务转移的 `input_filter`。
 
-### 安全防护措施
+### 安全防护措施 {#guardrails}
 
 Realtime 智能体支持针对智能体响应的输出安全防护措施，以及针对函数工具调用的输入安全防护措施。输出安全防护措施检查会进行防抖处理：每次检查都针对累积的输出文本和音频转录增量运行，而不是针对每个部分增量运行，并会发出 `guardrail_tripped`，而不是引发异常。
 
@@ -352,7 +352,7 @@ agent = RealtimeAgent(
 
 自定义 `RealtimeModel` 传输方式必须遵循 `RealtimeModelSendInterrupt.response_id` 和 `playback_only`，才能提供同样限定于源响应的音频中断行为。它们还必须覆盖 `RealtimeModel.send_event_if()`，以支持纯文本输出路径的恢复消息。实现必须在传输层实际提交事件的边界重新检查所提供的条件，或者将条件检查与事件提交串行化。默认实现会安全地跳过恢复消息，因为如果只检查一次条件，然后单独发送事件，在检查与事件提交之间可能会启动另一个响应；响应取消和 `guardrail_tripped` 事件仍会发生。
 
-## SIP 与电话
+## SIP 与电话 {#sip-and-telephony}
 
 Python SDK 通过 [`OpenAIRealtimeSIPModel`][agents.realtime.openai_realtime.OpenAIRealtimeSIPModel] 提供原生支持的 SIP 挂接流程。
 
@@ -375,7 +375,7 @@ async with await runner.run(
 
 如果需要先接听通话，并希望接听请求体与从智能体生成的会话配置保持一致，请使用 `OpenAIRealtimeSIPModel.build_initial_session_payload(...)`。完整流程请参阅 [`examples/realtime/twilio_sip/server.py`](https://github.com/openai/openai-agents-python/tree/main/examples/realtime/twilio_sip/server.py)。
 
-## 底层访问与自定义端点
+## 底层访问与自定义端点 {#low-level-access-and-custom-endpoints}
 
 可以通过 `session.model` 访问底层传输对象。
 
@@ -421,7 +421,7 @@ session = await runner.run(
 
 如果传入 `headers`，SDK 不会自动添加 `Authorization`。请勿对 Realtime 智能体使用旧版 beta 路径（`/openai/realtime?api-version=...`）。
 
-## 延伸阅读
+## 延伸阅读 {#further-reading}
 
 -   [Realtime 传输方式](transport.md)
 -   [快速入门](quickstart.md)

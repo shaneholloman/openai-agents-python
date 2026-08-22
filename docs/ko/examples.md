@@ -6,7 +6,7 @@ search:
 
 [저장소](https://github.com/openai/openai-agents-python/tree/main/examples)의 examples 섹션에서 SDK를 사용하는 다양한 샘플 구현을 확인해 보세요. 예제는 서로 다른 패턴과 기능을 보여 주는 여러 카테고리로 구성되어 있습니다.
 
-## 카테고리
+## 카테고리 {#categories}
 
 - **[agent_patterns](https://github.com/openai/openai-agents-python/tree/main/examples/agent_patterns):** 이 카테고리의 예제는 다음과 같은 일반적인 에이전트 설계 패턴을 보여 줍니다.
 

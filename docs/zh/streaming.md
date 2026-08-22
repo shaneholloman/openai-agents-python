@@ -10,7 +10,7 @@ search:
 
 持续使用 `result.stream_events()` 进行消费，直到异步迭代器结束。只有迭代器结束后，流式运行才算完成；会话持久化、审批记录维护或历史压缩等后处理可能会在最后一个可见 token 到达后才完成。当循环退出时，`result.is_complete` 会反映最终的运行状态。
 
-## 原始响应事件
+## 原始响应事件 {#raw-response-events}
 
 [`RawResponsesStreamEvent`][agents.stream_events.RawResponsesStreamEvent] 对象封装了直接从 LLM 传递的原始事件。每个对象的 `data` 字段都包含一个 OpenAI Responses API 事件，其类型可能是 `response.created` 或 `response.output_text.delta`。如果你希望响应消息一经生成就立即以流式方式发送给用户，这些事件会非常有用。
 
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## 流式传输与审批
+## 流式传输与审批 {#streaming-and-approvals}
 
 流式传输与因工具审批而暂停的运行兼容。如果工具需要审批，`result.stream_events()` 会结束，待处理的审批则会在 [`RunResultStreaming.interruptions`][agents.result.RunResultStreaming.interruptions] 中公开。使用 `result.to_state()` 将结果转换为 [`RunState`][agents.run_state.RunState]，批准或拒绝中断，然后使用 `Runner.run_streamed(...)` 恢复运行。
 
@@ -59,7 +59,7 @@ if result.interruptions:
 
 有关完整的暂停和恢复操作流程，请参阅[人在回路指南](human_in_the_loop.md)。
 
-## 当前轮次结束后的流式传输取消
+## 当前轮次结束后的流式传输取消 {#cancel-streaming-after-the-current-turn}
 
 如果需要中途停止流式运行，请调用 [`result.cancel()`][agents.result.RunResultStreaming.cancel]。默认情况下，这会立即停止运行。要让当前轮次正常完成后再停止，请改为调用 `result.cancel(mode="after_turn")`。
 
@@ -71,11 +71,11 @@ if result.interruptions:
 -   如果流式运行因工具审批而停止，请勿将其视为新轮次。应先将流消费完毕，检查 `result.interruptions`，然后改为从 `result.to_state()` 恢复运行。
 -   使用 [`RunConfig.session_input_callback`][agents.run.RunConfig.session_input_callback] 自定义如何在下一次模型调用前合并检索到的会话历史与新的用户输入。如果你在此处重写新轮次条目，则重写后的版本会作为该轮次的持久化内容。
 
-## 运行条目事件与智能体事件
+## 运行条目事件与智能体事件 {#run-item-events-and-agent-events}
 
 [`RunItemStreamEvent`][agents.stream_events.RunItemStreamEvent] 是更高层级的事件。它们会在条目完全生成后通知你。这样，你便可以按“消息已生成”“工具已运行”等粒度推送进度更新，而不是按每个 token 推送。同样，[`AgentUpdatedStreamEvent`][agents.stream_events.AgentUpdatedStreamEvent] 会在当前智能体发生变化时向你提供更新（例如，因任务转移而发生变化）。
 
-### 运行条目事件名称
+### 运行条目事件名称 {#run-item-event-names}
 
 `RunItemStreamEvent.name` 使用一组固定的语义事件名称：
 

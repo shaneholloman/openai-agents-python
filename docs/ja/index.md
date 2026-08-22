@@ -12,7 +12,7 @@ search:
 
 これらの基本コンポーネントを Python と組み合わせることで、ツールとエージェント間の複雑な関係を表現し、学習コストを抑えながら実用的なアプリケーションを構築できます。さらに、SDK には組み込みの **トレーシング** が含まれており、エージェント型フローの可視化とデバッグに加え、評価やアプリケーション向けモデルのファインチューニングも行えます。
 
-## Agents SDK を使用する理由
+## Agents SDK を使用する理由 {#why-use-the-agents-sdk}
 
 SDK には、設計を支える 2 つの原則があります。
 
@@ -34,7 +34,7 @@ SDK の主な機能は次のとおりです。
 -   **Human in the loop**: エージェントの実行中に人間を関与させるための組み込みの仕組みです。
 -   **トレーシング**: ワークフローを可視化、デバッグ、監視するための組み込みのトレーシングです。OpenAI の評価、ファインチューニング、蒸留ツール群をサポートしています。
 
-## Agents SDK と Responses API の選択
+## Agents SDK と Responses API の選択 {#agents-sdk-or-responses-api}
 
 SDK は、OpenAI モデルに対してデフォルトで Responses API を使用しますが、モデル呼び出しをより高レベルのランタイムでラップします。
 
@@ -51,13 +51,13 @@ SDK は、OpenAI モデルに対してデフォルトで Responses API を使用
 
 アプリケーション全体で、どちらか一方だけを選択する必要はありません。多くのアプリケーションでは、管理されたワークフローに SDK を使用し、より低レベルの処理では Responses API を直接呼び出します。
 
-## インストール
+## インストール {#installation}
 
 ```bash
 pip install openai-agents
 ```
 
-## Hello world の例
+## Hello world の例 {#hello-world-example}
 
 ```python
 from agents import Agent, Runner
@@ -78,14 +78,14 @@ print(result.final_output)
 export OPENAI_API_KEY=sk-...
 ```
 
-## はじめに
+## はじめに {#start-here}
 
 -   [クイックスタート](quickstart.md)で、最初のテキストベースのエージェントを構築します。
 -   次に、[エージェントの実行](running_agents.md#choose-a-memory-strategy)で、ターン間で状態を引き継ぐ方法を決定します。
 -   タスクが実際のファイル、リポジトリ、またはエージェントごとに隔離されたワークスペースの状態に依存する場合は、[サンドボックスエージェントのクイックスタート](sandbox_agents.md)を参照してください。
 -   ハンドオフとマネージャー型オーケストレーションのどちらを使用するか決める場合は、[エージェントオーケストレーション](multi_agent.md)を参照してください。
 
-## 目的別ガイド
+## 目的別ガイド {#choose-your-path}
 
 実行したい作業は決まっていても、説明がどのページにあるか分からない場合は、次の表を使用してください。
 

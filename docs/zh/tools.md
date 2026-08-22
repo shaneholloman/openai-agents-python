@@ -12,7 +12,7 @@ search:
 -   Agents as tools：将智能体公开为可调用工具，而无需完整的任务转移。
 -   实验性 Codex 工具：通过工具调用运行限定于工作区的 Codex 任务。
 
-## 工具类型选择
+## 工具类型选择 {#choosing-a-tool-type}
 
 将此页面用作目录，然后跳转到与你所控制的运行时相匹配的部分。
 
@@ -26,7 +26,7 @@ search:
 | 让一个智能体调用另一个智能体，而不进行任务转移 | [Agents as tools](#agents-as-tools) |
 | 从智能体运行限定于工作区的 Codex 任务 | [实验性 Codex 工具](#experimental-codex-tool) |
 
-## 托管工具
+## 托管工具 {#hosted-tools}
 
 使用 [`OpenAIResponsesModel`][agents.models.openai_responses.OpenAIResponsesModel] 时，OpenAI 提供了一些内置工具：
 
@@ -62,7 +62,7 @@ async def main():
     print(result.final_output)
 ```
 
-### 托管工具搜索
+### 托管工具搜索 {#hosted-tool-search}
 
 工具搜索允许 OpenAI Responses 模型将大型工具集合推迟到运行时加载，使模型只加载当前轮次所需的子集。当你有许多函数工具、命名空间组或托管 MCP 服务器，并且希望减少工具架构所占用的 token，而不预先公开所有工具时，这非常有用。
 
@@ -126,7 +126,7 @@ print(result.final_output)
 -   有关涵盖命名空间加载和顶层延迟加载工具的完整可运行代码示例，请参阅 `examples/tools/tool_search.py`。
 -   官方平台指南：[工具搜索](https://developers.openai.com/api/docs/guides/tools-tool-search)。
 
-### 编程式工具调用
+### 编程式工具调用 {#programmatic-tool-calling}
 
 编程式工具调用允许受支持的 OpenAI Responses 模型生成 JavaScript，以调用符合条件的工具、合并其输出，并向模型返回一个结果。它适用于范围明确且可从循环、分支、并行调用或中间计算中获益的工作流，无需在每次工具调用后都与模型往返交互。
 
@@ -180,7 +180,7 @@ print(result.final_output)
 -   有关完整的并发库存规划代码示例，请参阅 `examples/tools/programmatic_tool_calling.py`。
 -   官方平台指南：[编程式工具调用](https://developers.openai.com/api/docs/guides/tools-programmatic-tool-calling)。
 
-### 托管容器 shell 与技能
+### 托管容器 shell 与技能 {#hosted-container-shell-skills}
 
 `ShellTool` 还支持由OpenAI托管的容器执行。当你希望模型在托管容器中运行 shell 命令，而不是在本地运行时中运行时，请使用此模式。
 
@@ -229,7 +229,7 @@ print(result.final_output)
 -   有关完整代码示例，请参阅 `examples/tools/container_shell_skill_reference.py` 和 `examples/tools/container_shell_inline_skill.py`。
 -   OpenAI 平台指南：[Shell](https://platform.openai.com/docs/guides/tools-shell)和[技能](https://platform.openai.com/docs/guides/tools-skills)。
 
-## 本地运行时工具
+## 本地运行时工具 {#local-runtime-tools}
 
 本地运行时工具在模型响应本身之外执行。模型仍会决定何时调用它们，但实际工作由你的应用程序或已配置的执行环境完成。
 
@@ -245,7 +245,7 @@ print(result.final_output)
 
 对于 shell 操作超时，使用正整数毫秒值表示有限超时。在调用本地 `ShellTool` 执行器之前，SDK 会将 `0` 和 `None` 都视为未显式设置超时，因为零在不同执行器实现中没有可移植的统一含义；其他值会在调用执行器之前被拒绝。这仅适用于超时字段：`max_output_length=0` 仍是受支持的空捕获输出请求。
 
-### ComputerTool 与 Responses 计算机工具
+### ComputerTool 与 Responses 计算机工具 {#computertool-and-the-responses-computer-tool}
 
 `ComputerTool` 仍是本地工具框架：你需要提供 [`Computer`][agents.computer.Computer] 或 [`AsyncComputer`][agents.computer.AsyncComputer] 实现，SDK 会将该框架映射到 OpenAI Responses API 的计算机操作界面。
 
@@ -304,7 +304,7 @@ agent = Agent(
 )
 ```
 
-## 函数工具
+## 函数工具 {#function-tools}
 
 你可以将任意 Python 函数用作工具。Agents SDK 会自动设置该工具：
 
@@ -445,7 +445,7 @@ for tool in agent.tools:
     }
     ```
 
-### 函数工具的图像或文件返回
+### 函数工具的图像或文件返回 {#returning-images-or-files-from-function-tools}
 
 除了返回文本输出之外，你还可以返回一个或多个图像或文件作为函数工具的输出。为此，可以返回以下任意内容：
 
@@ -453,7 +453,7 @@ for tool in agent.tools:
 -   文件：[`ToolOutputFileContent`][agents.tool.ToolOutputFileContent]（或 TypedDict 版本 [`ToolOutputFileContentDict`][agents.tool.ToolOutputFileContentDict]）
 -   文本：字符串、可转换为字符串的对象，或 [`ToolOutputText`][agents.tool.ToolOutputText]（或 TypedDict 版本 [`ToolOutputTextDict`][agents.tool.ToolOutputTextDict]）
 
-### 自定义函数工具
+### 自定义函数工具 {#custom-function-tools}
 
 有时，你可能不希望将 Python 函数用作工具。如果愿意，可以直接创建 [`FunctionTool`][agents.tool.FunctionTool]。你需要提供：
 
@@ -493,7 +493,7 @@ tool = FunctionTool(
 )
 ```
 
-### 参数和文档字符串的自动解析
+### 参数和文档字符串的自动解析 {#automatic-argument-and-docstring-parsing}
 
 如前所述，我们会自动解析函数签名以提取工具架构，并解析文档字符串以提取工具和各个参数的描述。相关注意事项如下：
 
@@ -502,7 +502,7 @@ tool = FunctionTool(
 
 架构提取代码位于 [`agents.function_schema`][] 中。
 
-### 使用 Pydantic Field 约束和描述参数
+### 使用 Pydantic Field 约束和描述参数 {#constraining-and-describing-arguments-with-pydantic-field}
 
 你可以使用 Pydantic 的 [`Field`](https://docs.pydantic.dev/latest/concepts/fields/) 为工具参数添加约束（例如数字的最小值/最大值、字符串的长度或模式）和描述。与 Pydantic 一样，两种形式都受支持：基于默认值的形式（`arg: int = Field(..., ge=1)`）和 `Annotated`（`arg: Annotated[int, Field(..., ge=1)]`）。生成的 JSON 架构和验证会包含这些约束。
 
@@ -522,7 +522,7 @@ def score_b(score: Annotated[int, Field(..., ge=0, le=100, description="Score fr
     return f"Score recorded: {score}"
 ```
 
-### 函数工具超时
+### 函数工具超时 {#function-tool-timeouts}
 
 你可以使用 `@function_tool(timeout=...)` 为异步函数工具设置单次调用超时。
 
@@ -577,7 +577,7 @@ except ToolTimeoutError as e:
 
     超时配置仅支持异步 `@function_tool` 处理程序。
 
-### 函数工具错误处理
+### 函数工具错误处理 {#handling-errors-in-function-tools}
 
 通过 `@function_tool` 创建函数工具时，可以传入 `failure_error_function`。这是一个在工具调用崩溃时向 LLM 提供错误响应的函数。
 
@@ -609,7 +609,7 @@ def get_user_profile(user_id: str) -> str:
 
 如果手动创建 `FunctionTool` 对象，则必须在 `on_invoke_tool` 函数内部处理错误。
 
-## Agents as tools
+## Agents as tools {#agents-as-tools}
 
 在某些工作流中，你可能希望由一个中央智能体编排由多个专业智能体组成的网络，而不是转移控制权。你可以通过将智能体建模为工具来实现这一点。
 
@@ -655,7 +655,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### 工具智能体自定义
+### 工具智能体自定义 {#customizing-tool-agents}
 
 `agent.as_tool` 是一种将智能体转换为工具的便捷方法。它支持常见的运行时选项，例如 `max_turns`、`run_config`、`hooks`、`previous_response_id`、`conversation_id`、`session` 和 `needs_approval`。它还通过 `parameters`、`input_builder` 和 `include_input_schema` 支持结构化输入。
 
@@ -681,7 +681,7 @@ async def run_my_agent() -> str:
     return str(result.final_output)
 ```
 
-### 工具智能体的结构化输入
+### 工具智能体的结构化输入 {#structured-input-for-tool-agents}
 
 默认情况下，`Agent.as_tool()` 预期接收一个包含单个字符串字段 `input`（`{"input": "..."}`）的对象，但你可以通过传入 `parameters`（Pydantic 模型类型或 dataclass 类型）公开结构化架构。
 
@@ -711,11 +711,11 @@ translator_tool = translator_agent.as_tool(
 
 有关完整的可运行代码示例，请参阅 `examples/agent_patterns/agents_as_tools_structured.py`。
 
-### 工具智能体的审批门控
+### 工具智能体的审批门控 {#approval-gates-for-tool-agents}
 
 `Agent.as_tool(..., needs_approval=...)` 使用与 `function_tool` 相同的审批流程。如果需要审批，运行会暂停，待处理项目将出现在 `result.interruptions` 中；随后使用 `result.to_state()`，并在调用 `state.approve(...)` 或 `state.reject(...)` 后恢复运行。有关完整的暂停/恢复模式，请参阅[人在回路指南](human_in_the_loop.md)。
 
-### 自定义输出提取
+### 自定义输出提取 {#custom-output-extraction}
 
 在某些情况下，你可能希望先修改工具智能体的输出，再将其返回给中央智能体。这在以下场景中可能很有用：
 
@@ -744,7 +744,7 @@ json_tool = data_agent.as_tool(
 
 在自定义提取器中，嵌套的 [`RunResult`][agents.result.RunResult] 还会公开 [`agent_tool_invocation`][agents.result.RunResultBase.agent_tool_invocation]。当你需要在后处理嵌套结果时获取外层工具名称、调用 ID 或原始参数，这会很有用。请参阅[结果指南](results.md#agent-as-tool-metadata)。
 
-### 嵌套智能体运行的流式传输
+### 嵌套智能体运行的流式传输 {#streaming-nested-agent-runs}
 
 将 `on_stream` 回调传给 `as_tool`，即可监听嵌套智能体发出的流式事件，同时仍会在流完成后返回其最终输出。
 
@@ -772,7 +772,7 @@ billing_agent_tool = billing_agent.as_tool(
 - 通过模型工具调用来调用该工具时，`tool_call` 会存在；直接调用时，其值可能为 `None`。
 - 有关完整的可运行代码示例，请参阅 `examples/agent_patterns/agents_as_tools_streaming.py`。
 
-### 条件式工具启用
+### 条件式工具启用 {#conditional-tool-enabling}
 
 你可以使用 `is_enabled` 参数，在运行时有条件地启用或禁用智能体工具。这样便可根据上下文、用户偏好或运行时条件，动态筛选对 LLM 可用的工具。
 
@@ -842,7 +842,7 @@ asyncio.run(main())
 -   对不同工具配置进行 A/B 测试
 -   根据运行时状态动态筛选工具
 
-## 实验性 Codex 工具
+## 实验性 Codex 工具 {#experimental-codex-tool}
 
 `codex_tool` 封装了 Codex CLI，使智能体可以在工具调用期间运行限定于工作区的任务（shell、文件编辑、MCP 工具）。此功能目前处于实验阶段，可能会发生变化。
 

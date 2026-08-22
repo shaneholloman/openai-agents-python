@@ -12,7 +12,7 @@ search:
 
 这些基础组件与 Python 结合使用时，足以表达工具与智能体之间的复杂关系，让您无需经历陡峭的学习曲线即可构建实际应用。此外，SDK 还内置了**追踪**功能，让您能够可视化和调试智能体流程、对其进行评估，甚至针对您的应用微调模型。
 
-## Agents SDK 的使用理由
+## Agents SDK 的使用理由 {#why-use-the-agents-sdk}
 
 SDK 遵循两项核心设计原则：
 
@@ -34,7 +34,7 @@ SDK 遵循两项核心设计原则：
 -   **人在回路中**：用于在智能体运行期间引入人工参与的内置机制。
 -   **追踪**：用于可视化、调试和监控工作流的内置追踪功能，并支持 OpenAI 的评估、微调和蒸馏工具套件。
 
-## Agents SDK 与 Responses API 的选择
+## Agents SDK 与 Responses API 的选择 {#agents-sdk-or-responses-api}
 
 对于 OpenAI 模型，SDK 默认使用 Responses API，但它会将模型调用封装在更高层级的运行时中。
 
@@ -51,13 +51,13 @@ SDK 遵循两项核心设计原则：
 
 您无需在整个应用中只选择一种方式。许多应用会使用 SDK 管理工作流，同时针对较低层级的执行路径直接调用 Responses API。
 
-## 安装
+## 安装 {#installation}
 
 ```bash
 pip install openai-agents
 ```
 
-## Hello world 示例
+## Hello world 示例 {#hello-world-example}
 
 ```python
 from agents import Agent, Runner
@@ -78,14 +78,14 @@ print(result.final_output)
 export OPENAI_API_KEY=sk-...
 ```
 
-## 入门
+## 入门 {#start-here}
 
 -   通过[快速入门](quickstart.md)构建您的第一个文本智能体。
 -   然后在[运行智能体](running_agents.md#choose-a-memory-strategy)中决定如何跨轮次传递状态。
 -   如果任务依赖真实文件、仓库或每个智能体独立的隔离工作区状态，请阅读[沙箱智能体快速入门](sandbox_agents.md)。
 -   如果您正在任务转移与管理器式编排之间进行选择，请阅读[智能体编排](multi_agent.md)。
 
-## 路径选择
+## 路径选择 {#choose-your-path}
 
 当您明确想完成的工作，但不确定应该参阅哪个页面时，请使用此表。
 

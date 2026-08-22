@@ -8,7 +8,7 @@ search:
 
 任务转移以工具的形式呈现给LLM。因此，如果任务转移的目标是名为 `Refund Agent` 的智能体，则该工具将命名为 `transfer_to_refund_agent`。
 
-## 任务转移的创建
+## 任务转移的创建 {#creating-a-handoff}
 
 所有智能体都有一个 [`handoffs`][agents.agent.Agent.handoffs] 参数，该参数既可以直接接收 `Agent`，也可以接收用于自定义任务转移的 `Handoff` 对象。
 
@@ -16,7 +16,7 @@ search:
 
 你可以使用 Agents SDK 提供的 [`handoff()`][agents.handoffs.handoff] 函数创建任务转移。此函数允许你指定任务要转移到的智能体，以及可选的覆盖项和输入过滤器。
 
-### 基本用法
+### 基本用法 {#basic-usage}
 
 以下是创建简单任务转移的方法：
 
@@ -32,7 +32,7 @@ triage_agent = Agent(name="Triage agent", handoffs=[billing_agent, handoff(refun
 
 1. 你可以直接使用智能体（如 `billing_agent`），也可以使用 `handoff()` 函数。
 
-### 通过 `handoff()` 函数自定义任务转移
+### 通过 `handoff()` 函数自定义任务转移 {#customizing-handoffs-via-the-handoff-function}
 
 [`handoff()`][agents.handoffs.handoff] 函数支持自定义以下内容。
 
@@ -63,7 +63,7 @@ handoff_obj = handoff(
 )
 ```
 
-## 任务转移输入
+## 任务转移输入 {#handoff-inputs}
 
 在某些情况下，你希望LLM在调用任务转移时提供一些数据。例如，假设要将任务转移给“升级处理智能体”。你可能希望模型提供原因，以便记录日志。
 
@@ -93,7 +93,7 @@ handoff_obj = handoff(
 
 `input_type` 也独立于 [`RunContextWrapper.context`][agents.run_context.RunContextWrapper.context]。`input_type` 应用于模型在任务转移时决定的元数据，而不是你已在本地拥有的应用状态或依赖项。
 
-### `input_type` 的适用场景
+### `input_type` 的适用场景 {#when-to-use-input_type}
 
 当任务转移需要少量由模型生成的元数据（例如 `reason`、`language`、`priority` 或 `summary`）时，请使用 `input_type`。例如，分流智能体可以通过 `{ "reason": "duplicate_charge", "priority": "high" }` 将任务转移给退款智能体，而 `on_handoff` 可以在退款智能体接管之前记录或持久化该元数据。
 
@@ -104,7 +104,7 @@ handoff_obj = handoff(
 -   如果存在多个可能的专业智能体，请为每个目标注册一个任务转移。`input_type` 可以向所选任务转移添加元数据，但不会在不同目标之间进行分派。
 -   如果希望在不转移对话的情况下为嵌套的专业智能体提供结构化输入，建议使用 [`Agent.as_tool(parameters=...)`][agents.agent.Agent.as_tool]。请参阅[工具](tools.md#structured-input-for-tool-agents)。
 
-## 输入过滤器
+## 输入过滤器 {#input-filters}
 
 发生任务转移时，就像新智能体接管了对话，并且可以查看此前的完整对话历史记录。如果要更改这一行为，可以设置 [`input_filter`][agents.handoffs.Handoff.input_filter]。输入过滤器是一个函数，它通过 [`HandoffInputData`][agents.handoffs.HandoffInputData] 接收现有输入，并且必须返回新的 `HandoffInputData`。
 
@@ -140,7 +140,7 @@ handoff_obj = handoff(
 
 1. 调用 `FAQ agent` 时，这会自动从历史记录中移除所有与工具相关的项目。
 
-## 推荐提示词
+## 推荐提示词 {#recommended-prompts}
 
 为确保LLM正确理解任务转移，我们建议在智能体中加入有关任务转移的信息。我们在 [`agents.extensions.handoff_prompt.RECOMMENDED_PROMPT_PREFIX`][] 中提供了建议的前缀，你也可以调用 [`agents.extensions.handoff_prompt.prompt_with_handoff_instructions`][]，自动将建议的数据添加到提示词中。
 

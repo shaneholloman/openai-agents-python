@@ -10,7 +10,7 @@ search:
 
     サンドボックスエージェントはベータ版です。一般提供までに API の詳細、デフォルト、サポートされる機能が変更される可能性があります。また、今後さらに高度な機能が追加される予定です。
 
-## 選択ガイド
+## 選択ガイド {#decision-guide}
 
 <div class="sandbox-nowrap-first-column-table" markdown="1">
 
@@ -22,7 +22,7 @@ search:
 
 </div>
 
-## ローカルクライアント
+## ローカルクライアント {#local-clients}
 
 ほとんどのユーザーには、次の 2 つのサンドボックスクライアントのいずれかを推奨します。
 
@@ -58,7 +58,7 @@ run_config = RunConfig(
 
 コンテナ分離が必要な場合、またはサンドボックスイメージを別の環境で使用されるイメージと一致させる場合に使用します。[examples/sandbox/docker/docker_runner.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/docker/docker_runner.py) を参照してください。
 
-### Docker ネットワークの無効化
+### Docker ネットワークの無効化 {#disable-docker-networking}
 
 Docker サンドボックスからネットワークにアクセスできないようにする必要がある場合は、`network_mode="none"` を設定します。
 
@@ -71,7 +71,7 @@ options = DockerSandboxClientOptions(
 
 明示的にサポートされるネットワークモードは `"none"` のみです。Docker のデフォルト動作を維持するには、`network_mode` を省略してください。ネットワークを無効化したサンドボックスはポートを公開できないため、`network_mode="none"` と空ではない `exposed_ports` タプルを組み合わせると、オプションの検証時に失敗します。この設定はサンドボックスのセッション状態に保存され、その状態を再開する際に SDK が代替コンテナを作成する必要がある場合にも再適用されます。
 
-## マウントとリモートストレージ
+## マウントとリモートストレージ {#mounts-and-remote-storage}
 
 マウントエントリでは公開するストレージを記述し、マウント戦略ではサンドボックスバックエンドがそのストレージを接続する方法を記述します。組み込みのマウントエントリと汎用戦略は `agents.sandbox.entries` からインポートします。ホステッドプロバイダー向けの戦略は、`agents.extensions.sandbox` またはプロバイダー固有の拡張パッケージから利用できます。
 
@@ -97,7 +97,7 @@ options = DockerSandboxClientOptions(
 
 </div>
 
-## 対応ホステッドプラットフォーム
+## 対応ホステッドプラットフォーム {#supported-hosted-platforms}
 
 ホステッド環境が必要な場合、通常は同じ `SandboxAgent` 定義を引き継ぎ、[`SandboxRunConfig`][agents.run_config.SandboxRunConfig] のサンドボックスクライアントのみを変更します。
 
@@ -119,7 +119,7 @@ options = DockerSandboxClientOptions(
 
 </div>
 
-### Modal サンドボックスのリソースサイズ
+### Modal サンドボックスのリソースサイズ {#size-modal-sandboxes}
 
 新しい Modal サンドボックスのリソースを要求するには、`ModalSandboxClientOptions.cpu` と `ModalSandboxClientOptions.memory` を使用します。単一の値では、その量を要求します。2 項目の `(request, limit)` タプルでは、最初の項目を要求値、2 番目の項目を上限値として使用します。メモリ値の単位は MiB です。
 

@@ -32,7 +32,7 @@ graph LR
 
 ```
 
-## パイプラインの設定
+## パイプラインの設定 {#configuring-a-pipeline}
 
 パイプラインを作成するとき、次の項目を設定できます。
 
@@ -43,14 +43,14 @@ graph LR
     - トレーシングを無効にするかどうか、音声ファイルをアップロードするかどうか、ワークフロー名、トレース ID などのトレーシング設定
     - プロンプト、言語、使用するデータ型など、TTS モデルと STT モデルの設定
 
-## パイプラインの実行
+## パイプラインの実行 {#running-a-pipeline}
 
 [`run()`][agents.voice.pipeline.VoicePipeline.run] メソッドを使用してパイプラインを実行できます。このメソッドには、次の 2 つの形式で音声入力を渡せます。
 
 1. [`AudioInput`][agents.voice.input.AudioInput] は、完全な音声入力があり、その結果を生成するだけの場合に使用します。これは、話者が話し終えたタイミングを検出する必要がない場合に便利です。たとえば、事前に録音された音声がある場合や、ユーザーが話し終えたタイミングが明確なプッシュ・トゥ・トークアプリの場合です。
 2. [`StreamedAudioInput`][agents.voice.input.StreamedAudioInput] は、ユーザーが話し終えたタイミングを検出する必要がある場合に使用します。検出された音声チャンクを順次プッシュでき、音声パイプラインは「アクティビティ検出」と呼ばれる処理を通じて、適切なタイミングでエージェントのワークフローを自動的に実行します。
 
-## 結果
+## 結果 {#results}
 
 音声パイプラインの実行結果は [`StreamedAudioResult`][agents.voice.result.StreamedAudioResult] です。これは、イベントの発生に応じてストリーミングできるオブジェクトです。[`VoiceStreamEvent`][agents.voice.events.VoiceStreamEvent] には、次のようないくつかの種類があります。
 
@@ -76,8 +76,8 @@ async for event in result.stream():
         pass
 ```
 
-## ベストプラクティス
+## ベストプラクティス {#best-practices}
 
-### 割り込み
+### 割り込み {#interruptions}
 
 現在、Agents SDK は [`StreamedAudioInput`][agents.voice.input.StreamedAudioInput] に対する組み込みの割り込み処理を提供していません。代わりに、検出されたターンごとにワークフローが個別に実行されます。アプリケーション内で割り込みを処理する場合は、[`VoiceStreamEventLifecycle`][agents.voice.events.VoiceStreamEventLifecycle] イベントをリッスンできます。`turn_started` は、新しいターンが文字起こしされ、処理が開始されたことを示します。`turn_ended` は、該当するターンのすべての音声が送信された後にトリガーされます。これらのイベントを使用して、モデルがターンを開始したときに話者のマイクをミュートし、アプリケーションがそのターンに関連するすべての音声の再生を終えた後にミュートを解除できます。

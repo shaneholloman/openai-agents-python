@@ -25,9 +25,9 @@ async def main():
 
 有关更多信息，请阅读[结果指南](results.md)。
 
-## Runner 生命周期与配置
+## Runner 生命周期与配置 {#runner-lifecycle-and-configuration}
 
-### 智能体循环
+### 智能体循环 {#the-agent-loop}
 
 调用上述三个 `Runner` 方法中的任何一个时，需要传入起始智能体和输入。输入可以是：
 
@@ -48,11 +48,11 @@ async def main():
 
     判断 LLM 输出是否被视为“最终输出”的规则是：它生成了所需类型的文本输出，并且不存在工具调用。
 
-### 流式传输
+### 流式传输 {#streaming}
 
 流式传输让你能够在 LLM 运行时额外接收流式事件。流结束后，[`RunResultStreaming`][agents.result.RunResultStreaming] 将包含有关此次运行的完整信息，包括生成的所有新输出。你可以调用 `.stream_events()` 获取流式事件。有关更多信息，请阅读[流式传输指南](streaming.md)。
 
-#### Responses WebSocket 传输（可选辅助工具）
+#### Responses WebSocket 传输（可选辅助工具） {#responses-websocket-transport-optional-helper}
 
 如果启用 OpenAI Responses websocket 传输，你仍可继续使用常规的 `Runner` API。建议使用 websocket 会话辅助工具来复用连接，但这并非必需。
 
@@ -60,7 +60,7 @@ async def main():
 
 有关传输方式选择规则，以及具体模型对象或自定义提供商的注意事项，请参阅[模型](models/index.md#responses-websocket-transport)。
 
-##### 模式 1：不使用会话辅助工具（可行）
+##### 模式 1：不使用会话辅助工具（可行） {#pattern-1-no-session-helper-works}
 
 如果你只需要 websocket 传输，而不需要 SDK 为你管理共享的提供商/会话，请使用此模式。
 
@@ -87,7 +87,7 @@ asyncio.run(main())
 
 此模式适用于单次运行。如果反复调用 `Runner.run()` / `Runner.run_streamed()`，除非手动复用同一个 `RunConfig` / 提供商实例，否则每次运行都可能重新连接。
 
-##### 模式 2：使用 `responses_websocket_session()`（建议用于多轮复用）
+##### 模式 2：使用 `responses_websocket_session()`（建议用于多轮复用） {#pattern-2-use-responses_websocket_session-recommended-for-multi-turn-reuse}
 
 如果希望在多次运行中共享支持 websocket 的提供商和 `RunConfig`（包括继承相同 `run_config` 的嵌套 Agents-as-tools 调用），请使用 [`responses_websocket_session()`][agents.responses_websocket_session]。
 
@@ -125,15 +125,15 @@ asyncio.run(main())
 
 如果长时间推理轮次触发 websocket keepalive 超时，请增大 `ping_timeout`，或设置 `ping_timeout=None` 以禁用心跳超时。对于可靠性比 websocket 延迟更重要的运行，请使用 HTTP/SSE 传输。
 
-### 运行配置
+### 运行配置 {#run-config}
 
 通过 `run_config` 参数可以配置智能体运行的一些全局设置：
 
-#### 常见运行配置类别
+#### 常见运行配置类别 {#common-run-config-categories}
 
 使用 `RunConfig` 可覆盖单次运行的行为，而无须更改各个智能体定义。
 
-##### 模型、提供商与会话默认设置
+##### 模型、提供商与会话默认设置 {#model-provider-and-session-defaults}
 
 -   [`model`][agents.run.RunConfig.model]：用于设置要使用的全局 LLM 模型，而不考虑每个智能体具有的 `model`。
 -   [`model_provider`][agents.run.RunConfig.model_provider]：用于查找模型名称的模型提供商，默认为 OpenAI。
@@ -141,7 +141,7 @@ asyncio.run(main())
 -   [`session_settings`][agents.run.RunConfig.session_settings]：在运行期间检索历史记录时，覆盖会话级默认设置（例如 `SessionSettings(limit=...)`）。
 -   [`session_input_callback`][agents.run.RunConfig.session_input_callback]：使用 Sessions 时，自定义每次运行 `Runner` 之前将新用户输入与会话历史记录合并的方式。回调可以是同步或异步的。
 
-##### 安全防护措施、任务转移与模型输入调整
+##### 安全防护措施、任务转移与模型输入调整 {#guardrails-handoffs-and-model-input-shaping}
 
 -   [`input_guardrails`][agents.run.RunConfig.input_guardrails]、[`output_guardrails`][agents.run.RunConfig.output_guardrails]：要在所有运行中包含的输入或输出安全防护措施列表。
 -   [`handoff_input_filter`][agents.run.RunConfig.handoff_input_filter]：如果任务转移尚未配置输入过滤器，则应用于所有任务转移的全局输入过滤器。输入过滤器允许编辑发送给新智能体的输入。有关更多详细信息，请参阅 [`Handoff.input_filter`][agents.handoffs.Handoff.input_filter] 的文档。
@@ -150,7 +150,7 @@ asyncio.run(main())
 -   [`call_model_input_filter`][agents.run.RunConfig.call_model_input_filter]：在调用模型前一刻编辑已完全准备好的模型输入（instructions 和输入项）的钩子，例如用于裁剪历史记录或注入系统提示词。
 -   [`reasoning_item_id_policy`][agents.run.RunConfig.reasoning_item_id_policy]：控制 Runner 将先前输出转换为下一轮模型输入时，是保留还是省略推理项 ID。
 
-##### 追踪与可观测性
+##### 追踪与可观测性 {#tracing-and-observability}
 
 -   [`tracing_disabled`][agents.run.RunConfig.tracing_disabled]：用于为整个运行禁用[追踪](tracing.md)。
 -   [`tracing`][agents.run.RunConfig.tracing]：传入 [`TracingConfig`][agents.tracing.TracingConfig]，可覆盖追踪导出设置，例如每次运行使用的追踪 API 密钥。
@@ -158,7 +158,7 @@ asyncio.run(main())
 -   [`workflow_name`][agents.run.RunConfig.workflow_name]、[`trace_id`][agents.run.RunConfig.trace_id]、[`group_id`][agents.run.RunConfig.group_id]：设置此次运行的追踪工作流名称、追踪 ID 和追踪组 ID。我们建议至少设置 `workflow_name`。组 ID 是一个可选字段，可用于关联多次运行的追踪记录。
 -   [`trace_metadata`][agents.run.RunConfig.trace_metadata]：要包含在所有追踪记录中的元数据。
 
-##### 工具执行、审批与工具错误行为
+##### 工具执行、审批与工具错误行为 {#tool-execution-approval-and-tool-error-behavior}
 
 -   [`tool_execution`][agents.run.RunConfig.tool_execution]：配置 SDK 侧针对本地工具调用的执行行为，例如限制同时运行的本地函数工具调用数量。
 -   [`tool_not_found_behavior`][agents.run.RunConfig.tool_not_found_behavior]：配置当模型发出的函数工具调用名称与当前智能体可用的任何函数工具都不匹配时，Runner 应如何处理。默认行为是引发 `ModelBehaviorError`；也可以选择改为返回模型可见的错误输出。
@@ -167,9 +167,9 @@ asyncio.run(main())
 
 嵌套任务转移是一项需选择启用的 Beta 功能。传入 `RunConfig(nest_handoff_history=True)` 可启用有序记录压缩，或者设置 `handoff(..., nest_handoff_history=True)` 为特定任务转移启用此功能。内置映射器会将生成的助手摘要片段放置在无损消息项周围，而不是将整个记录压缩成一条消息。如果希望保留原始记录（默认行为），请不要设置此标志，或者提供按所需方式原样转发对话的 `handoff_input_filter`（或 `handoff_history_mapper`）。如果希望更改生成的摘要片段中使用的包装文本，而不编写自定义映射器，请调用 [`set_conversation_history_wrappers`][agents.handoffs.set_conversation_history_wrappers]（调用 [`reset_conversation_history_wrappers`][agents.handoffs.reset_conversation_history_wrappers] 可恢复默认值）。
 
-#### 运行配置详情
+#### 运行配置详情 {#run-config-details}
 
-##### `tool_execution`
+##### `tool_execution` {#tool_execution}
 
 如果希望配置 SDK 侧针对本地函数工具的行为，例如限制一次运行中的本地函数工具并发数，请使用 `tool_execution`。
 
@@ -196,7 +196,7 @@ result = await Runner.run(
 
 `pre_approval_tool_input_guardrails=False` 会保留默认审批流程：如果函数工具需要审批，运行会先暂停，而工具输入安全防护措施只会在审批后、即将执行前运行。如果希望在发出待审批中断之前运行函数工具输入安全防护措施，请将其设置为 `True`。通过此审批前检查的调用仍会在审批后再次运行相同的输入安全防护措施，因此会在执行前重新验证时效性检查。
 
-##### `tool_not_found_behavior`
+##### `tool_not_found_behavior` {#tool_not_found_behavior}
 
 默认情况下，如果模型发出的函数工具调用与当前智能体可用的任何函数工具都不匹配，Runner 会引发 `ModelBehaviorError`。
 
@@ -216,7 +216,7 @@ result = await Runner.run(
 
 此选项目前仅适用于工具名称查找失败的函数工具调用。其他无效工具载荷会继续使用其现有的错误处理行为。
 
-##### `tool_error_formatter`
+##### `tool_error_formatter` {#tool_error_formatter}
 
 使用 `tool_error_formatter` 可自定义 SDK 创建模型可见的工具错误输出时返回给模型的消息。
 
@@ -254,7 +254,7 @@ result = Runner.run_sync(
 )
 ```
 
-##### `reasoning_item_id_policy`
+##### `reasoning_item_id_policy` {#reasoning_item_id_policy}
 
 当 Runner 继续携带历史记录时（例如使用 `RunResult.to_input_list()` 或基于会话的运行时），`reasoning_item_id_policy` 控制如何将推理项转换为下一轮模型输入。
 
@@ -273,9 +273,9 @@ result = Runner.run_sync(
 -   它不会重写用户提供的初始输入项。
 -   应用此策略后，`call_model_input_filter` 仍可有意重新引入推理 ID。
 
-## 状态与对话管理
+## 状态与对话管理 {#state-and-conversation-management}
 
-### 内存策略选择
+### 内存策略选择 {#choose-a-memory-strategy}
 
 将状态带入下一轮通常有四种方式：
 
@@ -294,7 +294,7 @@ result = Runner.run_sync(
     （`conversation_id`、`previous_response_id` 或 `auto_previous_response_id`）
     组合使用。每次调用请选择一种方式。
 
-### 对话/聊天线程
+### 对话/聊天线程 {#conversationschat-threads}
 
 调用任何运行方法都可能导致一个或多个智能体运行（因而产生一次或多次 LLM 调用），但这代表聊天对话中的单个逻辑轮次。例如：
 
@@ -303,7 +303,7 @@ result = Runner.run_sync(
 
 智能体运行结束时，你可以选择向用户显示哪些内容。例如，可以向用户显示智能体生成的每个新项目，也可以只显示最终输出。无论哪种方式，用户随后都可能提出后续问题，此时可以再次调用运行方法。
 
-#### 手动对话管理
+#### 手动对话管理 {#manual-conversation-management}
 
 你可以使用 [`RunResultBase.to_input_list()`][agents.result.RunResultBase.to_input_list] 方法获取下一轮的输入，从而手动管理对话历史记录：
 
@@ -327,7 +327,7 @@ async def main():
         # California
 ```
 
-#### 使用 Sessions 自动管理对话
+#### 使用 Sessions 自动管理对话 {#automatic-conversation-management-with-sessions}
 
 如需更简单的方法，可以使用 [Sessions](sessions/index.md) 自动处理对话历史记录，而无须手动调用 `.to_input_list()`：
 
@@ -362,13 +362,13 @@ Sessions 会自动：
 有关更多详细信息，请参阅 [Sessions 文档](sessions/index.md)。
 
 
-#### 服务器管理的对话
+#### 服务器管理的对话 {#server-managed-conversations}
 
 你也可以让 OpenAI 的对话状态功能在服务器端管理对话状态，而不是通过 `to_input_list()` 或 `Sessions` 在本地处理。这样便可保留对话历史记录，而无须手动重新发送所有过去的消息。使用下述任一服务器管理方式时，每次请求只需传入新轮次的输入，并复用已保存的 ID。有关更多详细信息，请参阅 [OpenAI 对话状态指南](https://platform.openai.com/docs/guides/conversation-state?api-mode=responses)。
 
 OpenAI 提供两种跨轮次跟踪状态的方式：
 
-##### 1. 使用 `conversation_id`
+##### 1. 使用 `conversation_id` {#1-using-conversation_id}
 
 首先使用 OpenAI Conversations API 创建对话，然后在之后的每次调用中复用其 ID：
 
@@ -391,7 +391,7 @@ async def main():
         print(f"Assistant: {result.final_output}")
 ```
 
-##### 2. 使用 `previous_response_id`
+##### 2. 使用 `previous_response_id` {#2-using-previous_response_id}
 
 另一个选项是**响应链式衔接**，其中每个轮次都显式链接到上一轮的响应 ID。
 
@@ -435,9 +435,9 @@ async def main():
     即使未配置 `ModelSettings.retry`，也会进行这种兼容性重试。有关针对
     模型请求的更广泛选择启用式重试行为，请参阅 [Runner 管理的重试](models/index.md#runner-managed-retries)。
 
-## 钩子与自定义
+## 钩子与自定义 {#hooks-and-customization}
 
-### 模型调用输入过滤器
+### 模型调用输入过滤器 {#call-model-input-filter}
 
 使用 `call_model_input_filter` 可在模型调用前一刻编辑模型输入。该钩子接收当前智能体、上下文和合并后的输入项（如有会话历史记录，也包括在内），并返回新的 `ModelInputData`。
 
@@ -468,9 +468,9 @@ Runner 会将准备好的输入列表副本传递给钩子，因此你可以裁�
 
 通过 `run_config` 为每次运行设置该钩子，可用于隐去敏感数据、裁剪过长的历史记录或注入额外的系统指导。
 
-## 错误与恢复
+## 错误与恢复 {#errors-and-recovery}
 
-### 错误处理程序
+### 错误处理程序 {#error-handlers}
 
 所有 `Runner` 入口点都接受 `error_handlers`，这是一个以错误种类为键的字典。支持的键包括 `"max_turns"`、`"model_refusal"` 和 `"invalid_final_output"`。如果希望返回受控的最终输出，而不是以相应错误结束运行，请使用这些键。
 
@@ -567,27 +567,27 @@ result = Runner.run_sync(
 print(result.final_output)
 ```
 
-## 持久执行集成与人在回路
+## 持久执行集成与人在回路 {#durable-execution-integrations-and-human-in-the-loop}
 
 有关工具审批的暂停/恢复模式，请首先阅读专门的[人在回路指南](human_in_the_loop.md)。以下集成适用于运行可能经历长时间等待、重试或进程重启的持久编排。
 
-### Dapr
+### Dapr {#dapr}
 
 你可以使用 Agents SDK 的 [Dapr](https://dapr.io) Diagrid 集成来运行持久、长期运行的智能体，这些智能体可自动从故障中恢复并支持人在回路工作流。Dapr 是一个厂商中立的 [CNCF](https://cncf.io) 工作流编排器。可从[此处](https://docs.diagrid.io/getting-started/quickstarts/ai-agents/?agentframework=openai)开始使用 Dapr 和 OpenAI 智能体。
 
-### Temporal
+### Temporal {#temporal}
 
 你可以使用 Agents SDK 的 [Temporal](https://temporal.io/) 集成来运行持久、长期运行的工作流，包括人在回路任务。可在[此视频](https://www.youtube.com/watch?v=fFBZqzT4DD8)中观看 Temporal 与 Agents SDK 协同完成长期任务的实际演示，并在[此处查看文档](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents)。 
 
-### Restate
+### Restate {#restate}
 
 你可以使用 Agents SDK 的 [Restate](https://restate.dev/) 集成来运行轻量级、持久的智能体，包括人工审批、任务转移和会话管理。该集成依赖 Restate 的单二进制运行时，并支持将智能体作为进程/容器或无服务器函数运行。有关更多详细信息，请阅读[概述](https://www.restate.dev/blog/durable-orchestration-for-ai-agents-with-restate-and-openai-sdk)或查看[文档](https://docs.restate.dev/ai)。
 
-### DBOS
+### DBOS {#dbos}
 
 你可以使用 Agents SDK 的 [DBOS](https://dbos.dev/) 集成来运行可靠的智能体，并在故障和重启期间保留进度。它支持长期运行的智能体、人在回路工作流和任务转移，也支持同步和异步方法。该集成只需要 SQLite 或 Postgres 数据库。有关更多详细信息，请查看集成[代码仓库](https://github.com/dbos-inc/dbos-openai-agents)和[文档](https://docs.dbos.dev/integrations/openai-agents)。
 
-## 异常
+## 异常 {#exceptions}
 
 SDK 会在特定情况下引发异常。完整列表位于 [`agents.exceptions`][]。概览如下：
 

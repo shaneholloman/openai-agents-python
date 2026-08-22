@@ -12,13 +12,13 @@ search:
 
 SDK 提供了这套执行框架，无需你自行整合文件暂存、文件系统工具、Shell 访问、沙箱生命周期、快照以及特定于提供商的适配逻辑。你可以继续使用常规的 `Agent` 和 `Runner` 流程，然后添加用于工作区的 `Manifest`、沙箱原生工具所需的能力，以及用于指定工作运行位置的 `SandboxRunConfig`。
 
-## 前置条件
+## 前置条件 {#prerequisites}
 
 - Python 3.10 或更高版本
 - 基本熟悉 OpenAI Agents SDK
 - 一个沙箱客户端。进行本地开发时，可从 `UnixLocalSandboxClient` 开始。
 
-## 安装
+## 安装 {#installation}
 
 如果尚未安装 SDK：
 
@@ -32,7 +32,7 @@ pip install openai-agents
 pip install "openai-agents[docker]"
 ```
 
-## 本地沙箱智能体的创建
+## 本地沙箱智能体的创建 {#create-a-local-sandbox-agent}
 
 此代码示例将本地仓库存放到 `repo/` 下，按需延迟加载本地技能，并让运行器为本次运行创建 Unix 本地沙箱会话。
 
@@ -96,7 +96,7 @@ if __name__ == "__main__":
 
 请参阅 [examples/sandbox/docs/coding_task.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/docs/coding_task.py)。它使用一个基于 Shell 的微型仓库，因此可在不同的 Unix 本地运行中以确定性方式验证该代码示例。
 
-## 关键选项
+## 关键选项 {#key-choices}
 
 基本运行正常后，大多数人接下来会使用以下选项：
 
@@ -108,7 +108,7 @@ if __name__ == "__main__":
 - `SandboxRunConfig.client`：沙箱后端
 - `SandboxRunConfig.session`、`session_state` 或 `snapshot`：后续运行重新连接到先前工作的方式
 
-## 后续步骤
+## 后续步骤 {#where-to-go-next}
 
 - [概念](sandbox/guide.md)：了解清单、能力、权限、快照、运行配置和组合模式。
 - [沙箱客户端](sandbox/clients.md)：选择 Unix 本地、Docker、托管提供商和挂载策略。

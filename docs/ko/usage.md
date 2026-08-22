@@ -6,7 +6,7 @@ search:
 
 Agents SDK는 모든 실행의 토큰 사용량을 자동으로 추적합니다. 실행 컨텍스트에서 사용량에 접근하여 비용을 모니터링하거나, 한도를 적용하거나, 분석 데이터를 기록할 수 있습니다.
 
-## 추적 항목
+## 추적 항목 {#what-is-tracked}
 
 - **requests**: 수행된 LLM API 호출 수
 - **input_tokens**: 전송된 총 입력 토큰 수
@@ -18,7 +18,7 @@ Agents SDK는 모든 실행의 토큰 사용량을 자동으로 추적합니다.
   - `input_tokens_details.cache_write_tokens`
   - `output_tokens_details.reasoning_tokens`
 
-## 실행에서 사용량 접근
+## 실행에서 사용량 접근 {#accessing-usage-from-a-run}
 
 `Runner.run(...)` 실행 후 `result.context_wrapper.usage`를 통해 사용량에 접근합니다.
 
@@ -36,7 +36,7 @@ print("Total tokens:", usage.total_tokens)
 
 [`OpenAIResponsesCompactionSession`][agents.memory.openai_responses_compaction_session.OpenAIResponsesCompactionSession]가 실행이 완료되기 전에 기록을 자동으로 압축하면 해당 `responses.compact` 요청에서 보고된 사용량도 같은 실행의 합계에 추가됩니다. 실행 외부에서 수동으로 수행한 `run_compaction()` 호출에는 이를 포함하는 실행 컨텍스트가 없으므로 이전 실행에서 반환된 사용량 객체를 업데이트하지 않습니다. [OpenAI Responses 압축 세션](sessions/index.md#openai-responses-compaction-sessions)을 참고하세요.
 
-### 서드 파티 어댑터의 사용량 활성화
+### 서드 파티 어댑터의 사용량 활성화 {#enabling-usage-with-third-party-adapters}
 
 사용량 보고 방식은 서드 파티 어댑터와 제공자 백엔드에 따라 다릅니다. 서드 파티 어댑터를 통해 모델에 접근하면서 정확한 `result.context_wrapper.usage` 값이 필요한 경우 다음 사항을 참고하세요.
 
@@ -45,7 +45,7 @@ print("Total tokens:", usage.total_tokens)
 
 Models 가이드의 [서드 파티 어댑터](models/index.md#third-party-adapters) 섹션에서 어댑터별 참고 사항을 확인하고, 배포하려는 제공자 백엔드에서 사용량이 정확하게 보고되는지 검증하세요.
 
-## 요청별 사용량 추적
+## 요청별 사용량 추적 {#per-request-usage-tracking}
 
 SDK는 각 API 요청의 사용량을 `request_usage_entries`에서 자동으로 추적합니다. 이는 상세한 비용 계산과 컨텍스트 창 사용량 모니터링에 유용합니다.
 
@@ -56,7 +56,7 @@ for i, request in enumerate(result.context_wrapper.usage.request_usage_entries):
     print(f"Request {i + 1}: {request.input_tokens} in, {request.output_tokens} out")
 ```
 
-## 제공자 사용량 페이로드 보존
+## 제공자 사용량 페이로드 보존 {#preserving-provider-usage-payloads}
 
 Agents SDK는 제공자 사용량을 여러 모델 제공자에서 일관된 합계를 제공하는 [`Usage`][agents.usage.Usage] 필드로 정규화합니다. 애플리케이션에서 제공자별 사용량 필드를 유지하거나 생략된 필드와 제공자가 보고한 0을 구분해야 하는 경우 [`ModelSettings.preserve_raw_usage`][agents.model_settings.ModelSettings.preserve_raw_usage]를 `True`으로 설정합니다.
 
@@ -79,7 +79,7 @@ Agents SDK는 각 [`ModelResponse.raw_usage`][agents.items.ModelResponse.raw_usa
 
 `LitellmModel`는 현재 스트리밍 및 비스트리밍 실행 모두에서 `ModelResponse.raw_usage`을 채우지 않으므로 `preserve_raw_usage=True`는 해당 어댑터에서 효과가 없습니다. `LitellmModel`을 사용할 때는 계속해서 정규화된 [`Usage`][agents.usage.Usage] 필드를 사용하거나, 제공자별 필드 존재 여부가 필요한 경우 raw 사용량 보존을 지원하는 어댑터를 선택하세요.
 
-## 세션에서 사용량 접근
+## 세션에서 사용량 접근 {#accessing-usage-with-sessions}
 
 `Session`(예: `SQLiteSession`)을 사용하는 경우 `Runner.run(...)`를 호출할 때마다 해당 실행의 사용량이 반환됩니다. 세션은 컨텍스트를 위해 대화 기록을 유지하지만 각 실행의 사용량은 독립적입니다.
 
@@ -95,7 +95,7 @@ print(second.context_wrapper.usage.total_tokens)  # Usage for second run
 
 세션은 실행 간 대화 컨텍스트를 보존하지만, 각 `Runner.run()` 호출에서 반환되는 사용량 지표는 해당 실행만 나타냅니다. 세션에서는 이전 메시지가 각 실행의 입력으로 다시 제공될 수 있으며, 이는 이후 턴의 입력 토큰 수에 영향을 줍니다.
 
-## RunState 체크포인트의 사용량
+## RunState 체크포인트의 사용량 {#usage-in-runstate-checkpoints}
 
 [`RunResult.to_state()`][agents.result.RunResult.to_state]는 그 시점까지 누적된 사용량의 독립적인 스냅샷을 캡처합니다. 해당 체크포인트에서 재개된 실행은 캡처된 합계로 시작하며 자체 모델 호출의 사용량을 추가합니다. 재개된 실행은 이러한 새 합계를 원래 `RunResult` 또는 해당 결과에서 생성된 다른 체크포인트에 추가하지 않습니다.
 
@@ -113,7 +113,7 @@ assert resumed_b.context_wrapper.usage is not resumed_a.context_wrapper.usage
 
 이러한 격리는 [`Usage`][agents.usage.Usage] 내부의 `request_usage_entries` 목록에도 적용됩니다. 재개된 중첩 [`Agent.as_tool()`][agents.agent.Agent.as_tool] 실행은 독립적인 최상위 사용량 집계의 예외입니다. 재개 후의 모델 사용량은 중첩 실행의 이전 모델 호출과 마찬가지로 활성 외부 실행의 사용량에 의도적으로 집계됩니다.
 
-## 훅에서 사용량 활용
+## 훅에서 사용량 활용 {#using-usage-in-hooks}
 
 `RunHooks`을 사용하는 경우 각 훅에 전달되는 `context` 객체에는 `usage`이 포함됩니다. 이를 통해 주요 수명 주기 시점에 사용량을 기록할 수 있습니다.
 
@@ -124,7 +124,7 @@ class MyHooks(RunHooks):
         print(f"{agent.name} → {u.requests} requests, {u.total_tokens} total tokens")
 ```
 
-## API 레퍼런스
+## API 레퍼런스 {#api-reference}
 
 자세한 API 문서는 다음을 참고하세요.
 

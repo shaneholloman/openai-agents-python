@@ -32,7 +32,7 @@ search:
 
 外側のランタイムは引き続き、承認、トレーシング、ハンドオフ、および実行の再開に必要な状態の追跡を担います。サンドボックスセッションは、コマンド、ファイル変更、環境の分離を担います。この分担は、モデルの中核となる部分です。
 
-### 各構成要素の関係
+### 各構成要素の関係 {#how-the-pieces-fit-together}
 
 サンドボックス実行では、エージェント定義と実行ごとのサンドボックス設定を組み合わせます。Runner はエージェントを準備して稼働中のサンドボックスセッションにバインドし、後続の実行に備えて状態を保存できます。
 
@@ -60,7 +60,7 @@ flowchart LR
 
 シェルアクセスが時折使用するツールの 1 つにすぎない場合は、[ツールガイド](../tools.md)のホスト型シェルから始めてください。ワークスペースの分離、サンドボックスクライアントの選択、またはサンドボックスセッションの再開動作が設計の一部である場合は、サンドボックスエージェントを使用してください。
 
-## 適したユースケース
+## 適したユースケース {#when-to-use-them}
 
 サンドボックスエージェントは、次のようなワークスペース中心のワークフローに適しています。
 
@@ -72,13 +72,13 @@ flowchart LR
 
 ファイルへのアクセスや、状態を保持する変更可能なファイルシステムが不要な場合は、引き続き `Agent` を使用してください。シェルアクセスが時折必要になる機能の 1 つにすぎない場合は、ホスト型シェルを追加します。ワークスペース境界自体が機能の一部である場合は、サンドボックスエージェントを使用します。
 
-## サンドボックスクライアントの選択
+## サンドボックスクライアントの選択 {#choose-a-sandbox-client}
 
 macOS または Linux でのローカル開発では、`UnixLocalSandboxClient` から始めてください。Windows では、`DockerSandboxClient` またはホスト型プロバイダーを使用します。サポートされているどのプラットフォームでも、コンテナ分離やイメージの同等性が必要な場合は `DockerSandboxClient` に移行し、プロバイダー管理の実行が必要な場合はホスト型プロバイダーに移行します。
 
 ほとんどの場合、[`SandboxRunConfig`][agents.run_config.SandboxRunConfig] でサンドボックスクライアントとそのオプションを変更しても、`SandboxAgent` の定義は同じままです。ローカル、Docker、ホスト型、およびリモートマウントのオプションについては、[サンドボックスクライアント](clients.md)を参照してください。
 
-## 中核となる構成要素
+## 中核となる構成要素 {#core-pieces}
 
 <div class="sandbox-nowrap-first-column-table" markdown="1">
 
@@ -113,7 +113,7 @@ macOS または Linux でのローカル開発では、`UnixLocalSandboxClient` 
 3. 組み込み機能またはカスタム機能を追加します。
 4. `RunConfig(sandbox=SandboxRunConfig(...))` で、各実行がサンドボックスセッションを取得する方法を決定します。
 
-## サンドボックス実行の準備
+## サンドボックス実行の準備 {#how-a-sandbox-run-is-prepared}
 
 実行時に、Runner はその定義を具体的なサンドボックス対応の実行に変換します。
 
@@ -127,7 +127,7 @@ macOS または Linux でのローカル開発では、`UnixLocalSandboxClient` 
 
 これらの準備ステップがあるため、`default_manifest`、`instructions`、`base_instructions`、`capabilities`、`run_as` は、`SandboxAgent` を設計するときに考慮すべき主なサンドボックス固有のオプションです。
 
-## `SandboxAgent` のオプション
+## `SandboxAgent` のオプション {#sandboxagent-options}
 
 通常の `Agent` フィールドに加えて、次のサンドボックス固有のオプションがあります。
 
@@ -145,13 +145,13 @@ macOS または Linux でのローカル開発では、`UnixLocalSandboxClient` 
 
 サンドボックスクライアントの選択、サンドボックスセッションの再利用、マニフェストのオーバーライド、スナップショットの選択は、エージェントではなく [`SandboxRunConfig`][agents.run_config.SandboxRunConfig] に指定します。
 
-### `default_manifest`
+### `default_manifest` {#default_manifest}
 
 `default_manifest` は、Runner がこのエージェント用に新しいサンドボックスセッションを作成するときに使用するデフォルトの [`Manifest`][agents.sandbox.manifest.Manifest] です。エージェントが通常開始時に必要とするファイル、リポジトリ、補助資料、出力ディレクトリ、マウントに使用します。
 
 これはデフォルトにすぎません。実行では `SandboxRunConfig(manifest=...)` を使用してオーバーライドでき、再利用または再開されたサンドボックスセッションでは既存のワークスペース状態が維持されます。
 
-### `instructions` と `base_instructions`
+### `instructions` と `base_instructions` {#instructions-and-base_instructions}
 
 異なるプロンプト間でも維持する必要がある短いルールには、`instructions` を使用します。`SandboxAgent` では、これらの instructions が SDK のサンドボックス基本プロンプトの後に追加されるため、組み込みのサンドボックスガイダンスを維持しながら、独自の役割、ワークフロー、成功基準を追加できます。
 
@@ -179,7 +179,7 @@ SDK のサンドボックス基本プロンプトを置き換えたい場合に�
 
 `instructions` を省略しても、SDK はデフォルトのサンドボックスプロンプトを含めます。低レベルのラッパーにはそれで十分ですが、ユーザー向けのほとんどのエージェントでは、明示的な `instructions` も指定する必要があります。
 
-### `capabilities`
+### `capabilities` {#capabilities}
 
 機能は、サンドボックスネイティブの動作を `SandboxAgent` に付加します。実行開始前にワークスペースを構成し、サンドボックス固有の instructions を追加し、稼働中のサンドボックスセッションにバインドされる tools を公開し、そのエージェントのモデル動作や入力処理を調整できます。
 
@@ -214,9 +214,9 @@ SDK のサンドボックス基本プロンプトを置き換えたい場合に�
 
 適合する場合は、組み込み機能を優先してください。組み込み機能では対応できないサンドボックス固有のツールまたは instructions のインターフェースが必要な場合にのみ、カスタム機能を作成します。
 
-## 概念
+## 概念 {#concepts_1}
 
-### マニフェスト
+### マニフェスト {#manifest}
 
 [`Manifest`][agents.sandbox.manifest.Manifest] は、新しいサンドボックスセッションのワークスペースを記述します。ワークスペースの `root` の設定、ファイルとディレクトリの宣言、ローカルファイルのコピー、Git リポジトリのクローン、リモートストレージマウントの接続、環境変数の設定、ユーザーやグループの定義、およびワークスペース外にある特定の絶対パスへのアクセス許可を行えます。
 
@@ -262,7 +262,7 @@ Docker で別のホスト上の絶対パスを、コンテナ内の絶対 POSIX 
 
 スナップショットと `persist_workspace()` に含まれるのは、引き続きワークスペースルートのみです。追加で許可されたパスは実行時アクセスであり、永続的なワークスペース状態ではありません。
 
-### 権限
+### 権限 {#permissions}
 
 `Permissions` は、マニフェストエントリのファイルシステム権限を制御します。これはサンドボックスがマテリアライズするファイルに関するものであり、モデルの権限、承認ポリシー、API 認証情報に関するものではありません。
 
@@ -338,7 +338,7 @@ result = await Runner.run(
 
 ファイルレベルの共有ルールも必要な場合は、ユーザーをマニフェストのグループおよびエントリの `group` メタデータと組み合わせます。`run_as` ユーザーは、サンドボックスネイティブのアクションを実行する主体を制御します。`Permissions` は、サンドボックスがワークスペースをマテリアライズした後、そのユーザーが読み取り、書き込み、実行できるファイルを制御します。
 
-### SnapshotSpec
+### SnapshotSpec {#snapshotspec}
 
 `SnapshotSpec` は、保存済みのワークスペース内容をどこから新しいサンドボックスセッションに復元し、どこへ永続化するかを指定します。これはサンドボックスワークスペースのスナップショットポリシーです。一方、`session_state` は、特定のサンドボックスバックエンドを再開するためのシリアライズされた接続状態です。
 
@@ -363,7 +363,7 @@ Runner が新しいサンドボックスセッションを作成すると、サ�
 
 `snapshot` を省略すると、ランタイムは可能な場合にデフォルトのローカルスナップショット保存先を使用しようとします。設定できない場合は、何もしないスナップショットにフォールバックします。マウントされたパスと一時パスは、永続的なワークスペース内容としてスナップショットにコピーされません。
 
-### サンドボックスのライフサイクル
+### サンドボックスのライフサイクル {#sandbox-lifecycle}
 
 ライフサイクルには、**SDK 所有**と**開発者所有**の 2 つのモードがあります。
 
@@ -439,11 +439,11 @@ finally:
 
 `stop()` は、スナップショットに基づくワークスペース内容を永続化するだけで、サンドボックスを終了しません。`aclose()` は完全なセッションクリーンアップ処理です。停止前フックを実行し、`stop()` を呼び出し、サンドボックスリソースを停止して、セッションスコープの依存関係を閉じます。
 
-## `SandboxRunConfig` のオプション
+## `SandboxRunConfig` のオプション {#sandboxrunconfig-options}
 
 [`SandboxRunConfig`][agents.run_config.SandboxRunConfig] は、サンドボックスセッションの取得元と、新しいセッションの初期化方法を決定する実行ごとのオプションを保持します。
 
-### サンドボックスの取得元
+### サンドボックスの取得元 {#sandbox-source}
 
 次のオプションは、Runner がサンドボックスセッションを再利用、再開、作成のどれで取得するかを決定します。
 
@@ -464,7 +464,7 @@ finally:
 3. それ以外で、`run_config.sandbox.session_state` を渡した場合は、その明示的にシリアライズされたサンドボックスセッション状態から再開します。
 4. それ以外の場合、Runner は新しいサンドボックスセッションを作成します。その新しいセッションでは、`run_config.sandbox.manifest` が指定されていればそれを使用し、指定されていなければ `agent.default_manifest` を使用します。
 
-### 新規セッションの入力
+### 新規セッションの入力 {#fresh-session-inputs}
 
 次のオプションは、Runner が新しいサンドボックスセッションを作成するときにのみ関係します。
 
@@ -478,7 +478,7 @@ finally:
 
 </div>
 
-### モデル向け作業ディレクトリ
+### モデル向け作業ディレクトリ {#model-facing-working-directory}
 
 複数の実行で 1 つのサンドボックスセッションを共有しながら別々のサブディレクトリで作業する場合は、`cwd` に POSIX 形式のワークスペース相対ディレクトリを設定します。Runner が `cwd` を検証するとき、そのディレクトリが存在し、設定されたサンドボックスユーザーからアクセスできる必要があります。新しいセッションでは、Runner が最初にマニフェストをマテリアライズするため、この検証前にマニフェストでディレクトリを作成できます。
 
@@ -503,7 +503,7 @@ result = await Runner.run(
 
 パスを扱うカスタム機能は、モデルが指定した相対パスを解決するときに、バインドされた [`SandboxWorkspaceScope`][agents.sandbox.workspace_paths.SandboxWorkspaceScope] を適用する必要があります。モデル向け作業ディレクトリを分離しながら 1 つのサンドボックスセッションを共有する 2 つの並行実行については、[examples/sandbox/shared_session_workdirs.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/shared_session_workdirs.py) を参照してください。
 
-### マテリアライズの制御
+### マテリアライズの制御 {#materialization-controls}
 
 `concurrency_limits` は、並列実行できるサンドボックスのマテリアライズ作業量を制御します。大規模なマニフェストやローカルディレクトリのコピーで、より厳密なリソース制御が必要な場合は、`SandboxConcurrencyLimits(manifest_entries=..., local_dir_files=...)` を使用します。いずれかの値を `None` に設定すると、その制限だけを無効にできます。
 
@@ -517,7 +517,7 @@ result = await Runner.run(
 - 注入された稼働中のセッション: 実行中のサンドボックス `session` を渡すと、機能によるマニフェスト更新で互換性のあるマウント以外のエントリを追加できます。ただし、`manifest.root`、`manifest.environment`、`manifest.users`、`manifest.groups` の変更、既存エントリの削除、エントリ型の置き換え、マウントエントリの追加や変更はできません。
 - Runner API: `SandboxAgent` の実行でも、通常の `Runner.run()`、`Runner.run_sync()`、`Runner.run_streamed()` API を使用します。
 
-## 完全なコード例: コーディングタスク
+## 完全なコード例: コーディングタスク {#full-example-coding-task}
 
 このコーディング形式のコード例は、デフォルトの出発点として適しています。
 
@@ -600,15 +600,15 @@ if __name__ == "__main__":
 
 [examples/sandbox/docs/coding_task.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/docs/coding_task.py) を参照してください。このコード例では、Unix ローカル実行間で決定論的に検証できるように、小規模なシェルベースのリポジトリを使用しています。実際のタスクリポジトリは、もちろん Python、JavaScript、その他の任意のものを使用できます。
 
-## 一般的なパターン
+## 一般的なパターン {#common-patterns}
 
 上記の完全なコード例から始めてください。多くの場合、サンドボックスクライアント、サンドボックスセッションの取得元、またはワークスペースの取得元だけを変更し、同じ `SandboxAgent` をそのまま維持できます。
 
-### サンドボックスクライアントの切り替え
+### サンドボックスクライアントの切り替え {#switch-sandbox-clients}
 
 エージェント定義を同じままにし、実行設定だけを変更します。コンテナ分離やイメージの同等性が必要な場合は Docker を使用し、プロバイダー管理の実行が必要な場合はホスト型プロバイダーを使用します。コード例とプロバイダーオプションについては、[サンドボックスクライアント](clients.md)を参照してください。
 
-### ワークスペースのオーバーライド
+### ワークスペースのオーバーライド {#override-the-workspace}
 
 エージェント定義を同じままにし、新規セッションのマニフェストだけを入れ替えます。
 
@@ -632,7 +632,7 @@ run_config = RunConfig(
 
 エージェントを再構築せず、同じエージェントの役割を異なるリポジトリ、パケット、タスクバンドルに対して実行する場合に使用します。上記の検証済みコーディングのコード例では、一度限りのオーバーライドではなく `default_manifest` を使用して同じパターンを示しています。
 
-### サンドボックスセッションの注入
+### サンドボックスセッションの注入 {#inject-a-sandbox-session}
 
 明示的なライフサイクル制御、実行後の確認、または出力のコピーが必要な場合は、稼働中のサンドボックスセッションを注入します。
 
@@ -657,7 +657,7 @@ async with sandbox:
 
 実行後にワークスペースを確認する場合や、すでに起動済みのサンドボックスセッション上でストリーミングする場合に使用します。[examples/sandbox/docs/coding_task.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/docs/coding_task.py) と [examples/sandbox/docker/docker_runner.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/docker/docker_runner.py) を参照してください。
 
-### セッション状態からの再開
+### セッション状態からの再開 {#resume-from-session-state}
 
 `RunState` の外部ですでにサンドボックス状態をシリアライズしている場合は、その状態から Runner に再接続させます。
 
@@ -682,7 +682,7 @@ run_config = RunConfig(
 
 セッション状態と `RunState` のシリアライズでは、クラウドマウントの認証情報、認証情報を含む補助設定、コンテナ内での認証情報公開に関する確認も削除されます。マウント済みセッションの再開をサポートするバックエンドでは、状態に編集済みのマウント権限が含まれる場合、現在の信頼済みマニフェストを `SandboxRunConfig.manifest` または `agent.default_manifest` で指定してください。`"data"` という名前のマウントエントリで、マウントスコープの確認が必要な場合は、再開前に `trusted_manifest = trusted_manifest.with_in_container_mount_credential_exposure_acknowledged("data")` を使用してコピー済みマニフェストを保持してください。広範な権限には `trusted_manifest = trusted_manifest.with_in_container_mount_broad_credential_exposure_acknowledged("data")` を使用し、マウントが両方の権限クラスを使用する場合は両方のメソッドを呼び出します。確認が必要な正確なマウントパスをすべて渡してください。Agents SDKは、現在の信頼済みマニフェストが永続化された状態とまったく同じ、認証情報を除いたマウントトポロジーを持つ場合にのみ、認証情報を復元します。信頼済み設定が欠落または一致しない場合、サンドボックスの開始前に再開が失敗します。シリアライズされた状態だけで権限が付与されることはありません。`VercelSandboxClient` はマウント済みセッションを再開できないため、代わりに信頼済みマニフェストを使用して新しいサンドボックスを開始してください。
 
-### スナップショットからの開始
+### スナップショットからの開始 {#start-from-a-snapshot}
 
 保存済みのファイルや成果物から新しいサンドボックスを初期化します。
 
@@ -703,7 +703,7 @@ run_config = RunConfig(
 
 新しいサンドボックスセッションを作成する実行で、`agent.default_manifest` だけではなく、保存済みのワークスペース内容から開始する場合に使用します。ローカルスナップショットのフローについては [examples/sandbox/memory.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/memory.py)、リモートスナップショットクライアントについては [examples/sandbox/sandbox_agent_with_remote_snapshot.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/sandbox_agent_with_remote_snapshot.py) を参照してください。
 
-### Git からのスキル読み込み
+### Git からのスキル読み込み {#load-skills-from-git}
 
 ローカルのスキル取得元を、リポジトリに基づく取得元へ置き換えます。
 
@@ -718,7 +718,7 @@ capabilities = Capabilities.default() + [
 
 スキルバンドルに独自のリリースサイクルがある場合や、複数のサンドボックス間で共有する場合に使用します。[examples/sandbox/tax_prep.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/tax_prep.py) を参照してください。
 
-### tools としての公開
+### tools としての公開 {#expose-as-tools}
 
 ツールエージェントには、独自のサンドボックス境界を割り当てることも、親の実行で稼働中のサンドボックスを再利用させることもできます。再利用は、高速な読み取り専用の探索エージェントに便利です。別のサンドボックスの作成、初期化、スナップショット作成にコストをかけることなく、親の実行が使用しているものとまったく同じワークスペースを確認できます。
 
@@ -832,7 +832,7 @@ rollout_agent.as_tool(
 
 ツールエージェントが自由に変更を行う、信頼できないコマンドを実行する、または異なるバックエンドやイメージを使用する場合は、別のサンドボックスを使用します。[examples/sandbox/sandbox_agents_as_tools.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/sandbox_agents_as_tools.py) を参照してください。
 
-### ローカルツールおよび MCPとの組み合わせ
+### ローカルツールおよび MCPとの組み合わせ {#combine-with-local-tools-and-mcp}
 
 同じエージェントで通常の tools も使用しながら、サンドボックスワークスペースを維持します。
 
@@ -851,13 +851,13 @@ agent = SandboxAgent(
 
 ワークスペースの確認がエージェントの仕事の一部にすぎない場合に使用します。[examples/sandbox/sandbox_agent_with_tools.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/sandbox_agent_with_tools.py) を参照してください。
 
-## メモリ
+## メモリ {#memory}
 
 将来のサンドボックスエージェントの実行で以前の実行から学習する必要がある場合は、`Memory` 機能を使用します。メモリは SDK の会話用 `Session` メモリとは別のものです。学んだ内容をサンドボックスワークスペース内のファイルに抽出し、後続の実行でそのファイルを読み取れるようにします。
 
 設定、読み取りと生成の動作、複数ターンの会話、レイアウトの分離については、[エージェントメモリ](memory.md)を参照してください。
 
-## 構成パターン
+## 構成パターン {#composition-patterns}
 
 単一エージェントのパターンを理解したら、次に検討すべき設計上の問題は、より大規模なシステムのどこにサンドボックス境界を配置するかです。
 
@@ -873,7 +873,7 @@ agent = SandboxAgent(
 - ワークスペースの分離が必要なワークフロー部分だけを、サンドボックスを使用しないエージェントからサンドボックスエージェントへハンドオフする
 - オーケストレーターが複数のサンドボックスエージェントを tools として公開し、通常は各 `Agent.as_tool(...)` 呼び出しで個別のサンドボックス `RunConfig` を使用して、それぞれのツールに独自の分離されたワークスペースを割り当てる
 
-### ターンとサンドボックス実行
+### ターンとサンドボックス実行 {#turns-and-sandbox-runs}
 
 ハンドオフと Agents-as-toolsの呼び出しは、分けて説明すると理解しやすくなります。
 
@@ -886,7 +886,7 @@ agent = SandboxAgent(
 - ハンドオフでは、サンドボックスエージェントが同じ実行のアクティブなエージェントになるため、承認は同じトップレベル実行に留まります
 - `Agent.as_tool(...)` では、サンドボックスのツールエージェント内で発生した承認も外側の実行に提示されますが、保存されたネスト実行状態から提示され、外側の実行が再開されたときにネストされたサンドボックス実行が再開されます
 
-## 関連資料
+## 関連資料 {#further-reading}
 
 - [クイックスタート](../sandbox_agents.md): サンドボックスエージェントを 1 つ実行します。
 - [サンドボックスクライアント](clients.md): ローカル、Docker、ホスト型、マウントのオプションを選択します。

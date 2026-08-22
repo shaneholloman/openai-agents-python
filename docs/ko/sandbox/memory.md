@@ -18,7 +18,7 @@ search:
 
 버그를 수정하고, 메모리를 생성하고, 스냅샷을 재개하고, 후속 검증 실행에서 해당 메모리를 사용하는 완전한 2회 실행 예제는 [examples/sandbox/memory.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/memory.py)를 참고하세요. 메모리 레이아웃을 분리한 멀티턴 및 멀티 에이전트 예제는 [examples/sandbox/memory_multi_agent_multiturn.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/memory_multi_agent_multiturn.py)를 참고하세요.
 
-## 메모리 활성화
+## 메모리 활성화 {#enable-memory}
 
 샌드박스 에이전트에 `Memory()`을 기능으로 추가합니다.
 
@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix="sandbox-memory-example-") as snapshot_d
 
 `Memory()`은 메모리 읽기와 생성을 모두 활성화합니다. 내부 에이전트, 하위 에이전트, 검사기 또는 일회성 도구 에이전트의 실행처럼 새로운 신호를 크게 추가하지 않는 실행에서 메모리를 읽되 새 메모리는 생성하지 않아야 하는 에이전트에는 `Memory(generate=None)`을 사용하세요. 이후 사용할 메모리는 생성해야 하지만 사용자가 기존 메모리의 영향을 받지 않기를 원하는 실행에는 `Memory(read=None)`을 사용하세요.
 
-## 메모리 읽기
+## 메모리 읽기 {#read-memory}
 
 메모리 읽기에는 점진적 공개 방식이 사용됩니다. 실행이 시작될 때 SDK는 일반적으로 유용한 팁, 사용자 선호 사항 및 사용 가능한 메모리의 간단한 요약(`memory_summary.md`)을 에이전트의 개발자 프롬프트에 주입합니다. 이를 통해 에이전트는 이전 작업이 관련될 수 있는지 판단하기에 충분한 컨텍스트를 얻습니다.
 
@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix="sandbox-memory-example-") as snapshot_d
 
 메모리는 오래되어 현재 상태와 맞지 않을 수 있습니다. 에이전트는 메모리를 지침으로만 활용하고 현재 환경을 신뢰하도록 지시받습니다. 기본적으로 메모리 읽기에는 `live_update`이 활성화되어 있으므로, 에이전트가 오래된 메모리를 발견하면 같은 실행에서 구성된 `MEMORY.md`을 업데이트할 수 있습니다. 에이전트가 메모리를 읽되 실행 중에는 수정하지 않아야 하는 경우(예: 지연 시간에 민감한 실행) 실시간 업데이트를 비활성화하세요.
 
-## 메모리 생성
+## 메모리 생성 {#generate-memory}
 
 실행이 끝나면 샌드박스 런타임이 해당 실행 구간을 대화 파일에 추가합니다. 누적된 대화 파일은 샌드박스 세션이 종료될 때 처리됩니다.
 
@@ -101,7 +101,7 @@ GTM 에이전트에서 고객 및 회사 세부 정보처럼 사용 사례에 �
 
 최근 raw 메모리 수가 `max_raw_memories_for_consolidation`(기본값 256)을 초과하면 2단계에서는 가장 최근 대화의 메모리만 유지하고 오래된 메모리는 제거합니다. 최신성은 대화가 마지막으로 업데이트된 시간을 기준으로 결정됩니다. 이 망각 메커니즘은 메모리가 최신 환경을 반영하도록 지원합니다.
 
-## 멀티턴 대화
+## 멀티턴 대화 {#multi-turn-conversations}
 
 멀티턴 샌드박스 채팅에서는 동일한 실시간 샌드박스 세션과 함께 일반 SDK `Session`을 사용하세요.
 
@@ -141,7 +141,7 @@ async with sandbox:
 3. 위 항목이 모두 없는 경우의 `RunConfig.group_id`
 4. 안정적인 식별자가 없는 경우 실행별로 생성되는 ID
 
-## 에이전트별 메모리 격리를 위한 서로 다른 레이아웃 사용
+## 에이전트별 메모리 격리를 위한 서로 다른 레이아웃 사용 {#use-different-layouts-to-isolate-memory-for-different-agents}
 
 메모리 격리는 에이전트 이름이 아니라 `MemoryLayoutConfig`을 기준으로 합니다. 레이아웃과 메모리 대화 ID가 같은 에이전트는 하나의 메모리 대화와 통합 메모리를 공유합니다. 레이아웃이 다른 에이전트는 같은 샌드박스 워크스페이스를 공유하더라도 롤아웃 파일, raw 메모리, `MEMORY.md` 및 `memory_summary.md`을 별도로 유지합니다.
 

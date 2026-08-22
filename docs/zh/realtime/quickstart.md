@@ -10,13 +10,13 @@ Python SDK 中的实时智能体是在服务端运行的低延迟智能体，基
 
     Python SDK **不**提供浏览器 WebRTC 传输。本页仅介绍通过服务端 WebSocket、由 Python 管理的实时会话。此 SDK 适用于服务端编排、工具、审批和电话集成。另请参阅[实时传输](transport.md)。
 
-## 前提条件
+## 前提条件 {#prerequisites}
 
 -   Python 3.10 或更高版本
 -   OpenAI API 密钥
 -   基本熟悉 OpenAI Agents SDK
 
-## 安装
+## 安装 {#installation}
 
 如果尚未安装，请安装 OpenAI Agents SDK：
 
@@ -24,9 +24,9 @@ Python SDK 中的实时智能体是在服务端运行的低延迟智能体，基
 pip install openai-agents
 ```
 
-## 服务端实时会话的创建
+## 服务端实时会话的创建 {#create-a-server-side-realtime-session}
 
-### 1. 实时组件的导入
+### 1. 实时组件的导入 {#1-import-the-realtime-components}
 
 ```python
 import asyncio
@@ -34,7 +34,7 @@ import asyncio
 from agents.realtime import RealtimeAgent, RealtimeRunner
 ```
 
-### 2. 起始智能体的定义
+### 2. 起始智能体的定义 {#2-define-the-starting-agent}
 
 ```python
 agent = RealtimeAgent(
@@ -43,7 +43,7 @@ agent = RealtimeAgent(
 )
 ```
 
-### 3. 运行器的配置
+### 3. 运行器的配置 {#3-configure-the-runner}
 
 对于新代码，建议采用嵌套的 `audio.input` / `audio.output` 会话设置结构。对于新的实时智能体，请从 `gpt-realtime-2.1` 开始。
 
@@ -72,7 +72,7 @@ runner = RealtimeRunner(
 )
 ```
 
-### 4. 会话的启动与输入的发送
+### 4. 会话的启动与输入的发送 {#4-start-the-session-and-send-input}
 
 `runner.run()` 返回一个 `RealtimeSession`。进入会话上下文时，连接将建立。
 
@@ -102,12 +102,12 @@ if __name__ == "__main__":
 
 `session.send_message()` 接受纯字符串或结构化实时消息。对于原始音频块，请使用 [`session.send_audio()`][agents.realtime.session.RealtimeSession.send_audio]。
 
-## 本快速入门未包含的内容
+## 本快速入门未包含的内容 {#what-this-quickstart-does-not-include}
 
 -   麦克风采集和扬声器播放代码。请参阅 [`examples/realtime`](https://github.com/openai/openai-agents-python/tree/main/examples/realtime) 中的实时功能代码示例。
 -   SIP / 电话接入流程。请参阅[实时传输](transport.md)和 [SIP 部分](guide.md#sip-and-telephony)。
 
-## 关键设置
+## 关键设置 {#key-settings}
 
 基本会话正常运行后，大多数人接下来会用到以下设置：
 
@@ -126,7 +126,7 @@ if __name__ == "__main__":
 
 有关完整 schema，请参阅 [`RealtimeRunConfig`][agents.realtime.config.RealtimeRunConfig] 和 [`RealtimeSessionModelSettings`][agents.realtime.config.RealtimeSessionModelSettings]。
 
-## 连接选项
+## 连接选项 {#connection-options}
 
 在环境中设置 API 密钥：
 
@@ -151,7 +151,7 @@ session = await runner.run(model_config={"api_key": "your-api-key"})
 
 连接 Azure OpenAI 时，请将 `model_config["url"]` 设置为正式发布版 Realtime 端点 URL，并显式传入标头。使用实时智能体时，请避免使用旧版 beta 路径（`/openai/realtime?api-version=...`）。有关详细信息，请参阅[实时智能体指南](guide.md#low-level-access-and-custom-endpoints)。
 
-## 后续步骤
+## 后续步骤 {#next-steps}
 
 -   阅读[实时传输](transport.md)，以便在服务端 WebSocket 和 SIP 之间进行选择。
 -   阅读[实时智能体指南](guide.md)，了解生命周期、结构化输入、审批、任务转移、安全防护措施和底层控制。

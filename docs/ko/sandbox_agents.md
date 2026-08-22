@@ -12,13 +12,13 @@ search:
 
 SDK는 파일 스테이징, 파일 시스템 도구, 셸 액세스, 샌드박스 수명 주기, 스냅샷, 제공업체별 연동 코드를 직접 연결하지 않아도 이러한 실행 하네스를 제공합니다. 기존 `Agent` 및 `Runner` 흐름을 유지하면서 작업 공간용 `Manifest`, 샌드박스 네이티브 도구의 기능, 작업이 실행될 위치를 지정하는 `SandboxRunConfig`을 추가하면 됩니다.
 
-## 사전 요구 사항
+## 사전 요구 사항 {#prerequisites}
 
 - Python 3.10 이상
 - OpenAI Agents SDK에 대한 기본 지식
 - 샌드박스 클라이언트. 로컬 개발에서는 `UnixLocalSandboxClient`로 시작
 
-## 설치
+## 설치 {#installation}
 
 아직 SDK를 설치하지 않았다면 다음을 실행합니다.
 
@@ -32,7 +32,7 @@ Docker 기반 샌드박스의 경우:
 pip install "openai-agents[docker]"
 ```
 
-## 로컬 샌드박스 에이전트 생성
+## 로컬 샌드박스 에이전트 생성 {#create-a-local-sandbox-agent}
 
 이 예제는 `repo/` 아래에 로컬 저장소를 스테이징하고, 로컬 스킬을 지연 로드하며, 러너가 실행을 위한 Unix 로컬 샌드박스 세션을 생성하도록 합니다.
 
@@ -96,7 +96,7 @@ if __name__ == "__main__":
 
 [examples/sandbox/docs/coding_task.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/docs/coding_task.py)를 참고하세요. 이 예제는 소규모 셸 기반 저장소를 사용하므로 Unix 로컬 실행 전반에서 결정론적으로 검증할 수 있습니다.
 
-## 주요 선택 사항
+## 주요 선택 사항 {#key-choices}
 
 기본 실행이 정상적으로 작동한 후 대부분 다음 항목을 선택합니다.
 
@@ -108,7 +108,7 @@ if __name__ == "__main__":
 - `SandboxRunConfig.client`: 샌드박스 백엔드
 - `SandboxRunConfig.session`, `session_state` 또는 `snapshot`: 후속 실행에서 이전 작업에 다시 연결하는 방법
 
-## 다음 단계
+## 다음 단계 {#where-to-go-next}
 
 - [개념](sandbox/guide.md): 매니페스트, 기능, 권한, 스냅샷, 실행 구성 및 구성 패턴을 이해합니다.
 - [샌드박스 클라이언트](sandbox/clients.md): Unix 로컬, Docker, 호스티드 제공업체 및 마운트 전략을 선택합니다.

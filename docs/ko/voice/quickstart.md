@@ -4,7 +4,7 @@ search:
 ---
 # 빠른 시작
 
-## 사전 요구 사항
+## 사전 요구 사항 {#prerequisites}
 
 Agents SDK의 기본 [빠른 시작 지침](../quickstart.md)을 따르고 가상 환경을 설정했는지 확인합니다. 그런 다음 SDK에서 선택적 음성 의존성을 설치합니다.
 
@@ -18,7 +18,7 @@ pip install 'openai-agents[voice]'
 pip install sounddevice
 ```
 
-## 개념
+## 개념 {#concepts}
 
 알아야 할 주요 개념은 3단계 프로세스인 [`VoicePipeline`][agents.voice.pipeline.VoicePipeline]입니다.
 
@@ -52,7 +52,7 @@ graph LR
 
 ```
 
-## 에이전트
+## 에이전트 {#agents}
 
 먼저 에이전트를 설정해 보겠습니다. 이 SDK로 에이전트를 만들어 본 적이 있다면 익숙하게 느껴질 것입니다. 두 개의 에이전트, 구성된 핸드오프, 도구 하나를 사용합니다.
 
@@ -92,7 +92,7 @@ agent = Agent(
 )
 ```
 
-## 음성 파이프라인
+## 음성 파이프라인 {#voice-pipeline}
 
 [`SingleAgentVoiceWorkflow`][agents.voice.workflow.SingleAgentVoiceWorkflow]을 워크플로로 사용하여 간단한 음성 파이프라인을 설정합니다.
 
@@ -101,7 +101,7 @@ from agents.voice import SingleAgentVoiceWorkflow, VoicePipeline
 pipeline = VoicePipeline(workflow=SingleAgentVoiceWorkflow(agent))
 ```
 
-## 파이프라인 실행
+## 파이프라인 실행 {#run-the-pipeline}
 
 ```python
 import numpy as np
@@ -126,7 +126,7 @@ async for event in result.stream():
 
 ```
 
-## 전체 코드 통합
+## 전체 코드 통합 {#put-it-all-together}
 
 ```python
 import asyncio

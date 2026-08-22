@@ -16,7 +16,7 @@ search:
 -   모델 선택 및 제공자 구성은 [모델](models/index.md)을 참고하세요.
 -   실행별 트레이싱 메타데이터 및 사용자 지정 트레이스 프로세서는 [트레이싱](tracing.md)을 참고하세요.
 
-## 구성 객체와 딕셔너리
+## 구성 객체와 딕셔너리 {#configuration-objects-and-dictionaries}
 
 SDK에서 정의한 구성 매개변수는 일반적으로 형식이 지정된 설정 객체 또는 동일한 필드를 포함하는 딕셔너리를 허용합니다. 이는 형식 어노테이션에 딕셔너리가 포함된 에이전트, 실행, 모델, 세션, 샌드박스 및 음성 구성 경계 전반에 적용됩니다. SDK에서 정의한 중첩 설정 형식에도 딕셔너리를 사용할 수 있습니다.
 
@@ -35,7 +35,7 @@ agent = Agent(
 
 SDK는 이러한 딕셔너리를 해당 설정 객체로 정규화합니다. SDK에서 정의한 데이터 클래스 구성 형식에 알 수 없는 필드가 있으면 `TypeError`이 발생하므로, 옵션 이름의 오타를 조기에 발견하는 데 도움이 됩니다. 특정 경계에서 딕셔너리를 허용하는지 확인하려면 해당 매개변수의 형식 어노테이션 또는 API 레퍼런스를 확인하세요.
 
-## API 키와 클라이언트
+## API 키와 클라이언트 {#api-keys-and-clients}
 
 기본적으로 SDK는 LLM 요청과 트레이싱에 `OPENAI_API_KEY` 환경 변수를 사용합니다. SDK가 처음 OpenAI 클라이언트를 생성할 때 키를 확인하므로(지연 초기화), 첫 번째 모델 호출 전에 환경 변수를 설정하세요. 앱이 시작되기 전에 해당 환경 변수를 설정할 수 없다면 [set_default_openai_key()][agents.set_default_openai_key] 함수를 사용하여 키를 설정할 수 있습니다.
 
@@ -57,7 +57,7 @@ set_default_openai_client(custom_client)
 
 [`OpenAIProvider`][agents.models.openai_provider.OpenAIProvider]에 명시적 클라이언트를 전달하면 해당 클라이언트가 연결 및 계정 설정을 관리합니다. `OpenAIProvider`에 `api_key`, `base_url`, `websocket_base_url`, `organization` 또는 `project`을 함께 전달하지 마세요. `openai_client`을 이러한 인수 중 하나와 함께 사용하면 중복 값을 조용히 무시하는 대신 [`UserError`][agents.exceptions.UserError]가 발생합니다. `AsyncOpenAI`을 생성할 때 원하는 값을 설정하세요.
 
-### `openai` v3 기반 사용자 지정 HTTP 클라이언트
+### `openai` v3 기반 사용자 지정 HTTP 클라이언트 {#custom-http-clients-with-openai-v3}
 
 버전 0.21.0에는 `openai>=3.0.0,<4`이 필요합니다. 기본 OpenAI 제공자는 HTTPX2를 사용하므로 대부분의 애플리케이션에서는 HTTP 클라이언트를 직접 구성할 필요가 없습니다. 애플리케이션에서 `AsyncOpenAI`에 `http_client=`을 전달한다면 사용자 지정 클라이언트와 전송 관련 옵션에 HTTPX2 형식을 사용하세요.
 
@@ -96,7 +96,7 @@ from agents import set_default_openai_api
 set_default_openai_api("chat_completions")
 ```
 
-## OpenAI 제공자 기본값
+## OpenAI 제공자 기본값 {#openai-provider-defaults}
 
 SDK의 OpenAI 백엔드를 사용하는 제공자는 모델 이름 문자열을 모델에 매핑할 때 SDK 전역 기본값도 읽습니다. OpenAI Responses 모델이 기본적으로 웹소켓 전송을 사용하도록 하려면 [`set_default_openai_responses_transport()`][agents.set_default_openai_responses_transport]을 사용하세요.
 
@@ -128,7 +128,7 @@ set_default_openai_agent_registration(
 
 SDK 기본값이 설정되지 않은 경우 SDK의 OpenAI 백엔드를 사용하는 제공자는 `OPENAI_AGENT_HARNESS_ID` 환경 변수로 대체합니다. 하네스 ID가 구성되어 있으면 `RunConfig.trace_metadata`에 해당 키가 이미 존재하지 않는 한 SDK가 이를 `agent_harness_id`으로 트레이스 메타데이터에 추가합니다.
 
-## 트레이싱
+## 트레이싱 {#tracing}
 
 트레이싱은 기본적으로 활성화됩니다. 기본적으로 위 섹션의 모델 요청과 동일한 OpenAI API 키, 즉 환경 변수 또는 설정한 기본 키를 사용합니다. [`set_tracing_export_api_key`][agents.set_tracing_export_api_key] 함수를 사용하여 트레이싱에 사용할 API 키를 별도로 설정할 수 있습니다.
 
@@ -200,7 +200,7 @@ export OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA=0
 
 전체 트레이싱 제어 기능은 [트레이싱 가이드](tracing.md)를 참고하세요.
 
-## 디버그 로깅
+## 디버그 로깅 {#debug-logging}
 
 SDK는 두 개의 Python 로거(`openai.agents` 및 `openai.agents.tracing`)를 정의하며 기본적으로 핸들러를 연결하지 않습니다. 로그는 애플리케이션의 Python 로깅 구성을 따릅니다.
 
@@ -231,7 +231,7 @@ logger.setLevel(logging.WARNING)
 logger.addHandler(logging.StreamHandler())
 ```
 
-### 로그와 진단 정보의 민감한 데이터
+### 로그와 진단 정보의 민감한 데이터 {#sensitive-data-in-logs-and-diagnostics}
 
 일부 로그와 진단 예외에는 민감한 데이터(예: 모델 또는 도구 입력과 출력)가 포함될 수 있습니다.
 

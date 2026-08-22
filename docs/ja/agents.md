@@ -10,7 +10,7 @@ search:
 
 SDK は、OpenAI モデルに対してデフォルトで Responses API を使用しますが、ここでの違いはオーケストレーションにあります。`Agent` と `Runner` を組み合わせることで、SDK がターン、ツール、ガードレール、ハンドオフ、セッションを管理します。このループを自分で管理したい場合は、代わりに Responses API を直接使用してください。
 
-## 次のガイドの選択
+## 次のガイドの選択 {#choose-the-next-guide}
 
 このページを、エージェント定義のハブとして使用してください。次に行う必要がある判断に合った関連ガイドに進んでください。
 
@@ -25,7 +25,7 @@ SDK は、OpenAI モデルに対してデフォルトで Responses API を使用
 | 最終出力、実行項目、または再開可能な状態を確認する | [実行結果](results.md) |
 | ローカルの依存関係とランタイム状態を共有する | [コンテキスト管理](context.md) |
 
-## 基本設定
+## 基本設定 {#basic-configuration}
 
 エージェントで最も一般的なプロパティは次のとおりです。
 
@@ -67,7 +67,7 @@ agent = Agent(
 
 このセクションの内容はすべて `Agent` に適用されます。`SandboxAgent` は同じ考え方を基盤とし、さらにワークスペース単位の実行用に `default_manifest`、`base_instructions`、`capabilities`、`run_as` を追加します。[サンドボックスエージェントの概念](sandbox/guide.md)を参照してください。
 
-## プロンプトテンプレート
+## プロンプトテンプレート {#prompt-templates}
 
 `prompt` を設定すると、OpenAI プラットフォームで作成したプロンプトテンプレートを参照できます。これは、Responses API を介して OpenAI モデルにアクセスする場合に機能します。
 
@@ -126,7 +126,7 @@ result = await Runner.run(
 )
 ```
 
-## コンテキスト
+## コンテキスト {#context}
 
 エージェントは `context` 型に対してジェネリックです。コンテキストは依存性注入のためのツールです。コンテキストは、自分で作成して `Runner.run()` に渡すオブジェクトであり、すべてのエージェント、ツール、ハンドオフなどに渡されます。また、エージェント実行に必要な依存関係や状態をまとめて保持します。任意の Python オブジェクトをコンテキストとして指定できます。
 
@@ -154,7 +154,7 @@ agent = Agent[UserContext](
 )
 ```
 
-## 出力型
+## 出力型 {#output-types}
 
 デフォルトでは、エージェントはプレーンテキスト (つまり `str`) の出力を生成します。エージェントに特定の型の出力を生成させる場合は、`output_type` パラメーターを使用できます。一般的には [Pydantic](https://docs.pydantic.dev/) オブジェクトを使用しますが、Pydantic の [TypeAdapter](https://docs.pydantic.dev/latest/api/type_adapter/) でラップできる任意の型をサポートしています。たとえば、データクラス、リスト、TypedDict などです。
 
@@ -179,7 +179,7 @@ agent = Agent(
 
     `output_type` を渡すと、通常のプレーンテキスト応答ではなく [structured outputs](https://platform.openai.com/docs/guides/structured-outputs) を使用するようモデルに指示します。
 
-## マルチエージェントシステムの設計パターン
+## マルチエージェントシステムの設計パターン {#multi-agent-system-design-patterns}
 
 マルチエージェントシステムを設計する方法は多数ありますが、一般的に幅広く適用できる次の 2 つのパターンがよく見られます。
 
@@ -188,7 +188,7 @@ agent = Agent(
 
 詳細については、[エージェント構築の実践ガイド](https://cdn.openai.com/business-guides-and-resources/a-practical-guide-to-building-agents.pdf)を参照してください。
 
-### マネージャー (agents as tools)
+### マネージャー (agents as tools) {#manager-agents-as-tools}
 
 `customer_facing_agent` はすべてのユーザー操作を処理し、ツールとして公開された専門のサブエージェントを呼び出します。詳細については、[ツール](tools.md#agents-as-tools)のドキュメントを参照してください。
 
@@ -217,7 +217,7 @@ customer_facing_agent = Agent(
 )
 ```
 
-### ハンドオフ
+### ハンドオフ {#handoffs}
 
 設定されたハンドオフ先は、エージェントが処理を委任できるサブエージェントです。ハンドオフが発生すると、委任先のエージェントが会話履歴を受け取り、会話を引き継ぎます。このパターンにより、単一のタスクに優れたモジュール式の専門エージェントを構築できます。詳細については、[ハンドオフ](handoffs.md)のドキュメントを参照してください。
 
@@ -238,7 +238,7 @@ triage_agent = Agent(
 )
 ```
 
-## 動的な指示
+## 動的な指示 {#dynamic-instructions}
 
 ほとんどの場合、エージェントの作成時に指示を指定できます。ただし、関数を介して動的な指示を指定することもできます。この関数はエージェントとコンテキストを受け取り、プロンプトを返す必要があります。通常の関数と `async` 関数の両方を使用できます。
 
@@ -257,7 +257,7 @@ agent = Agent[UserContext](
 )
 ```
 
-## ライフサイクルイベント (フック)
+## ライフサイクルイベント (フック) {#lifecycle-events-hooks}
 
 エージェントのライフサイクルを監視したい場合があります。たとえば、特定のイベントが発生したときに、イベントのログ記録、データの事前取得、使用量の記録を行いたい場合があります。
 
@@ -302,11 +302,11 @@ print(result.final_output)
 
 コールバックの全機能については、[Lifecycle API リファレンス](ref/lifecycle.md)を参照してください。
 
-## ガードレール
+## ガードレール {#guardrails}
 
 ガードレールを使用すると、エージェントの実行と並行してユーザー入力に対するチェック／検証を実行し、エージェントの出力が生成された後にその出力をチェックできます。たとえば、ユーザー入力とエージェント出力が関連性のある内容かどうかを審査できます。詳細については、[ガードレール](guardrails.md)のドキュメントを参照してください。
 
-## エージェントの複製／コピー
+## エージェントの複製／コピー {#cloningcopying-agents}
 
 エージェントの `clone()` メソッドを使用すると、エージェントを複製し、必要に応じて任意のプロパティを変更できます。
 
@@ -325,7 +325,7 @@ robot_agent = pirate_agent.clone(
 
 `clone()` は `dataclasses.replace` を使用するため、シャローコピーを実行します。`tools`、`handoffs`、`mcp_servers`、`input_guardrails`、`output_guardrails` など、上書きしないリスト属性は、元のエージェントが保持するものとまったく同じリストのままです。したがって、どちらかのエージェントを介してそのリストを変更すると、両方のエージェントに影響します。クローンに独立したリストコンテナーを持たせるには、たとえば `pirate_agent.clone(tools=[*pirate_agent.tools, extra_tool])` のように新しいリストを渡します。その新しいリストにコピーされた項目は、それらの項目も置き換えない限り、同じツールまたはハンドオフオブジェクトのままです。
 
-## ツール使用の強制
+## ツール使用の強制 {#forcing-tool-use}
 
 ツールのリストを指定しても、LLM が必ずツールを使用するとは限りません。[`ModelSettings.tool_choice`][agents.model_settings.ModelSettings.tool_choice] を設定することで、ツールの使用を強制できます。有効な値は次のとおりです。
 
@@ -353,7 +353,7 @@ agent = Agent(
 )
 ```
 
-## ツール使用時の動作
+## ツール使用時の動作 {#tool-use-behavior}
 
 `Agent` 設定の `tool_use_behavior` パラメーターは、ツール出力の処理方法を制御します。
 

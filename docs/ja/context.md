@@ -9,7 +9,7 @@ search:
 1. コードからローカルに利用できるコンテキスト: ツール関数の実行時、`on_handoff` などのコールバック時、ライフサイクルフック内などで必要となる可能性があるデータや依存関係です。
 2. LLM が利用できるコンテキスト: LLM が応答を生成するときに参照するデータです。
 
-## ローカルコンテキスト
+## ローカルコンテキスト {#local-context}
 
 これは、[`RunContextWrapper`][agents.run_context.RunContextWrapper] クラスと、そのクラス内の [`context`][agents.run_context.RunContextWrapper.context] プロパティによって表されます。仕組みは次のとおりです。
 
@@ -33,7 +33,7 @@ search:
 
 単一の実行内では、派生したラッパーは基盤となるアプリコンテキスト、承認状態、使用量追跡を共有します。ネストされた [`Agent.as_tool()`][agents.agent.Agent.as_tool] の実行では、別の `tool_input` を関連付けることができますが、デフォルトではアプリ状態の独立したコピーは作成されません。
 
-### `RunContextWrapper` の公開情報
+### `RunContextWrapper` の公開情報 {#what-runcontextwrapper-exposes}
 
 [`RunContextWrapper`][agents.run_context.RunContextWrapper] は、アプリで定義したコンテキストオブジェクトのラッパーです。実際には、主に次のものを使用します。
 
@@ -94,7 +94,7 @@ if __name__ == "__main__":
 
 ---
 
-### 高度な機能: `ToolContext`
+### 高度な機能: `ToolContext` {#advanced-toolcontext}
 
 場合によっては、実行中のツールについて、その名前、呼び出し ID、raw 引数文字列などの追加メタデータにアクセスしたいことがあります。  
 その場合は、`RunContextWrapper` を拡張する [`ToolContext`][agents.tool_context.ToolContext] クラスを使用できます。
@@ -140,7 +140,7 @@ agent = Agent(
 
 ---
 
-## エージェント / LLM コンテキスト
+## エージェント / LLM コンテキスト {#agentllm-context}
 
 LLM が呼び出されたとき、LLM が参照できるのは会話履歴に含まれるデータ **だけ** です。つまり、新しいデータを LLM から利用可能にするには、その履歴に含まれる形で提供する必要があります。これには、次のような方法があります。
 

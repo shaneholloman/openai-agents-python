@@ -25,9 +25,9 @@ async def main():
 
 자세한 내용은 [결과 가이드](results.md)를 참조하세요.
 
-## 실행기 수명 주기 및 구성
+## 실행기 수명 주기 및 구성 {#runner-lifecycle-and-configuration}
 
-### 에이전트 루프
+### 에이전트 루프 {#the-agent-loop}
 
 위 세 가지 `Runner` 메서드 중 하나를 호출할 때 시작 에이전트와 입력을 전달합니다. 입력은 다음 중 하나일 수 있습니다.
 
@@ -48,11 +48,11 @@ async def main():
 
     LLM 출력이 "최종 출력"으로 간주되는 조건은 원하는 타입의 텍스트 출력을 생성하고 도구 호출이 없는 것입니다.
 
-### 스트리밍
+### 스트리밍 {#streaming}
 
 스트리밍을 사용하면 LLM이 실행되는 동안 스트리밍 이벤트를 추가로 수신할 수 있습니다. 스트림이 완료되면 [`RunResultStreaming`][agents.result.RunResultStreaming]에 새로 생성된 모든 출력을 비롯한 실행의 전체 정보가 포함됩니다. 스트리밍 이벤트에는 `.stream_events()`를 호출할 수 있습니다. 자세한 내용은 [스트리밍 가이드](streaming.md)를 참조하세요.
 
-#### Responses WebSocket 전송(선택적 도우미)
+#### Responses WebSocket 전송(선택적 도우미) {#responses-websocket-transport-optional-helper}
 
 OpenAI Responses websocket 전송을 활성화해도 일반 `Runner` API를 계속 사용할 수 있습니다. 연결을 재사용하려면 websocket 세션 도우미를 사용하는 것이 좋지만 필수는 아닙니다.
 
@@ -60,7 +60,7 @@ OpenAI Responses websocket 전송을 활성화해도 일반 `Runner` API를 계�
 
 구체적인 모델 객체 또는 사용자 지정 공급자와 관련된 전송 선택 규칙 및 주의 사항은 [모델](models/index.md#responses-websocket-transport)을 참조하세요.
 
-##### 패턴 1: 세션 도우미 없음(작동함)
+##### 패턴 1: 세션 도우미 없음(작동함) {#pattern-1-no-session-helper-works}
 
 websocket 전송만 필요하고 SDK가 공유 공급자/세션을 관리할 필요가 없을 때 사용합니다.
 
@@ -87,7 +87,7 @@ asyncio.run(main())
 
 이 패턴은 단일 실행에 적합합니다. `Runner.run()` / `Runner.run_streamed()`을 반복적으로 호출하면 동일한 `RunConfig` / 공급자 인스턴스를 수동으로 재사용하지 않는 한 실행할 때마다 다시 연결될 수 있습니다.
 
-##### 패턴 2: `responses_websocket_session()` 사용(여러 턴 재사용에 권장)
+##### 패턴 2: `responses_websocket_session()` 사용(여러 턴 재사용에 권장) {#pattern-2-use-responses_websocket_session-recommended-for-multi-turn-reuse}
 
 여러 실행에서 websocket을 지원하는 공유 공급자와 `RunConfig`을 사용하려면 [`responses_websocket_session()`][agents.responses_websocket_session]을 사용하세요. 여기에는 동일한 `run_config`를 상속하는 중첩된 에이전트 도구 호출도 포함됩니다.
 
@@ -125,15 +125,15 @@ asyncio.run(main())
 
 긴 추론 턴에서 websocket keepalive 시간 초과가 발생하면 `ping_timeout`를 늘리거나 `ping_timeout=None`으로 설정하여 heartbeat 시간 초과를 비활성화하세요. websocket 지연 시간보다 안정성이 더 중요한 실행에는 HTTP/SSE 전송을 사용하세요.
 
-### 실행 구성
+### 실행 구성 {#run-config}
 
 `run_config` 매개변수를 사용하면 에이전트 실행의 일부 전역 설정을 구성할 수 있습니다.
 
-#### 일반적인 실행 구성 카테고리
+#### 일반적인 실행 구성 카테고리 {#common-run-config-categories}
 
 각 에이전트 정의를 변경하지 않고 단일 실행의 동작을 재정의하려면 `RunConfig`을 사용하세요.
 
-##### 모델, 공급자 및 세션 기본값
+##### 모델, 공급자 및 세션 기본값 {#model-provider-and-session-defaults}
 
 -   [`model`][agents.run.RunConfig.model]: 각 에이전트가 어떤 `model`을 갖는지와 관계없이 사용할 전역 LLM 모델을 설정할 수 있습니다.
 -   [`model_provider`][agents.run.RunConfig.model_provider]: 모델 이름을 조회하는 모델 공급자이며 기본값은 OpenAI입니다.
@@ -141,7 +141,7 @@ asyncio.run(main())
 -   [`session_settings`][agents.run.RunConfig.session_settings]: 실행 중 기록을 가져올 때 세션 수준 기본값(예: `SessionSettings(limit=...)`)을 재정의합니다.
 -   [`session_input_callback`][agents.run.RunConfig.session_input_callback]: Sessions를 사용할 때 각 `Runner` 실행 전에 새 사용자 입력이 세션 기록과 병합되는 방식을 사용자 지정합니다. 콜백은 동기 또는 비동기일 수 있습니다.
 
-##### 가드레일, 핸드오프 및 모델 입력 조정
+##### 가드레일, 핸드오프 및 모델 입력 조정 {#guardrails-handoffs-and-model-input-shaping}
 
 -   [`input_guardrails`][agents.run.RunConfig.input_guardrails], [`output_guardrails`][agents.run.RunConfig.output_guardrails]: 모든 실행에 포함할 입력 또는 출력 가드레일 목록입니다.
 -   [`handoff_input_filter`][agents.run.RunConfig.handoff_input_filter]: 핸드오프에 이미 입력 필터가 없는 경우 모든 핸드오프에 적용할 전역 입력 필터입니다. 입력 필터를 사용하면 새 에이전트로 전송되는 입력을 편집할 수 있습니다. 자세한 내용은 [`Handoff.input_filter`][agents.handoffs.Handoff.input_filter] 문서를 참조하세요.
@@ -150,7 +150,7 @@ asyncio.run(main())
 -   [`call_model_input_filter`][agents.run.RunConfig.call_model_input_filter]: 모델 호출 직전에 완전히 준비된 모델 입력(instructions 및 입력 항목)을 편집하는 훅입니다. 예를 들어 기록을 잘라내거나 시스템 프롬프트를 삽입할 수 있습니다.
 -   [`reasoning_item_id_policy`][agents.run.RunConfig.reasoning_item_id_policy]: 실행기가 이전 출력을 다음 턴의 모델 입력으로 변환할 때 추론 항목 ID를 보존할지 생략할지 제어합니다.
 
-##### 트레이싱 및 관찰 가능성
+##### 트레이싱 및 관찰 가능성 {#tracing-and-observability}
 
 -   [`tracing_disabled`][agents.run.RunConfig.tracing_disabled]: 전체 실행에서 [트레이싱](tracing.md)을 비활성화할 수 있습니다.
 -   [`tracing`][agents.run.RunConfig.tracing]: 실행별 트레이싱 API 키와 같은 트레이스 내보내기 설정을 재정의하려면 [`TracingConfig`][agents.tracing.TracingConfig]을 전달합니다.
@@ -158,7 +158,7 @@ asyncio.run(main())
 -   [`workflow_name`][agents.run.RunConfig.workflow_name], [`trace_id`][agents.run.RunConfig.trace_id], [`group_id`][agents.run.RunConfig.group_id]: 실행의 트레이싱 워크플로 이름, 트레이스 ID 및 트레이스 그룹 ID를 설정합니다. 최소한 `workflow_name`는 설정하는 것이 좋습니다. 그룹 ID는 여러 실행의 트레이스를 연결할 수 있는 선택적 필드입니다.
 -   [`trace_metadata`][agents.run.RunConfig.trace_metadata]: 모든 트레이스에 포함할 메타데이터입니다.
 
-##### 도구 실행, 승인 및 도구 오류 동작
+##### 도구 실행, 승인 및 도구 오류 동작 {#tool-execution-approval-and-tool-error-behavior}
 
 -   [`tool_execution`][agents.run.RunConfig.tool_execution]: 한 번에 실행할 로컬 함수 도구 호출 수를 제한하는 등 로컬 도구 호출에 대한 SDK 측 실행 동작을 구성합니다.
 -   [`tool_not_found_behavior`][agents.run.RunConfig.tool_not_found_behavior]: 모델이 생성한 함수 도구 호출의 도구 이름이 현재 에이전트에서 사용할 수 있는 어떤 함수 도구와도 일치하지 않을 때 실행기가 처리하는 방식을 구성합니다. 기본값은 `ModelBehaviorError`을 발생시킵니다. 대신 모델에 표시되는 오류 출력을 반환하도록 옵트인할 수 있습니다.
@@ -167,9 +167,9 @@ asyncio.run(main())
 
 중첩 핸드오프는 옵트인 베타로 제공됩니다. 순차 트랜스크립트 압축을 활성화하려면 `RunConfig(nest_handoff_history=True)`를 전달하거나 특정 핸드오프에 대해 `handoff(..., nest_handoff_history=True)`을 설정하세요. 기본 제공 매퍼는 전체 트랜스크립트를 하나의 메시지로 축소하는 대신 손실 없는 메시지 항목 주위에 생성된 어시스턴트 요약 세그먼트를 배치합니다. 기본값인 raw 트랜스크립트를 유지하려면 플래그를 설정하지 않거나 대화를 필요한 형태 그대로 전달하는 `handoff_input_filter`(또는 `handoff_history_mapper`)를 제공하세요. 사용자 지정 매퍼를 작성하지 않고 생성된 요약 세그먼트에 사용되는 래퍼 텍스트를 변경하려면 [`set_conversation_history_wrappers`][agents.handoffs.set_conversation_history_wrappers]을 호출하세요. 기본값을 복원하려면 [`reset_conversation_history_wrappers`][agents.handoffs.reset_conversation_history_wrappers]을 호출하세요.
 
-#### 실행 구성 세부 정보
+#### 실행 구성 세부 정보 {#run-config-details}
 
-##### `tool_execution`
+##### `tool_execution` {#tool_execution}
 
 실행 시 로컬 함수 도구의 동시 실행 수를 제한하는 등 로컬 함수 도구에 대한 SDK 측 동작을 구성하려면 `tool_execution`를 사용하세요.
 
@@ -196,7 +196,7 @@ result = await Runner.run(
 
 `pre_approval_tool_input_guardrails=False`는 기본 승인 흐름을 유지합니다. 함수 도구에 승인이 필요한 경우 실행이 먼저 일시 중지되며 도구 입력 가드레일은 승인 후 실행 직전에만 동작합니다. 대기 중인 승인 인터럽션(중단 처리)이 발생하기 전에 함수 도구 입력 가드레일을 실행하려면 `True`로 설정하세요. 이 사전 승인 검사를 통과한 호출도 승인 후 동일한 입력 가드레일을 다시 실행하므로, 시간에 민감한 검사가 실행 전에 다시 검증됩니다.
 
-##### `tool_not_found_behavior`
+##### `tool_not_found_behavior` {#tool_not_found_behavior}
 
 기본적으로 모델이 현재 에이전트에서 사용할 수 있는 어떤 함수 도구와도 일치하지 않는 함수 도구 호출을 생성하면 실행기는 `ModelBehaviorError`을 발생시킵니다.
 
@@ -216,7 +216,7 @@ result = await Runner.run(
 
 현재 이 옵션은 도구 이름 조회에 실패한 함수 도구 호출에만 적용됩니다. 그 밖의 유효하지 않은 도구 페이로드에는 기존 오류 동작이 계속 적용됩니다.
 
-##### `tool_error_formatter`
+##### `tool_error_formatter` {#tool_error_formatter}
 
 SDK가 모델에 표시되는 도구 오류 출력을 생성할 때 모델에 반환되는 메시지를 사용자 지정하려면 `tool_error_formatter`을 사용하세요.
 
@@ -254,7 +254,7 @@ result = Runner.run_sync(
 )
 ```
 
-##### `reasoning_item_id_policy`
+##### `reasoning_item_id_policy` {#reasoning_item_id_policy}
 
 `reasoning_item_id_policy`은 실행기가 기록을 다음 턴으로 전달할 때(예: `RunResult.to_input_list()` 또는 세션 기반 실행을 사용할 때) 추론 항목을 다음 턴의 모델 입력으로 변환하는 방식을 제어합니다.
 
@@ -273,9 +273,9 @@ SDK가 이전 출력에서 후속 입력을 구성하고(세션 영속성, 서�
 -   사용자가 제공한 초기 입력 항목은 다시 작성하지 않습니다.
 -   이 정책이 적용된 후에도 `call_model_input_filter`에서 의도적으로 추론 ID를 다시 추가할 수 있습니다.
 
-## 상태 및 대화 관리
+## 상태 및 대화 관리 {#state-and-conversation-management}
 
-### 메모리 전략 선택
+### 메모리 전략 선택 {#choose-a-memory-strategy}
 
 다음 턴으로 상태를 전달하는 일반적인 방법은 네 가지입니다.
 
@@ -294,7 +294,7 @@ SDK가 이전 출력에서 후속 입력을 구성하고(세션 영속성, 서�
     (`conversation_id`, `previous_response_id` 또는 `auto_previous_response_id`)을
     함께 사용할 수 없습니다. 호출마다 한 가지 방식을 선택하세요.
 
-### 대화/채팅 스레드
+### 대화/채팅 스레드 {#conversationschat-threads}
 
 실행 메서드 중 하나를 호출하면 하나 이상의 에이전트가 실행될 수 있으며 이에 따라 하나 이상의 LLM 호출이 발생할 수 있지만, 채팅 대화에서는 하나의 논리적 턴을 나타냅니다. 예를 들면 다음과 같습니다.
 
@@ -303,7 +303,7 @@ SDK가 이전 출력에서 후속 입력을 구성하고(세션 영속성, 서�
 
 에이전트 실행이 끝나면 사용자에게 표시할 내용을 선택할 수 있습니다. 예를 들어 에이전트가 생성한 모든 새 항목을 표시하거나 최종 출력만 표시할 수 있습니다. 어떤 경우든 사용자가 후속 질문을 할 수 있으며, 이때 실행 메서드를 다시 호출할 수 있습니다.
 
-#### 수동 대화 관리
+#### 수동 대화 관리 {#manual-conversation-management}
 
 [`RunResultBase.to_input_list()`][agents.result.RunResultBase.to_input_list] 메서드로 다음 턴의 입력을 가져와 대화 기록을 수동으로 관리할 수 있습니다.
 
@@ -327,7 +327,7 @@ async def main():
         # California
 ```
 
-#### 세션을 사용한 자동 대화 관리
+#### 세션을 사용한 자동 대화 관리 {#automatic-conversation-management-with-sessions}
 
 더 간단한 방법으로 [Sessions](sessions/index.md)를 사용하면 `.to_input_list()`를 수동으로 호출하지 않고도 대화 기록을 자동으로 처리할 수 있습니다.
 
@@ -362,13 +362,13 @@ Sessions는 다음 작업을 자동으로 수행합니다.
 자세한 내용은 [Sessions 문서](sessions/index.md)를 참조하세요.
 
 
-#### 서버 관리형 대화
+#### 서버 관리형 대화 {#server-managed-conversations}
 
 `to_input_list()` 또는 `Sessions`로 로컬에서 처리하는 대신 OpenAI 대화 상태 기능이 서버 측에서 대화 상태를 관리하도록 할 수도 있습니다. 이를 통해 이전의 모든 메시지를 수동으로 다시 전송하지 않고도 대화 기록을 보존할 수 있습니다. 아래 서버 관리형 방식 중 하나를 사용할 때는 요청마다 새 턴의 입력만 전달하고 저장된 ID를 재사용하세요. 자세한 내용은 [OpenAI 대화 상태 가이드](https://platform.openai.com/docs/guides/conversation-state?api-mode=responses)를 참조하세요.
 
 OpenAI는 여러 턴에 걸쳐 상태를 추적하는 두 가지 방법을 제공합니다.
 
-##### 1. `conversation_id` 사용
+##### 1. `conversation_id` 사용 {#1-using-conversation_id}
 
 먼저 OpenAI Conversations API로 대화를 생성한 다음 이후의 모든 호출에서 해당 ID를 재사용합니다.
 
@@ -391,7 +391,7 @@ async def main():
         print(f"Assistant: {result.final_output}")
 ```
 
-##### 2. `previous_response_id` 사용
+##### 2. `previous_response_id` 사용 {#2-using-previous_response_id}
 
 또 다른 옵션은 각 턴을 이전 턴의 응답 ID에 명시적으로 연결하는 **응답 체이닝**입니다.
 
@@ -435,9 +435,9 @@ async def main():
     이 호환성 재시도는 `ModelSettings.retry`를 구성하지 않아도 수행됩니다. 모델 요청에 대한
     더 광범위한 옵트인 재시도 동작은 [실행기 관리형 재시도](models/index.md#runner-managed-retries)를 참조하세요.
 
-## 훅 및 사용자 지정
+## 훅 및 사용자 지정 {#hooks-and-customization}
 
-### 모델 호출 입력 필터
+### 모델 호출 입력 필터 {#call-model-input-filter}
 
 모델 호출 직전에 모델 입력을 편집하려면 `call_model_input_filter`을 사용하세요. 훅은 현재 에이전트, 컨텍스트 및 결합된 입력 항목(있는 경우 세션 기록 포함)을 수신하고 새 `ModelInputData`를 반환합니다.
 
@@ -468,9 +468,9 @@ result = Runner.run_sync(
 
 민감한 데이터를 수정하거나, 긴 기록을 잘라내거나, 추가 시스템 지침을 삽입하려면 `run_config`을 통해 실행별로 훅을 설정하세요.
 
-## 오류 및 복구
+## 오류 및 복구 {#errors-and-recovery}
 
-### 오류 처리기
+### 오류 처리기 {#error-handlers}
 
 모든 `Runner` 진입점은 오류 종류를 키로 사용하는 dict인 `error_handlers`를 허용합니다. 지원되는 키는 `"max_turns"`, `"model_refusal"`, `"invalid_final_output"`입니다. 해당 오류로 실행을 종료하는 대신 제어된 최종 출력을 반환하려면 이를 사용하세요.
 
@@ -567,27 +567,27 @@ result = Runner.run_sync(
 print(result.final_output)
 ```
 
-## 내구성 실행 통합 및 휴먼인더루프 (HITL)
+## 내구성 실행 통합 및 휴먼인더루프 (HITL) {#durable-execution-integrations-and-human-in-the-loop}
 
 도구 승인 일시 중지/재개 패턴은 전용 [휴먼인더루프 가이드](human_in_the_loop.md)에서 시작하세요. 아래 통합은 실행이 오랜 대기, 재시도 또는 프로세스 재시작에 걸쳐 지속될 수 있는 내구성 있는 오케스트레이션을 위한 것입니다.
 
-### Dapr
+### Dapr {#dapr}
 
 Agents SDK [Dapr](https://dapr.io) Diagrid 통합을 사용하면 장애에서 자동으로 복구되고 휴먼인더루프 (HITL) 워크플로를 지원하는 내구성 있는 장기 실행 에이전트를 실행할 수 있습니다. Dapr는 공급업체 중립적인 [CNCF](https://cncf.io) 워크플로 오케스트레이터입니다. Dapr와 OpenAI 에이전트는 [여기](https://docs.diagrid.io/getting-started/quickstarts/ai-agents/?agentframework=openai)에서 시작할 수 있습니다.
 
-### Temporal
+### Temporal {#temporal}
 
 Agents SDK [Temporal](https://temporal.io/) 통합을 사용하면 휴먼인더루프 (HITL) 작업을 포함한 내구성 있는 장기 실행 워크플로를 실행할 수 있습니다. 장기 실행 작업을 완료하기 위해 Temporal과 Agents SDK가 함께 작동하는 데모는 [이 동영상](https://www.youtube.com/watch?v=fFBZqzT4DD8)에서 확인하고, [문서는 여기](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents)에서 확인하세요. 
 
-### Restate
+### Restate {#restate}
 
 Agents SDK [Restate](https://restate.dev/) 통합을 사용하면 사람의 승인, 핸드오프 및 세션 관리를 포함한 경량의 내구성 있는 에이전트를 구현할 수 있습니다. 이 통합은 Restate의 단일 바이너리 런타임을 종속성으로 요구하며, 에이전트를 프로세스/컨테이너 또는 서버리스 함수로 실행할 수 있도록 지원합니다. 자세한 내용은 [개요](https://www.restate.dev/blog/durable-orchestration-for-ai-agents-with-restate-and-openai-sdk)를 읽거나 [문서](https://docs.restate.dev/ai)를 참조하세요.
 
-### DBOS
+### DBOS {#dbos}
 
 Agents SDK [DBOS](https://dbos.dev/) 통합을 사용하면 장애 및 재시작 이후에도 진행 상황을 보존하는 신뢰할 수 있는 에이전트를 실행할 수 있습니다. 장기 실행 에이전트, 휴먼인더루프 (HITL) 워크플로 및 핸드오프를 지원합니다. 동기 및 비동기 메서드를 모두 지원합니다. 이 통합에는 SQLite 또는 Postgres 데이터베이스만 필요합니다. 자세한 내용은 통합 [리포지토리](https://github.com/dbos-inc/dbos-openai-agents)와 [문서](https://docs.dbos.dev/integrations/openai-agents)를 참조하세요.
 
-## 예외
+## 예외 {#exceptions}
 
 SDK는 특정 상황에서 예외를 발생시킵니다. 전체 목록은 [`agents.exceptions`][]에서 확인할 수 있습니다. 개요는 다음과 같습니다.
 

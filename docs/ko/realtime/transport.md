@@ -10,7 +10,7 @@ search:
 
     Python SDK에는 브라우저 WebRTC 트랜스포트가 포함되어 있지 **않습니다**. 이 페이지에서는 Python SDK의 트랜스포트 선택지인 서버 측 WebSocket과 SIP 연결 흐름만 다룹니다. 브라우저 WebRTC는 별도의 플랫폼 주제이며, 공식 [WebRTC를 사용하는 Realtime API](https://developers.openai.com/api/docs/guides/realtime-webrtc/) 가이드에 문서화되어 있습니다.
 
-## 선택 가이드
+## 선택 가이드 {#decision-guide}
 
 | 목표 | 시작 지점 | 이유 |
 | --- | --- | --- |
@@ -18,7 +18,7 @@ search:
 | 선택할 트랜스포트와 배포 구조 파악 | 이 페이지 | 트랜스포트나 배포 구조를 확정하기 전에 이 페이지를 참조합니다. |
 | 에이전트를 전화 또는 SIP 통화에 연결 | [실시간 가이드](guide.md) 및 [`examples/realtime/twilio_sip`](https://github.com/openai/openai-agents-python/tree/main/examples/realtime/twilio_sip) | 저장소는 `call_id`에서 구동하는 SIP 연결 흐름을 제공합니다. |
 
-## 서버 측 WebSocket 기반의 기본 Python 경로
+## 서버 측 WebSocket 기반의 기본 Python 경로 {#server-side-websocket-is-the-default-python-path}
 
 사용자 지정 `RealtimeModel`를 전달하지 않으면 `RealtimeRunner`은 `OpenAIRealtimeWebSocketModel`를 사용합니다.
 
@@ -37,7 +37,7 @@ search:
 
 서버에서 오디오 파이프라인, 도구 실행, 승인 흐름 및 기록 처리를 담당하는 경우 이 경로를 사용합니다.
 
-### 저수준 WebSocket 조정
+### 저수준 WebSocket 조정 {#low-level-websocket-tuning}
 
 기반 서버 측 WebSocket 연결을 조정해야 할 때 `transport_config`를 `OpenAIRealtimeWebSocketModel`에 전달합니다.
 
@@ -69,7 +69,7 @@ runner = RealtimeRunner(starting_agent=agent, model=model)
 
 이 설정은 Realtime API 세션이 아닌 클라이언트 연결을 구성합니다. 엔드포인트, 인증, 통화 연결 및 재생 설정에는 계속해서 `RealtimeModelConfig`을 사용합니다.
 
-## 텔레포니 경로인 SIP 연결
+## 텔레포니 경로인 SIP 연결 {#sip-attach-is-the-telephony-path}
 
 이 저장소에 문서화된 텔레포니 흐름에서 Python SDK는 `call_id`를 통해 기존 실시간 통화에 연결합니다.
 
@@ -84,7 +84,7 @@ runner = RealtimeRunner(starting_agent=agent, model=model)
 
 더 광범위한 Realtime API에서는 일부 서버 측 제어 패턴에 `call_id`도 사용하지만, 이 저장소에서 제공하는 연결 예제는 SIP입니다.
 
-## SDK 범위 밖의 브라우저 WebRTC
+## SDK 범위 밖의 브라우저 WebRTC {#browser-webrtc-is-outside-this-sdk}
 
 앱의 기본 클라이언트가 Realtime WebRTC를 사용하는 브라우저인 경우 다음 사항에 유의합니다.
 
@@ -95,7 +95,7 @@ runner = RealtimeRunner(starting_agent=agent, model=model)
 
 현재 이 저장소는 브라우저 WebRTC와 Python 사이드밴드를 함께 사용하는 예제도 제공하지 않습니다.
 
-## 사용자 지정 엔드포인트 및 연결 지점
+## 사용자 지정 엔드포인트 및 연결 지점 {#custom-endpoints-and-attach-points}
 
 [`RealtimeModelConfig`][agents.realtime.model.RealtimeModelConfig]의 트랜스포트 구성 인터페이스를 사용하면 기본 트랜스포트 동작을 사용자 지정할 수 있습니다.
 

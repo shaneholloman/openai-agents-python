@@ -12,7 +12,7 @@ search:
 
 本页重点介绍通过 `interruptions` 实现的手动审批流程。如果你的应用可以通过代码做出决策，某些工具类型还支持程序化审批回调，使运行无需暂停即可继续。
 
-## 需审批工具的标记
+## 需审批工具的标记 {#marking-tools-that-need-approval}
 
 将 `needs_approval` 设置为 `True` 可始终要求审批，也可以提供一个异步函数，针对每次调用分别做出决策。该可调用对象会接收运行上下文、解析后的工具参数和工具调用 ID。
 
@@ -46,7 +46,7 @@ agent = Agent(
 
 [`function_tool`][agents.tool.function_tool]、[`Agent.as_tool`][agents.agent.Agent.as_tool]、[`ShellTool`][agents.tool.ShellTool] 和 [`ApplyPatchTool`][agents.tool.ApplyPatchTool] 均提供 `needs_approval`。本地 MCP 服务器也支持通过 [`MCPServerStdio`][agents.mcp.server.MCPServerStdio]、[`MCPServerSse`][agents.mcp.server.MCPServerSse] 和 [`MCPServerStreamableHttp`][agents.mcp.server.MCPServerStreamableHttp] 上的 `require_approval` 进行审批。托管的 MCP 服务器通过 [`HostedMCPTool`][agents.tool.HostedMCPTool] 支持审批，其中使用 `tool_config={"require_approval": "always"}`，并可选择提供 `on_approval_request` 回调。如果你希望自动批准或自动拒绝，而不呈现中断项，Shell 和 apply_patch 工具可接受 `on_approval` 回调。
 
-## 审批流程
+## 审批流程 {#how-the-approval-flow-works}
 
 1. 当模型发出工具调用时，运行器会评估其审批规则（`needs_approval`、`require_approval` 或托管 MCP 的对应规则）。
 2. 如果该工具调用的审批决策已存储在 [`RunContextWrapper`][agents.run_context.RunContextWrapper] 中，运行器将继续执行而不再提示。单次调用审批的作用域限定于特定调用 ID；传入 `always_approve=True` 或 `always_reject=True`，可在本次运行的剩余期间，为后续对同一工具标识的调用保留相同决策。
@@ -60,7 +60,7 @@ agent = Agent(
 
 你不必在同一轮处理中解决所有待处理审批。`interruptions` 可以同时包含常规函数工具、托管 MCP 审批以及嵌套的 `Agent.as_tool()` 审批。如果你仅批准或拒绝部分项目后重新运行，已解决的调用可以继续，而未解决的调用仍会保留在 `interruptions` 中，并再次暂停运行。
 
-## 自定义拒绝消息
+## 自定义拒绝消息 {#custom-rejection-messages}
 
 默认情况下，被拒绝的工具调用会将 SDK 的标准拒绝文本返回到运行中。你可以在两个层级自定义该消息：
 
@@ -90,7 +90,7 @@ state.reject(
 
 有关同时展示这两个层级的完整代码示例，请参阅 [`examples/agent_patterns/human_in_the_loop_custom_rejection.py`](https://github.com/openai/openai-agents-python/tree/main/examples/agent_patterns/human_in_the_loop_custom_rejection.py)。
 
-## 自动审批决策
+## 自动审批决策 {#automatic-approval-decisions}
 
 手动 `interruptions` 是最通用的模式，但并非唯一方式：
 
@@ -100,13 +100,13 @@ state.reject(
 
 当这些回调返回决策时，运行会继续，而无需暂停等待人工响应。对于 Realtime 和语音会话 API，请参阅 [Realtime 指南](realtime/guide.md)中的审批流程。
 
-## 流式传输与会话
+## 流式传输与会话 {#streaming-and-sessions}
 
 同一中断流程也适用于流式运行。流式运行暂停后，应持续消费 [`RunResultStreaming.stream_events()`][agents.result.RunResultStreaming.stream_events]，直到迭代器结束；然后检查 [`RunResultStreaming.interruptions`][agents.result.RunResultStreaming.interruptions]、解决其中的中断项，并在希望恢复后的输出继续进行流式传输时，使用 [`Runner.run_streamed(...)`][agents.run.Runner.run_streamed] 恢复。有关此模式的流式版本，请参阅[流式传输](streaming.md)。
 
 如果你还使用了会话，请在从 `RunState` 恢复时继续传入同一个会话实例，或者传入针对相同会话 ID 和后端存储配置的另一个会话对象。恢复后的轮次随后会追加到同一份已存储的对话历史中。有关会话生命周期的详细信息，请参阅[会话](sessions/index.md)。
 
-## 暂停、批准与恢复示例
+## 暂停、批准与恢复示例 {#example-pause-approve-resume}
 
 下面的代码片段与 JavaScript HITL 指南采用相同流程：它会在工具需要审批时暂停，将状态持久化到磁盘，重新加载状态，并在收集决策后恢复运行。
 
@@ -177,7 +177,7 @@ if __name__ == "__main__":
 
 若要在可能因审批而暂停的运行中使用流式传输，请调用 `Runner.run_streamed`，消费 `result.stream_events()` 直至其完成，然后执行与上述相同的 `result.to_state()` 和恢复步骤。
 
-## 仓库模式与代码示例
+## 仓库模式与代码示例 {#repository-patterns-and-examples}
 
 - **流式审批**：`examples/agent_patterns/human_in_the_loop_stream.py` 展示了如何完整消费 `stream_events()`，然后批准待处理的工具调用，最后使用 `Runner.run_streamed(agent, state)` 恢复运行。
 - **自定义拒绝文本**：`examples/agent_patterns/human_in_the_loop_custom_rejection.py` 展示了在审批被拒绝时，如何将运行级 `tool_error_formatter` 与单次调用的 `rejection_message` 覆盖设置结合使用。
@@ -188,7 +188,7 @@ if __name__ == "__main__":
 - **会话与记忆**：向 `Runner.run` 传入会话，使审批和对话历史能够跨多个轮次保留。SQLite 和 OpenAI Conversations 会话变体位于 `examples/memory/memory_session_hitl_example.py` 和 `examples/memory/openai_session_hitl_example.py` 中。
 - **实时智能体**：实时演示提供了 WebSocket 消息，可通过 `RealtimeSession` 上的 `approve_tool_call` / `reject_tool_call` 批准或拒绝工具调用（有关服务器端处理程序，请参阅 `examples/realtime/app/server.py`；有关 API 接口，请参阅 [Realtime 指南](realtime/guide.md#tool-approvals)）。
 
-## 长期审批
+## 长期审批 {#long-running-approvals}
 
 `RunState` 专为持久化而设计。使用 `state.to_json()` 或 `state.to_string()` 将待处理工作存储在数据库或队列中，之后再使用 `RunState.from_json(...)` 或 `RunState.from_string(...)` 重新创建它。
 
@@ -202,6 +202,6 @@ if __name__ == "__main__":
 
 已序列化的运行状态包含应用上下文，以及由 SDK 管理的运行时元数据，例如审批、用量、已序列化的 `tool_input`、嵌套的智能体工具恢复信息、追踪元数据和服务器管理的对话设置。如果你计划存储或传输已序列化的状态，请将 `RunContextWrapper.context` 视为持久化数据；除非你明确希望密钥随状态一起传递，否则请避免将密钥放入其中。
 
-## 待处理任务的版本管理
+## 待处理任务的版本管理 {#versioning-pending-tasks}
 
 如果审批可能长时间处于待处理状态，请将智能体定义或 SDK 的版本标记与已序列化状态一同存储。这样，你就可以将反序列化操作路由到匹配的代码路径，避免模型、提示词或工具定义发生变化时出现不兼容问题。

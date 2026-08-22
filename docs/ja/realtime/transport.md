@@ -10,7 +10,7 @@ search:
 
     Python SDK には、ブラウザー向け WebRTC トランスポートは **含まれていません** 。このページでは、Python SDK のトランスポートの選択肢である、サーバー側 WebSocket と SIP 接続フローのみを扱います。ブラウザー WebRTC は別のプラットフォームトピックであり、公式の [WebRTC を使用する Realtime API](https://developers.openai.com/api/docs/guides/realtime-webrtc/) ガイドに記載されています。
 
-## 選択ガイド
+## 選択ガイド {#decision-guide}
 
 | 目的 | 最初に参照するもの | 理由 |
 | --- | --- | --- |
@@ -18,7 +18,7 @@ search:
 | 選択すべきトランスポートとデプロイ構成を理解する | このページ | トランスポートまたはデプロイ構成を決定する前に、このページを参照してください。 |
 | エージェントを電話または SIP 通話に接続する | [リアルタイムガイド](guide.md)および [`examples/realtime/twilio_sip`](https://github.com/openai/openai-agents-python/tree/main/examples/realtime/twilio_sip) | このリポジトリには、`call_id` によって駆動される SIP 接続フローが含まれています。 |
 
-## Python のデフォルトパスとなるサーバー側 WebSocket
+## Python のデフォルトパスとなるサーバー側 WebSocket {#server-side-websocket-is-the-default-python-path}
 
 カスタムの `RealtimeModel` を渡さない限り、`RealtimeRunner` は `OpenAIRealtimeWebSocketModel` を使用します。
 
@@ -37,7 +37,7 @@ search:
 
 サーバーが音声パイプライン、ツール実行、承認フロー、および履歴処理を担う場合は、このパスを使用してください。
 
-### 低レベル WebSocket の調整
+### 低レベル WebSocket の調整 {#low-level-websocket-tuning}
 
 基盤となるサーバー側 WebSocket 接続を調整する必要がある場合は、`OpenAIRealtimeWebSocketModel` に `transport_config` を渡します。
 
@@ -69,7 +69,7 @@ runner = RealtimeRunner(starting_agent=agent, model=model)
 
 これらの設定は Realtime APIセッションではなく、クライアント接続を構成します。エンドポイント、認証、通話への接続、および再生設定には、引き続き `RealtimeModelConfig` を使用してください。
 
-## 電話通信向けの SIP 接続
+## 電話通信向けの SIP 接続 {#sip-attach-is-the-telephony-path}
 
 このリポジトリに記載されている電話通信フローでは、Python SDK は `call_id` を介して既存のリアルタイム通話に接続します。
 
@@ -84,7 +84,7 @@ runner = RealtimeRunner(starting_agent=agent, model=model)
 
 より広範な Realtime APIでは、一部のサーバー側制御パターンに `call_id` も使用しますが、このリポジトリに含まれる接続のコード例では SIP を使用しています。
 
-## SDK の対象外となるブラウザー WebRTC
+## SDK の対象外となるブラウザー WebRTC {#browser-webrtc-is-outside-this-sdk}
 
 アプリの主要クライアントが Realtime WebRTC を使用するブラウザーである場合は、次の点に注意してください。
 
@@ -95,7 +95,7 @@ runner = RealtimeRunner(starting_agent=agent, model=model)
 
 また、このリポジトリには現在、ブラウザー WebRTC と Python サイドバンドを組み合わせたコード例も含まれていません。
 
-## カスタムエンドポイントと接続ポイント
+## カスタムエンドポイントと接続ポイント {#custom-endpoints-and-attach-points}
 
 [`RealtimeModelConfig`][agents.realtime.model.RealtimeModelConfig] のトランスポート設定インターフェースを使用すると、デフォルトのトランスポート動作をカスタマイズできます。
 

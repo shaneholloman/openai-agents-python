@@ -10,7 +10,7 @@ search:
 
     Python SDK **不**包含浏览器 WebRTC 传输。本页面仅介绍 Python SDK 的传输选择：服务器端 WebSocket 和 SIP 接入流程。浏览器 WebRTC 属于独立的平台主题，相关内容请参阅官方 [Realtime API 与 WebRTC](https://developers.openai.com/api/docs/guides/realtime-webrtc/)指南。
 
-## 选择指南
+## 选择指南 {#decision-guide}
 
 | 目标 | 入门资源 | 原因 |
 | --- | --- | --- |
@@ -18,7 +18,7 @@ search:
 | 了解应选择的传输方式和部署形态 | 本页面 | 在确定传输方式或部署形态之前，请先阅读本页面。 |
 | 将智能体接入电话或 SIP 通话 | [实时指南](guide.md)和 [`examples/realtime/twilio_sip`](https://github.com/openai/openai-agents-python/tree/main/examples/realtime/twilio_sip) | 该仓库提供了由 `call_id` 驱动的 SIP 接入流程。 |
 
-## 默认的 Python 路径：服务器端 WebSocket
+## 默认的 Python 路径：服务器端 WebSocket {#server-side-websocket-is-the-default-python-path}
 
 除非传入自定义 `RealtimeModel`，否则 `RealtimeRunner` 会使用 `OpenAIRealtimeWebSocketModel`。
 
@@ -37,7 +37,7 @@ search:
 
 当您的服务器负责音频管线、工具执行、审批流程和历史记录处理时，请使用此路径。
 
-### 底层 WebSocket 调优
+### 底层 WebSocket 调优 {#low-level-websocket-tuning}
 
 需要调优底层服务器端 WebSocket 连接时，请将 `transport_config` 传递给 `OpenAIRealtimeWebSocketModel`：
 
@@ -69,7 +69,7 @@ runner = RealtimeRunner(starting_agent=agent, model=model)
 
 这些设置配置的是客户端连接，而不是 Realtime API 会话。端点、身份验证、通话接入和播放设置仍应使用 `RealtimeModelConfig`。
 
-## 电话通信路径：SIP 接入
+## 电话通信路径：SIP 接入 {#sip-attach-is-the-telephony-path}
 
 对于本仓库中记录的电话通信流程，Python SDK 通过 `call_id` 接入现有的实时通话。
 
@@ -84,7 +84,7 @@ runner = RealtimeRunner(starting_agent=agent, model=model)
 
 更广泛的 Realtime API 也会将 `call_id` 用于某些服务器端控制模式，但本仓库提供的接入示例使用的是 SIP。
 
-## SDK 范围之外的浏览器 WebRTC
+## SDK 范围之外的浏览器 WebRTC {#browser-webrtc-is-outside-this-sdk}
 
 如果您的应用主要使用 Realtime WebRTC 浏览器客户端：
 
@@ -95,7 +95,7 @@ runner = RealtimeRunner(starting_agent=agent, model=model)
 
 本仓库目前也未提供浏览器 WebRTC 与 Python 旁路连接结合使用的示例。
 
-## 自定义端点和接入点
+## 自定义端点和接入点 {#custom-endpoints-and-attach-points}
 
 [`RealtimeModelConfig`][agents.realtime.model.RealtimeModelConfig] 中的传输配置接口允许您自定义默认传输行为：
 

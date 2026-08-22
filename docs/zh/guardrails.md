@@ -11,7 +11,7 @@ search:
 1. 输入安全防护措施针对初始用户输入运行
 2. 输出安全防护措施针对智能体的最终输出运行
 
-## 工作流边界
+## 工作流边界 {#workflow-boundaries}
 
 安全防护措施会附加到智能体和工具上，但它们并非都在工作流中的相同节点运行：
 
@@ -21,7 +21,7 @@ search:
 
 如果需要在包含管理者、任务转移或受委派专家的工作流中，于每次自定义函数工具调用前和/或调用后执行检查，请使用工具安全防护措施，而不要只依赖智能体级别的输入/输出安全防护措施。
 
-## 输入安全防护措施
+## 输入安全防护措施 {#input-guardrails}
 
 输入安全防护措施分 3 个步骤运行：
 
@@ -33,7 +33,7 @@ search:
 
     输入安全防护措施旨在针对用户输入运行，因此仅当某个智能体是*第一个*智能体时，才会运行该智能体的安全防护措施。你可能会疑惑，为什么 `guardrails` 属性位于智能体上，而不是传给 `Runner.run`？这是因为安全防护措施往往与实际的智能体相关——你会为不同智能体运行不同的安全防护措施，因此将代码放在一起有助于提高可读性。
 
-### 执行模式
+### 执行模式 {#execution-modes}
 
 输入安全防护措施支持两种执行模式：
 
@@ -41,7 +41,7 @@ search:
 
 - **阻塞执行**（`run_in_parallel=False`）：安全防护措施会在智能体启动*之前*运行并完成。如果安全防护措施的触发器被触发，智能体将完全不会执行，从而避免消耗 token 和执行工具。这种模式非常适合成本优化，以及需要避免工具调用产生潜在副作用的场景。
 
-## 输出安全防护措施
+## 输出安全防护措施 {#output-guardrails}
 
 输出安全防护措施分 3 个步骤运行：
 
@@ -59,7 +59,7 @@ search:
 
 终止型函数工具输出需要额外处理，因为在智能体级别的输出安全防护措施检查该值之前，工具已经运行。当 [`Agent.tool_use_behavior`][agents.agent.Agent.tool_use_behavior] 将该工具结果设为最终输出，而输出触发器将其拒绝时，只有在可以根据已验证字段重建函数调用/输出对的情况下，SDK 才会保留可有效重放的函数调用/输出对。保留的 `function_call_output` 载荷会替换为固定文本 `"Output withheld by an output guardrail."`；原始工具输出载荷不会保留在会话、`RunState`、流式传输结果状态或沙箱内存输入中。SDK 会保留重放所需的已验证函数调用元数据，包括函数参数，因此该元数据可能包含也曾出现在被拒绝输出中的数据。当前响应的 [`OutputGuardrailResult`][agents.guardrail.OutputGuardrailResult] 对象也会将 `agent_output` 替换为该固定文本，并清除 `output_info`。当前响应的 [`ToolOutputGuardrailResult`][agents.tool_guardrails.ToolOutputGuardrailResult] 对象会保留允许/拒绝行为类型，但会将包含载荷的 `output_info` 和拒绝消息替换为相同文本。此前已接受的轮次和安全防护措施结果保持不变。如果响应包含推理内容或其他 SDK 无法安全清理的结构，SDK 会丢弃当前响应的完整后缀，而不是保留被拒绝的输出载荷。抛出异常的安全防护措施函数并未返回拒绝判定，因此已完成的终止工具轮次会遵循上述异常持久化行为。
 
-## 工具安全防护措施
+## 工具安全防护措施 {#tool-guardrails}
 
 工具安全防护措施会包装**`FunctionTool` 实例**，使你能够在这些工具执行前后验证或阻止对它们的调用。它们配置在工具本身上，并在每次调用该工具时运行。
 
@@ -70,7 +70,7 @@ search:
 
 有关详情，请参阅下方代码片段。
 
-## 触发器
+## 触发器 {#tripwires}
 
 如果智能体输入或输出未通过安全防护措施，安全防护措施可以通过触发器发出信号。运行器会立即抛出 `InputGuardrailTripwireTriggered` 或 `OutputGuardrailTripwireTriggered` 异常，并停止执行智能体。工具安全防护措施使用对应的 `ToolInputGuardrailTripwireTriggered` 和 `ToolOutputGuardrailTripwireTriggered` 异常。
 
@@ -78,7 +78,7 @@ search:
 
 工具触发器异常则会直接公开触发它的 `guardrail` 和 `output`。其中的 `run_data.tool_input_guardrail_results` 和 `run_data.tool_output_guardrail_results` 列表会保留失败前已完成轮次中累积的结果；触发结果可通过异常的 `output` 获取。其他由运行器管理的故障（例如 `MaxTurnsExceeded`）也会在这些列表中保留已完成的工具安全防护措施结果。在 `stream_events()` 抛出异常后，流式传输结果会公开相同的智能体和工具安全防护措施累积结果列表。在运行器管理的执行路径之外抛出异常时，`run_data` 可以是 `None`。
 
-## 安全防护措施实现
+## 安全防护措施实现 {#implementing-a-guardrail}
 
 你需要提供一个接收输入并返回 [`GuardrailFunctionOutput`][agents.guardrail.GuardrailFunctionOutput] 的函数。在此示例中，我们将在底层运行一个智能体来实现这一点。
 

@@ -10,7 +10,7 @@ search:
 
 비동기 이터레이터가 완료될 때까지 `result.stream_events()`를 계속 소비해야 합니다. 스트리밍 실행은 이터레이터가 종료될 때까지 완료된 것이 아니며, 세션 영속화, 승인 기록 관리, 기록 압축과 같은 후처리는 마지막으로 표시되는 토큰이 도착한 후에도 계속될 수 있습니다. 루프가 종료되면 `result.is_complete`에 최종 실행 상태가 반영됩니다.
 
-## 가공되지 않은 응답 이벤트
+## 가공되지 않은 응답 이벤트 {#raw-response-events}
 
 [`RawResponsesStreamEvent`][agents.stream_events.RawResponsesStreamEvent] 객체는 LLM에서 직접 전달된 가공되지 않은 이벤트를 래핑합니다. 각 객체의 `data` 필드에는 `response.created` 또는 `response.output_text.delta` 같은 유형의 OpenAI Responses API 이벤트가 포함됩니다. 이러한 이벤트는 응답 메시지가 생성되는 즉시 사용자에게 스트리밍하려는 경우 유용합니다.
 
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## 스트리밍 및 승인
+## 스트리밍 및 승인 {#streaming-and-approvals}
 
 스트리밍은 도구 승인을 위해 일시 중지되는 실행과 호환됩니다. 도구에 승인이 필요하면 `result.stream_events()`가 완료되고, 보류 중인 승인은 [`RunResultStreaming.interruptions`][agents.result.RunResultStreaming.interruptions]에 노출됩니다. `result.to_state()`를 사용하여 결과를 [`RunState`][agents.run_state.RunState]로 변환하고, 인터럽션(중단 처리)을 승인하거나 거부한 다음 `Runner.run_streamed(...)`으로 재개합니다.
 
@@ -59,7 +59,7 @@ if result.interruptions:
 
 전체 일시 중지 및 재개 과정은 [휴먼인더루프 (HITL) 가이드](human_in_the_loop.md)를 참고하세요.
 
-## 현재 턴 이후 스트리밍 취소
+## 현재 턴 이후 스트리밍 취소 {#cancel-streaming-after-the-current-turn}
 
 진행 중인 스트리밍 실행을 중간에 중지해야 하는 경우 [`result.cancel()`][agents.result.RunResultStreaming.cancel]을 호출합니다. 기본적으로 실행이 즉시 중지됩니다. 중지하기 전에 현재 턴이 정상적으로 완료되도록 하려면 대신 `result.cancel(mode="after_turn")`를 호출합니다.
 
@@ -71,11 +71,11 @@ if result.interruptions:
 -   스트리밍 실행이 도구 승인을 위해 중지된 경우 이를 새 턴으로 취급하지 마세요. 스트림을 끝까지 소비하고 `result.interruptions`를 검사한 다음 `result.to_state()`에서 재개합니다.
 -   다음 모델 호출 전에 조회된 세션 기록과 새 사용자 입력을 병합하는 방식을 사용자 지정하려면 [`RunConfig.session_input_callback`][agents.run.RunConfig.session_input_callback]을 사용합니다. 여기에서 새 턴 항목을 다시 작성하면 다시 작성된 버전이 해당 턴에 영속화됩니다.
 
-## 실행 항목 이벤트 및 에이전트 이벤트
+## 실행 항목 이벤트 및 에이전트 이벤트 {#run-item-events-and-agent-events}
 
 [`RunItemStreamEvent`][agents.stream_events.RunItemStreamEvent]는 상위 수준의 이벤트입니다. 항목이 완전히 생성되었을 때 이를 알려 줍니다. 따라서 각 토큰 대신 "메시지 생성됨", "도구 실행됨" 등의 수준으로 진행 상황 업데이트를 전달할 수 있습니다. 마찬가지로 [`AgentUpdatedStreamEvent`][agents.stream_events.AgentUpdatedStreamEvent]는 현재 에이전트가 변경될 때 업데이트를 제공합니다(예: 핸드오프의 결과).
 
-### 실행 항목 이벤트 이름
+### 실행 항목 이벤트 이름 {#run-item-event-names}
 
 `RunItemStreamEvent.name`는 정해진 의미론적 이벤트 이름 집합을 사용합니다.
 

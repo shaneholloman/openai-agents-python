@@ -10,7 +10,7 @@ Agents SDK는 여러 에이전트 실행에 걸쳐 대화 기록을 자동으로
 
 SDK가 클라이언트 측 메모리를 관리하게 하려면 세션을 사용하세요. 동일한 실행에서 세션은 실행 수준 연속 실행 옵션인 `conversation_id`, `previous_response_id`, `auto_previous_response_id`과 함께 사용할 수 없습니다. 대신 OpenAI 서버에서 관리하는 연속 실행을 원한다면 세션을 추가로 겹쳐 사용하지 말고 이러한 메커니즘 중 하나를 선택하세요.
 
-## 빠른 시작
+## 빠른 시작 {#quick-start}
 
 ```python
 from agents import Agent, Runner, SQLiteSession
@@ -49,7 +49,7 @@ result = Runner.run_sync(
 print(result.final_output)  # "Approximately 39 million"
 ```
 
-## 동일한 세션을 사용한 인터럽션(중단 처리)된 실행 재개
+## 동일한 세션을 사용한 인터럽션(중단 처리)된 실행 재개 {#resuming-interrupted-runs-with-the-same-session}
 
 승인을 위해 실행이 일시 중지되면 동일한 세션 인스턴스(또는 동일한 세션 ID와 동일한 기본 스토리지 백엔드로 구성된 다른 인스턴스)를 사용하여 재개하세요. 그러면 재개된 턴이 저장된 동일한 대화 기록을 이어갑니다.
 
@@ -63,7 +63,7 @@ if result.interruptions:
     result = await Runner.run(agent, state, session=session)
 ```
 
-## 핵심 세션 동작
+## 핵심 세션 동작 {#core-session-behavior}
 
 세션 메모리가 활성화되면 다음과 같이 동작합니다.
 
@@ -73,7 +73,7 @@ if result.interruptions:
 
 따라서 `.to_input_list()`을 수동으로 호출하고 실행 사이의 대화 상태를 관리할 필요가 없습니다.
 
-## 기록과 새 입력의 병합 방식 제어
+## 기록과 새 입력의 병합 방식 제어 {#control-how-history-and-new-input-merge}
 
 세션을 전달하면 러너는 일반적으로 다음 순서로 모델 입력을 준비합니다.
 
@@ -111,7 +111,7 @@ result = await Runner.run(
 
 세션의 항목 저장 방식을 변경하지 않고 기록을 맞춤 정리하거나 재정렬하거나 선택적으로 포함해야 할 때 사용하세요. 모델 호출 직전에 나중 단계의 최종 처리가 필요하다면 [에이전트 실행 가이드](../running_agents.md)의 [`call_model_input_filter`][agents.run.RunConfig.call_model_input_filter]를 사용하세요.
 
-## 가져오는 기록 제한
+## 가져오는 기록 제한 {#limiting-retrieved-history}
 
 각 실행 전에 가져올 기록의 양을 제어하려면 [`SessionSettings`][agents.memory.SessionSettings]을 사용하세요.
 
@@ -136,9 +136,9 @@ result = await Runner.run(
 
 세션 구현에서 기본 세션 설정을 제공하는 경우, `RunConfig.session_settings`의 `None`이 아닌 각 값은 해당 실행에서 대응하는 기본값을 재정의합니다. 이는 세션의 기본 동작을 변경하지 않고 가져오는 기록의 크기를 제한하려는 긴 대화에 유용합니다.
 
-## 메모리 작업
+## 메모리 작업 {#memory-operations}
 
-### 기본 작업
+### 기본 작업 {#basic-operations}
 
 세션은 대화 기록을 관리하기 위한 여러 작업을 지원합니다.
 
@@ -165,7 +165,7 @@ print(last_item)  # {"role": "assistant", "content": "Hi there!"}
 await session.clear_session()
 ```
 
-### 수정 시 pop_item 사용
+### 수정 시 pop_item 사용 {#using-pop_item-for-corrections}
 
 대화의 마지막 항목을 실행 취소하거나 수정하려는 경우 `pop_item` 메서드가 특히 유용합니다.
 
@@ -196,11 +196,11 @@ result = await Runner.run(
 print(f"Agent: {result.final_output}")
 ```
 
-## 내장 세션 구현
+## 내장 세션 구현 {#built-in-session-implementations}
 
 SDK는 다양한 사용 사례를 위한 여러 세션 구현을 제공합니다.
 
-### 내장 세션 구현 선택
+### 내장 세션 구현 선택 {#choose-a-built-in-session-implementation}
 
 아래의 자세한 예제를 읽기 전에 이 표를 사용하여 시작점을 선택하세요.
 
@@ -221,7 +221,7 @@ SDK는 다양한 사용 사례를 위한 여러 세션 구현을 제공합니다
 
 ChatKit용 Python 서버를 구현하는 경우 ChatKit의 스레드 및 항목 영속성을 위해 `chatkit.store.Store` 구현을 사용하세요. `SQLAlchemySession`과 같은 Agents SDK 세션은 SDK 측 대화 기록을 관리하지만 ChatKit 스토어를 그대로 대체할 수는 없습니다. [`chatkit-python` ChatKit 데이터 스토어 구현 가이드](https://github.com/openai/chatkit-python/blob/main/docs/guides/respond-to-user-message.md#implement-your-chatkit-data-store)를 참조하세요.
 
-### OpenAI Conversations API 세션
+### OpenAI Conversations API 세션 {#openai-conversations-api-sessions}
 
 `OpenAIConversationsSession`를 통해 [OpenAI의 Conversations API](https://platform.openai.com/docs/api-reference/conversations)를 사용하세요.
 
@@ -257,11 +257,11 @@ result = await Runner.run(
 print(result.final_output)  # "California"
 ```
 
-### OpenAI Responses 압축 세션
+### OpenAI Responses 압축 세션 {#openai-responses-compaction-sessions}
 
 Responses API(`responses.compact`)로 저장된 대화 기록을 압축하려면 `OpenAIResponsesCompactionSession`을 사용하세요. 이 클래스는 기본 세션을 감싸며 `should_trigger_compaction`에 따라 각 턴 후 자동으로 압축할 수 있습니다. `OpenAIConversationsSession`을 이 클래스로 감싸지 마세요. 두 기능은 서로 다른 방식으로 기록을 관리합니다.
 
-#### 일반적인 사용법(자동 압축)
+#### 일반적인 사용법(자동 압축) {#typical-usage-auto-compaction}
 
 ```python
 from agents import Agent, Runner, SQLiteSession
@@ -286,7 +286,7 @@ print(result.final_output)
 
 에이전트가 `ModelSettings(store=False)`으로 실행되는 경우 Responses API는 나중에 조회할 수 있도록 마지막 응답을 유지하지 않습니다. 이러한 무상태 설정에서 기본 `"auto"` 모드는 `previous_response_id`에 의존하는 대신 입력 기반 압축으로 대체됩니다. 전체 예제는 [`examples/memory/compaction_session_stateless_example.py`](https://github.com/openai/openai-agents-python/tree/main/examples/memory/compaction_session_stateless_example.py)을 참조하세요.
 
-#### 자동 압축에 의한 스트리밍 차단 가능성
+#### 자동 압축에 의한 스트리밍 차단 가능성 {#auto-compaction-can-block-streaming}
 
 압축은 세션 기록을 지우고 다시 작성하므로 SDK는 실행이 완료된 것으로 간주하기 전에 압축이 끝날 때까지 기다립니다. 스트리밍 모드에서는 압축 작업이 많은 경우 마지막 출력 토큰 이후에도 `run.stream_events()`이 몇 초 동안 열려 있을 수 있습니다.
 
@@ -313,7 +313,7 @@ result = await Runner.run(agent, "Hello", session=session)
 await session.run_compaction({"force": True})
 ```
 
-### SQLite 세션
+### SQLite 세션 {#sqlite-sessions}
 
 SQLite를 사용하는 기본 경량 세션 구현입니다.
 
@@ -334,7 +334,7 @@ result = await Runner.run(
 )
 ```
 
-### 비동기 SQLite 세션
+### 비동기 SQLite 세션 {#async-sqlite-sessions}
 
 `aiosqlite` 기반 SQLite 영속성이 필요한 경우 `AsyncSQLiteSession`을 사용하세요.
 
@@ -351,7 +351,7 @@ session = AsyncSQLiteSession("user_123", db_path="conversations.db")
 result = await Runner.run(agent, "Hello", session=session)
 ```
 
-### Redis 세션
+### Redis 세션 {#redis-sessions}
 
 여러 워커 또는 서비스 간에 세션 메모리를 공유하려면 `RedisSession`를 사용하세요.
 
@@ -374,7 +374,7 @@ await session.close()
 
 `from_url(...)`은 Redis 클라이언트를 생성하고 소유합니다. `close()` 이후 세션은 종료 상태가 되며 이후 세션 작업에서는 `RuntimeError`이 발생합니다. 반복되거나 동시에 실행되는 `close()` 호출은 안전합니다. 애플리케이션에서 이미 Redis 클라이언트를 관리하는 경우 `redis_client=...`을 사용하여 `RedisSession(...)`을 직접 생성하세요. 이 경우 `close()`은 아무 작업도 수행하지 않으며, 호출자가 클라이언트 소유권을 유지하고 세션도 계속 사용할 수 있습니다.
 
-### SQLAlchemy 세션
+### SQLAlchemy 세션 {#sqlalchemy-sessions}
 
 SQLAlchemy가 지원하는 모든 데이터베이스를 사용할 수 있는 프로덕션용 Agents SDK 세션 영속성 구현입니다.
 
@@ -396,7 +396,7 @@ session = SQLAlchemySession("user_123", engine=engine, create_tables=True)
 
 자세한 문서는 [SQLAlchemy 세션](sqlalchemy_session.md)을 참조하세요.
 
-### Dapr 세션
+### Dapr 세션 {#dapr-sessions}
 
 이미 Dapr 사이드카를 실행하고 있거나 에이전트 코드를 변경하지 않고 구성된 상태 저장소 백엔드를 전환하려면 `DaprSession`을 사용하세요.
 
@@ -429,7 +429,7 @@ async with DaprSession.from_address(
 -   로컬 구성 요소와 문제 해결을 포함한 전체 설정 안내는 [`examples/memory/dapr_session_example.py`](https://github.com/openai/openai-agents-python/tree/main/examples/memory/dapr_session_example.py)를 참조하세요.
 
 
-### MongoDB 세션
+### MongoDB 세션 {#mongodb-sessions}
 
 이미 MongoDB를 사용하는 애플리케이션이나 수평 확장이 가능한 다중 프로세스 세션 스토리지가 필요한 애플리케이션에서는 `MongoDBSession`을 사용하세요.
 
@@ -461,7 +461,7 @@ await session.close()
 -   두 개의 컬렉션이 사용되며 두 이름 모두 `sessions_collection=`(기본값 `agent_sessions`)과 `messages_collection=`(기본값 `agent_messages`)을 통해 구성할 수 있습니다. 인덱스는 처음 사용할 때 자동으로 생성됩니다. 비어 있지 않은 각 `add_items()` 호출은 단조 증가하는 `seq`이 마지막 항목을 기준으로 배치 순서를 지정하는 논리적 배치 문서 하나를 작성합니다. 기존의 항목별 메시지 문서도 계속 읽을 수 있습니다. 논리적 배치는 MongoDB의 단일 문서 크기 제한 이내여야 하며, 크기를 초과하는 배치는 일부를 저장하지 않고 원자적으로 실패합니다.
 -   첫 실행 전에 연결 상태를 확인하려면 `await session.ping()`을 사용하세요.
 
-### 고급 SQLite 세션
+### 고급 SQLite 세션 {#advanced-sqlite-sessions}
 
 대화 브랜칭, 사용량 분석 및 구조화된 쿼리를 지원하는 향상된 SQLite 세션입니다.
 
@@ -485,7 +485,7 @@ await session.create_branch_from_turn(2)  # Branch from turn 2
 
 자세한 문서는 [고급 SQLite 세션](advanced_sqlite_session.md)을 참조하세요.
 
-### 암호화된 세션
+### 암호화된 세션 {#encrypted-sessions}
 
 모든 세션 구현에 사용할 수 있는 투명한 암호화 래퍼입니다.
 
@@ -512,13 +512,13 @@ result = await Runner.run(agent, "Hello", session=session)
 
 자세한 문서는 [암호화된 세션](encrypted_session.md)을 참조하세요.
 
-### 기타 세션 유형
+### 기타 세션 유형 {#other-session-types}
 
 그 밖에도 몇 가지 내장 옵션이 있습니다. `examples/memory/`과 `extensions/memory/` 아래의 소스 코드를 참조하세요.
 
-## 운영 패턴
+## 운영 패턴 {#operational-patterns}
 
-### 세션 ID 명명 방식
+### 세션 ID 명명 방식 {#session-id-naming}
 
 대화를 정리하는 데 도움이 되는 의미 있는 세션 ID를 사용하세요.
 
@@ -526,7 +526,7 @@ result = await Runner.run(agent, "Hello", session=session)
 -   스레드 기반: `"thread_abc123"`
 -   컨텍스트 기반: `"support_ticket_456"`
 
-### 메모리 영속성
+### 메모리 영속성 {#memory-persistence}
 
 -   임시 대화에는 인메모리 SQLite(`SQLiteSession("session_id")`) 사용
 -   지속되는 대화에는 파일 기반 SQLite(`SQLiteSession("session_id", "path/to/db.sqlite")`) 사용
@@ -539,7 +539,7 @@ result = await Runner.run(agent, "Hello", session=session)
 -   모든 세션에 투명한 암호화 및 TTL 기반 만료를 적용하려면 암호화된 세션(`EncryptedSession(session_id, underlying_session, encryption_key)`) 사용
 -   더 고급 사용 사례에서는 다른 프로덕션 시스템(예: Django)을 위한 맞춤형 세션 백엔드 구현 고려
 
-### 여러 세션
+### 여러 세션 {#multiple-sessions}
 
 ```python
 from agents import Agent, Runner, SQLiteSession
@@ -562,7 +562,7 @@ result2 = await Runner.run(
 )
 ```
 
-### 세션 공유
+### 세션 공유 {#session-sharing}
 
 ```python
 # Different agents can share the same session
@@ -583,7 +583,7 @@ result2 = await Runner.run(
 )
 ```
 
-## 전체 예제
+## 전체 예제 {#complete-example}
 
 다음은 세션 메모리의 실제 동작을 보여주는 전체 예제입니다.
 
@@ -647,7 +647,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## 맞춤형 세션 구현
+## 맞춤형 세션 구현 {#custom-session-implementations}
 
 [`Session`][agents.memory.session.Session] 프로토콜을 구조적으로 따르는 클래스를 생성하여 자체 세션 메모리를 구현할 수 있습니다. `SessionABC`을 상속할 필요는 없습니다. `session_id`과 `session_settings`을 정의하고 네 개의 기록 메서드를 직접 구현하세요.
 
@@ -691,7 +691,7 @@ result = await Runner.run(
 )
 ```
 
-### 맞춤형 세션에서 실행 컨텍스트 접근
+### 맞춤형 세션에서 실행 컨텍스트 접근 {#accessing-run-context-from-a-custom-session}
 
 Agents SDK는 테넌트 라우팅, 권한 부여 또는 기타 앱별 스토리지 결정을 위해 활성 [`RunContextWrapper`][agents.run_context.RunContextWrapper]을 맞춤형 세션에 전달할 수 있습니다. Agents SDK가 래퍼를 전달하도록 하려면 네 개의 기록 메서드 모두에 명시적으로 이름이 지정되고 키워드와 호환되는 `wrapper` 매개변수를 추가하세요.
 
@@ -732,7 +732,7 @@ class ContextAwareSession:
 
 Agents SDK는 `get_items`, `add_items`, `pop_item`, `clear_session`이 모두 `wrapper`을 선언하는 경우에만 이 통합을 활성화합니다. 일반적인 `**kwargs` 매개변수는 이 시그니처 검사를 충족하지 않습니다. `wrapper`을 생략하는 기존 세션 구현은 릴리스된 호출 형식을 유지하며 변경 없이 계속 작동합니다.
 
-## 커뮤니티 세션 구현
+## 커뮤니티 세션 구현 {#community-session-implementations}
 
 커뮤니티에서 추가 세션 구현을 개발했습니다.
 
@@ -742,7 +742,7 @@ Agents SDK는 `get_items`, `add_items`, `pop_item`, `clear_session`이 모두 `w
 
 세션 구현을 개발했다면 여기에 추가할 수 있도록 문서 PR을 자유롭게 제출해 주세요!
 
-## API 레퍼런스
+## API 레퍼런스 {#api-reference}
 
 자세한 API 문서는 다음을 참조하세요.
 

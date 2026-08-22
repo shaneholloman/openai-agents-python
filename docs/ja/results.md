@@ -13,7 +13,7 @@ search:
 
 `RunResultStreaming` には、[`stream_events()`][agents.result.RunResultStreaming.stream_events]、[`current_agent`][agents.result.RunResultStreaming.current_agent]、[`is_complete`][agents.result.RunResultStreaming.is_complete]、[`cancel(...)`][agents.result.RunResultStreaming.cancel] など、ストリーミング固有の制御が追加されています。
 
-## 適切な実行結果サーフェスの選択
+## 適切な実行結果サーフェスの選択 {#choose-the-right-result-surface}
 
 ほとんどのアプリケーションで必要になる実行結果のプロパティやヘルパーは、ごく一部です。
 
@@ -28,7 +28,7 @@ search:
 | 現在のネストされた `Agent.as_tool()` 呼び出しに関するメタデータ | `agent_tool_invocation` |
 | raw モデル呼び出しまたはガードレールの診断情報 | `raw_responses` とガードレールの実行結果配列 |
 
-## 最終出力
+## 最終出力 {#final-output}
 
 [`final_output`][agents.result.RunResultBase.final_output] プロパティには、最後に実行されたエージェントの最終出力が含まれます。これは次のいずれかです。
 
@@ -42,7 +42,7 @@ search:
 
 ストリーミングモードでは、ストリームの処理が完了するまで `final_output` は `None` のままです。イベントごとのフローについては、[ストリーミング](streaming.md)を参照してください。
 
-## 入力、次ターンの履歴、新規項目
+## 入力、次ターンの履歴、新規項目 {#input-next-turn-history-and-new-items}
 
 これらのサーフェスは、それぞれ異なる問いに対応します。
 
@@ -67,7 +67,7 @@ JavaScript SDK とは異なり、Python には実行中に新たに生成され�
 
 コンピュータツール項目を会話入力として再送信する場合は、raw Responses ペイロード形式が使用されます。プレビューモデルの `computer_call` 項目では単一の `action` が保持されますが、`gpt-5.5` のコンピュータ呼び出しでは、バッチ化された `actions[]` を保持できます。[`to_input_list()`][agents.result.RunResultBase.to_input_list] と [`RunState`][agents.run_state.RunState] はモデルが生成した形式をそのまま保持するため、これらの項目を会話入力として手動で再送信する処理、一時停止と再開のフロー、保存された会話記録は、プレビュー版と GA 版の両方のコンピュータツール呼び出しで引き続き機能します。ローカルの実行結果は、引き続き `new_items` 内に `computer_call_output` 項目として表示されます。
 
-### 新規項目
+### 新規項目 {#new-items}
 
 [`new_items`][agents.result.RunResultBase.new_items] では、実行中に発生した内容を最も詳細に確認できます。一般的な項目の型は次のとおりです。
 
@@ -110,15 +110,15 @@ caller_id = (
 
 プログラムが所有する子呼び出しでは、`caller` の `type` フィールドは `program` であり、`caller_id` によって親プログラム呼び出しが識別されます。
 
-## 会話の続行または再開
+## 会話の続行または再開 {#continue-or-resume-the-conversation}
 
-### 次ターンのエージェント
+### 次ターンのエージェント {#next-turn-agent}
 
 [`last_agent`][agents.result.RunResultBase.last_agent] には、最後に実行されたエージェントが含まれます。多くの場合、ハンドオフ後の次のユーザーターンで再利用するには、このエージェントが最適です。
 
 ストリーミングモードでは、実行の進行に伴って [`RunResultStreaming.current_agent`][agents.result.RunResultStreaming.current_agent] が更新されるため、ストリームが完了する前にハンドオフを確認できます。
 
-### 中断と実行状態
+### 中断と実行状態 {#interruptions-and-run-state}
 
 ツールに承認が必要な場合、保留中の承認は [`RunResult.interruptions`][agents.result.RunResult.interruptions] または [`RunResultStreaming.interruptions`][agents.result.RunResultStreaming.interruptions] で公開されます。これには、直接のツール、ハンドオフ後に到達したツール、またはネストされた [`Agent.as_tool()`][agents.agent.Agent.as_tool] の実行によって発生した承認が含まれる場合があります。
 
@@ -139,7 +139,7 @@ if result.interruptions:
     result = await Runner.run(agent, state)
 ```
 
-#### 再開前の入力追加
+#### 再開前の入力追加 {#add-input-before-resuming}
 
 実行が一時停止した後、または完了済みのターンの後で停止した後に新しいユーザー入力が到着し、未完了の実行が次のモデル呼び出しに到達する前である場合は、[`RunState.add_input()`][agents.run_state.RunState.add_input] を使用します。文字列はユーザーメッセージになり、複数回呼び出した場合は挿入順が維持されます。ステージングされた入力はシリアライズ済みの `RunState` に含まれるため、`to_json()` / `from_json()` および `to_string()` / `from_string()` のラウンドトリップ後も維持されます。
 
@@ -159,13 +159,13 @@ result = await Runner.run(agent, state)
 
 ストリーミング実行では、まず [`stream_events()`][agents.result.RunResultStreaming.stream_events] の消費を完了してから、`result.interruptions` を確認し、`result.to_state()` から再開します。承認フロー全体については、[Human-in-the-loop](human_in_the_loop.md)を参照してください。
 
-### サーバー管理による続行
+### サーバー管理による続行 {#server-managed-continuation}
 
 [`last_response_id`][agents.result.RunResultBase.last_response_id] は、実行から得られた最新のモデルレスポンス ID です。OpenAI Responses API のチェーンを続行する場合は、次のターンでこれを `previous_response_id` として渡します。
 
 すでに `to_input_list()`、`session`、`conversation_id` を使用して会話を続行している場合、通常は `last_response_id` は必要ありません。複数ステップの実行からすべてのモデルレスポンスが必要な場合は、代わりに `raw_responses` を確認してください。
 
-## エージェントをツールとして使用する場合のメタデータ
+## エージェントをツールとして使用する場合のメタデータ {#agent-as-tool-metadata}
 
 実行結果がネストされた [`Agent.as_tool()`][agents.agent.Agent.as_tool] の実行から得られた場合、[`agent_tool_invocation`][agents.result.RunResultBase.agent_tool_invocation] は、それを包含する `Agent.as_tool()` 呼び出しに関するイミュータブルなメタデータを公開します。
 
@@ -179,7 +179,7 @@ result = await Runner.run(agent, state)
 
 そのネストされた実行について、パース済みの構造化入力も必要な場合は、`context_wrapper.tool_input` を読み取ります。これは、[`RunState`][agents.run_state.RunState] がネストされたツール入力用に汎用的にシリアライズするフィールドです。一方、`agent_tool_invocation` は現在のネストされた呼び出しのメタデータを実行結果上で直接公開します。
 
-## ストリーミングのライフサイクルと診断
+## ストリーミングのライフサイクルと診断 {#streaming-lifecycle-and-diagnostics}
 
 [`RunResultStreaming`][agents.result.RunResultStreaming] は上記と同じ実行結果サーフェスを継承し、さらにストリーミング固有の制御を追加します。
 
@@ -194,7 +194,7 @@ result = await Runner.run(agent, state)
 
 Python には、ストリーミング用の独立した `completed` Promise または `error` プロパティはありません。実行を終了させるストリーミングエラーは `stream_events()` によって送出され、`is_complete` は実行が終端状態に到達したかどうかを示します。
 
-### raw レスポンス
+### raw レスポンス {#raw-responses}
 
 [`raw_responses`][agents.result.RunResultBase.raw_responses] には、実行中に収集された raw モデルレスポンスが含まれます。複数ステップの実行では、ハンドオフや繰り返されるモデル／ツール／モデルのサイクルなどにより、複数のレスポンスが生成される場合があります。
 
@@ -207,7 +207,7 @@ Python には、ストリーミング用の独立した `completed` Promise ま�
 
 `ModelResponse.request_id` と `ModelResponse.raw_usage` はそれぞれ `None` になる可能性があるため、これらの値は会話状態ではなく、オプションの診断情報として扱ってください。
 
-### ガードレールの実行結果
+### ガードレールの実行結果 {#guardrail-results}
 
 エージェントレベルのガードレールは、[`input_guardrail_results`][agents.result.RunResultBase.input_guardrail_results] と [`output_guardrail_results`][agents.result.RunResultBase.output_guardrail_results] として公開されます。
 
@@ -217,7 +217,7 @@ Python には、ストリーミング用の独立した `completed` Promise ま�
 
 エージェントレベルの出力ガードレールが、終端となる関数ツールによって直接生成された最終出力をブロックした場合、1 つの秘匿化ルールが適用されます。ブロックされた現在のレスポンスでは、`output_guardrail_results` が拒否されたエージェント出力を置き換え、ペイロードを含む出力メタデータをクリアします。また、`tool_output_guardrail_results` がペイロードを含むツールメタデータを置き換えます。それ以前に受け入れられた実行結果は変更されません。サニタイズされた出力ガードレールの実行結果は、[`OutputGuardrailTripwireTriggered`][agents.exceptions.OutputGuardrailTripwireTriggered] の `guardrail_result` として公開されます。サニタイズされた出力ガードレールとツール出力ガードレールの実行結果は、ストリーミングされた実行結果の状態と `RunState` からも公開されます。[出力ガードレール](guardrails.md#output-guardrails)を参照してください。
 
-### コンテキストと使用量
+### コンテキストと使用量 {#context-and-usage}
 
 [`context_wrapper`][agents.result.RunResultBase.context_wrapper] は、アプリのコンテキストに加えて、承認、使用量、ネストされた `tool_input` など、SDK が管理するランタイムメタデータを公開します。
 

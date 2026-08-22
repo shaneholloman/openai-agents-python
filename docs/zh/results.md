@@ -13,7 +13,7 @@ search:
 
 `RunResultStreaming` 增加了流式传输专用的控制项，例如 [`stream_events()`][agents.result.RunResultStreaming.stream_events]、[`current_agent`][agents.result.RunResultStreaming.current_agent]、[`is_complete`][agents.result.RunResultStreaming.is_complete] 和 [`cancel(...)`][agents.result.RunResultStreaming.cancel]。
 
-## 合适的结果接口
+## 合适的结果接口 {#choose-the-right-result-surface}
 
 大多数应用只需要少数几个结果属性或辅助方法：
 
@@ -28,7 +28,7 @@ search:
 | 当前嵌套 `Agent.as_tool()` 调用的元数据 | `agent_tool_invocation` |
 | 原始模型调用或安全防护措施诊断信息 | `raw_responses` 和安全防护措施结果数组 |
 
-## 最终输出
+## 最终输出 {#final-output}
 
 [`final_output`][agents.result.RunResultBase.final_output] 属性包含最后运行的智能体所生成的最终输出。它可能是：
 
@@ -42,7 +42,7 @@ search:
 
 在流式传输模式下，`final_output` 会一直保持为 `None`，直到流处理完成。有关逐事件流程，请参阅[流式传输](streaming.md)。
 
-## 输入、下一轮历史记录和新项目
+## 输入、下一轮历史记录和新项目 {#input-next-turn-history-and-new-items}
 
 这些接口分别回答不同的问题：
 
@@ -67,7 +67,7 @@ search:
 
 将计算机工具项目作为对话输入重新提交时，会使用原始 Responses 载荷结构。预览模型的 `computer_call` 项目会保留单个 `action`，而 `gpt-5.5` 计算机调用可以保留批量的 `actions[]`。[`to_input_list()`][agents.result.RunResultBase.to_input_list] 和 [`RunState`][agents.run_state.RunState] 会保留模型生成的结构，因此，在将这些项目手动重新提交为对话输入时，暂停/恢复流程和已存储的对话记录都能继续兼容预览版和 GA 版计算机工具调用。本地执行结果仍会在 `new_items` 中显示为 `computer_call_output` 项目。
 
-### 新项目
+### 新项目 {#new-items}
 
 [`new_items`][agents.result.RunResultBase.new_items] 提供运行过程中所发生事件的最丰富视图。常见项目类型包括：
 
@@ -110,15 +110,15 @@ caller_id = (
 
 对于程序拥有的子调用，`caller` 的 `type` 字段为 `program`，而 `caller_id` 用于标识父程序调用。
 
-## 对话的继续或恢复
+## 对话的继续或恢复 {#continue-or-resume-the-conversation}
 
-### 下一轮智能体
+### 下一轮智能体 {#next-turn-agent}
 
 [`last_agent`][agents.result.RunResultBase.last_agent] 包含最后运行的智能体。任务转移后，它通常是下一轮用户输入最适合复用的智能体。
 
 在流式传输模式下，[`RunResultStreaming.current_agent`][agents.result.RunResultStreaming.current_agent] 会随着运行进展而更新，因此你可以在流结束前观察任务转移。
 
-### 中断和运行状态
+### 中断和运行状态 {#interruptions-and-run-state}
 
 如果某个工具需要审批，待处理的审批会公开在 [`RunResult.interruptions`][agents.result.RunResult.interruptions] 或 [`RunResultStreaming.interruptions`][agents.result.RunResultStreaming.interruptions] 中。其中可能包括直接工具、任务转移后调用的工具，或嵌套 [`Agent.as_tool()`][agents.agent.Agent.as_tool] 运行所触发的审批。
 
@@ -139,7 +139,7 @@ if result.interruptions:
     result = await Runner.run(agent, state)
 ```
 
-#### 恢复前添加输入
+#### 恢复前添加输入 {#add-input-before-resuming}
 
 如果运行在暂停后，或在完成一轮后停止，但尚未执行未完成运行中的下一次模型调用时有新的用户输入到达，请使用 [`RunState.add_input()`][agents.run_state.RunState.add_input]。字符串会成为一条用户消息，多次调用会保留插入顺序。暂存输入是已序列化 `RunState` 的一部分，因此在 `to_json()` / `from_json()` 和 `to_string()` / `from_string()` 往返转换后仍会保留。
 
@@ -159,13 +159,13 @@ result = await Runner.run(agent, state)
 
 对于流式传输运行，请先完成对 [`stream_events()`][agents.result.RunResultStreaming.stream_events] 的消费，然后检查 `result.interruptions`，并从 `result.to_state()` 恢复。有关完整审批流程，请参阅[人在回路](human_in_the_loop.md)。
 
-### 服务器托管的延续
+### 服务器托管的延续 {#server-managed-continuation}
 
 [`last_response_id`][agents.result.RunResultBase.last_response_id] 是运行中最新的模型响应 ID。如果希望在下一轮继续 OpenAI Responses API 链，请将其作为 `previous_response_id` 传回。
 
 如果已通过 `to_input_list()`、`session` 或 `conversation_id` 继续对话，通常不需要 `last_response_id`。如果需要多步骤运行中的每个模型响应，请改为检查 `raw_responses`。
 
-## 智能体作为工具的元数据
+## 智能体作为工具的元数据 {#agent-as-tool-metadata}
 
 当结果来自嵌套的 [`Agent.as_tool()`][agents.agent.Agent.as_tool] 运行时，[`agent_tool_invocation`][agents.result.RunResultBase.agent_tool_invocation] 会公开有关外层 `Agent.as_tool()` 调用的不可变元数据：
 
@@ -179,7 +179,7 @@ result = await Runner.run(agent, state)
 
 如果还需要该嵌套运行的已解析结构化输入，请读取 `context_wrapper.tool_input`。这是 [`RunState`][agents.run_state.RunState] 为嵌套工具输入进行通用序列化的字段，而 `agent_tool_invocation` 会直接在结果中公开当前嵌套调用的元数据。
 
-## 流式传输生命周期和诊断
+## 流式传输生命周期和诊断 {#streaming-lifecycle-and-diagnostics}
 
 [`RunResultStreaming`][agents.result.RunResultStreaming] 继承了上述相同的结果接口，但增加了流式传输专用的控制项：
 
@@ -194,7 +194,7 @@ result = await Runner.run(agent, state)
 
 Python 不会公开单独的流式 `completed` promise 或 `error` 属性。导致运行终止的流式传输失败会由 `stream_events()` 抛出，而 `is_complete` 会反映运行是否已达到终止状态。
 
-### 原始响应
+### 原始响应 {#raw-responses}
 
 [`raw_responses`][agents.result.RunResultBase.raw_responses] 包含运行期间收集的原始模型响应。多步骤运行可能会生成多个响应，例如在任务转移期间或重复的模型/工具/模型循环中。
 
@@ -207,7 +207,7 @@ Python 不会公开单独的流式 `completed` promise 或 `error` 属性。导�
 
 `ModelResponse.request_id` 和 `ModelResponse.raw_usage` 都可能是 `None`，因此应将这些值视为可选诊断信息，而不是对话状态。
 
-### 安全防护措施结果
+### 安全防护措施结果 {#guardrail-results}
 
 智能体级安全防护措施分别通过 [`input_guardrail_results`][agents.result.RunResultBase.input_guardrail_results] 和 [`output_guardrail_results`][agents.result.RunResultBase.output_guardrail_results] 公开。
 
@@ -217,7 +217,7 @@ Python 不会公开单独的流式 `completed` promise 或 `error` 属性。导�
 
 当智能体级输出安全防护措施阻止由终止函数工具直接生成的最终输出时，会应用一条脱敏规则。对于当前被阻止的响应，`output_guardrail_results` 会替换被拒绝的智能体输出，并清除包含载荷的输出元数据，而 `tool_output_guardrail_results` 会替换包含载荷的工具元数据。此前已接受的结果保持不变。经过净化的输出安全防护措施结果会在 [`OutputGuardrailTripwireTriggered`][agents.exceptions.OutputGuardrailTripwireTriggered] 上公开为 `guardrail_result`。经过净化的输出安全防护措施和工具输出安全防护措施结果也会通过流式传输结果状态和 `RunState` 公开；请参阅[输出安全防护措施](guardrails.md#output-guardrails)。
 
-### 上下文和用量
+### 上下文和用量 {#context-and-usage}
 
 [`context_wrapper`][agents.result.RunResultBase.context_wrapper] 会公开你的应用上下文，以及由 SDK 管理的运行时元数据，例如审批、用量和嵌套的 `tool_input`。
 

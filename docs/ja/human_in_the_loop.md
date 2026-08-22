@@ -12,7 +12,7 @@ search:
 
 このページでは、`interruptions` を介した手動承認フローを中心に説明します。アプリがコード内で判断できる場合、一部のツールタイプではプログラムによる承認コールバックもサポートされているため、実行を一時停止せずに続行できます。
 
-## 承認が必要なツールの指定
+## 承認が必要なツールの指定 {#marking-tools-that-need-approval}
 
 常に承認を要求するには `needs_approval` を `True` に設定し、呼び出しごとに判断するには非同期関数を指定します。この callable は、実行コンテキスト、解析済みのツールパラメーター、ツール呼び出し ID を受け取ります。
 
@@ -46,7 +46,7 @@ agent = Agent(
 
 `needs_approval` は、[`function_tool`][agents.tool.function_tool]、[`Agent.as_tool`][agents.agent.Agent.as_tool]、[`ShellTool`][agents.tool.ShellTool]、[`ApplyPatchTool`][agents.tool.ApplyPatchTool] で利用できます。ローカル MCP サーバーでも、[`MCPServerStdio`][agents.mcp.server.MCPServerStdio]、[`MCPServerSse`][agents.mcp.server.MCPServerSse]、[`MCPServerStreamableHttp`][agents.mcp.server.MCPServerStreamableHttp] の `require_approval` を介して承認をサポートしています。ホスト型 MCP サーバーでは、`tool_config={"require_approval": "always"}` と任意の `on_approval_request` コールバックを指定した [`HostedMCPTool`][agents.tool.HostedMCPTool] を介して承認をサポートしています。Shell ツールと apply_patch ツールでは、割り込みを提示せずに自動承認または自動拒否する場合、`on_approval` コールバックを利用できます。
 
-## 承認フローの仕組み
+## 承認フローの仕組み {#how-the-approval-flow-works}
 
 1. モデルがツール呼び出しを出力すると、ランナーはその承認ルール（`needs_approval`、`require_approval`、またはホスト型 MCP に相当するもの）を評価します。
 2. そのツール呼び出しに対する承認判断がすでに [`RunContextWrapper`][agents.run_context.RunContextWrapper] に保存されている場合、ランナーは確認せずに処理を続行します。呼び出し単位の承認は、特定の呼び出し ID に限定されます。実行の残りの期間中、同じツール識別情報に対する今後の呼び出しにも同じ判断を保持するには、`always_approve=True` または `always_reject=True` を渡します。
@@ -60,7 +60,7 @@ agent = Agent(
 
 保留中の承認をすべて同じ処理内で解決する必要はありません。`interruptions` には、通常の関数ツール、ホスト型 MCP の承認、ネストされた `Agent.as_tool()` の承認を混在させることができます。一部の項目だけを承認または拒否して再実行すると、解決済みの呼び出しは続行できますが、未解決のものは `interruptions` に残り、実行は再び一時停止します。
 
-## カスタム拒否メッセージ
+## カスタム拒否メッセージ {#custom-rejection-messages}
 
 デフォルトでは、拒否されたツール呼び出しについて、SDK の標準的な拒否テキストが実行に返されます。このメッセージは、次の 2 つの層でカスタマイズできます。
 
@@ -90,7 +90,7 @@ state.reject(
 
 両方の層を組み合わせた完全な例については、[`examples/agent_patterns/human_in_the_loop_custom_rejection.py`](https://github.com/openai/openai-agents-python/tree/main/examples/agent_patterns/human_in_the_loop_custom_rejection.py) を参照してください。
 
-## 自動承認判断
+## 自動承認判断 {#automatic-approval-decisions}
 
 手動の `interruptions` は最も汎用的なパターンですが、唯一の方法ではありません。
 
@@ -100,13 +100,13 @@ state.reject(
 
 これらのコールバックが判断を返すと、人の応答を待つために一時停止することなく実行が続行されます。Realtime API と音声セッション API については、[Realtime ガイド](realtime/guide.md)の承認フローを参照してください。
 
-## ストリーミングとセッション
+## ストリーミングとセッション {#streaming-and-sessions}
 
 同じ割り込みフローをストリーミング実行でも利用できます。ストリーミング実行が一時停止した後も、イテレーターが終了するまで [`RunResultStreaming.stream_events()`][agents.result.RunResultStreaming.stream_events] を消費し続け、[`RunResultStreaming.interruptions`][agents.result.RunResultStreaming.interruptions] を確認して解決します。再開後の出力でもストリーミングを継続する場合は、[`Runner.run_streamed(...)`][agents.run.Runner.run_streamed] で再開します。このパターンのストリーミング版については、[ストリーミング](streaming.md)を参照してください。
 
 セッションも使用している場合は、`RunState` から再開するときに同じセッションインスタンスを引き続き渡すか、同じセッション ID とバッキングストア向けに構成された別のセッションオブジェクトを渡します。再開されたターンは、同じ保存済み会話履歴に追加されます。セッションのライフサイクルの詳細については、[セッション](sessions/index.md)を参照してください。
 
-## 一時停止、承認、再開の例
+## 一時停止、承認、再開の例 {#example-pause-approve-resume}
 
 以下のスニペットは JavaScript の HITL ガイドと同様に、ツールに承認が必要な場合に一時停止し、状態をディスクに保持して再読み込みし、判断を取得した後に再開します。
 
@@ -177,7 +177,7 @@ if __name__ == "__main__":
 
 承認のために一時停止する可能性がある実行でストリーミングを使用するには、`Runner.run_streamed` を呼び出し、完了するまで `result.stream_events()` を消費した後、上記と同じ `result.to_state()` および再開の手順に従います。
 
-## リポジトリのパターンとコード例
+## リポジトリのパターンとコード例 {#repository-patterns-and-examples}
 
 - **ストリーミング承認**: `examples/agent_patterns/human_in_the_loop_stream.py` は、`stream_events()` を最後まで消費し、保留中のツール呼び出しを承認してから `Runner.run_streamed(agent, state)` で再開する方法を示します。
 - **カスタム拒否テキスト**: `examples/agent_patterns/human_in_the_loop_custom_rejection.py` は、承認が拒否されたときに、実行レベルの `tool_error_formatter` と呼び出し単位の `rejection_message` オーバーライドを組み合わせる方法を示します。
@@ -188,7 +188,7 @@ if __name__ == "__main__":
 - **セッションとメモリ**: 承認と会話履歴を複数のターンにわたって保持するには、`Runner.run` にセッションを渡します。SQLite および OpenAI Conversations のセッションバリアントは、`examples/memory/memory_session_hitl_example.py` と `examples/memory/openai_session_hitl_example.py` にあります。
 - **Realtime エージェント**: Realtime デモでは、`RealtimeSession` の `approve_tool_call` / `reject_tool_call` を介してツール呼び出しを承認または拒否する WebSocket メッセージを公開しています（サーバー側のハンドラーについては `examples/realtime/app/server.py`、API サーフェスについては [Realtime ガイド](realtime/guide.md#tool-approvals)を参照）。
 
-## 長時間にわたる承認
+## 長時間にわたる承認 {#long-running-approvals}
 
 `RunState` は永続性を考慮して設計されています。保留中の処理をデータベースやキューに保存するには `state.to_json()` または `state.to_string()` を使用し、後から再作成するには `RunState.from_json(...)` または `RunState.from_string(...)` を使用します。
 
@@ -202,6 +202,6 @@ if __name__ == "__main__":
 
 シリアライズ済みの実行状態には、アプリのコンテキストに加えて、承認、使用量、シリアライズ済みの `tool_input`、ネストされたツールとしてのエージェントの再開情報、トレースメタデータ、サーバー管理の会話設定など、SDK が管理するランタイムメタデータが含まれます。シリアライズ済みの状態を保存または送信する場合は、`RunContextWrapper.context` を永続化データとして扱い、意図的に状態とともに移動させる場合を除き、そこにシークレットを格納しないでください。
 
-## 保留中タスクのバージョニング
+## 保留中タスクのバージョニング {#versioning-pending-tasks}
 
 承認が長期間保留される可能性がある場合は、シリアライズ済みの状態とともに、エージェント定義または SDK のバージョンマーカーを保存します。これにより、モデル、プロンプト、またはツール定義が変更された場合でも、対応するコードパスにデシリアライズを振り分け、非互換性を回避できます。

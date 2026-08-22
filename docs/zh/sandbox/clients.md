@@ -10,7 +10,7 @@ search:
 
     沙箱智能体目前处于 Beta 阶段。在正式发布之前，API 细节、默认值和支持的功能可能会发生变化，并且后续将逐步提供更高级的功能。
 
-## 决策指南
+## 决策指南 {#decision-guide}
 
 <div class="sandbox-nowrap-first-column-table" markdown="1">
 
@@ -22,7 +22,7 @@ search:
 
 </div>
 
-## 本地客户端
+## 本地客户端 {#local-clients}
 
 对于大多数用户，建议从以下两个沙箱客户端之一开始：
 
@@ -58,7 +58,7 @@ run_config = RunConfig(
 
 当你需要容器隔离，或希望沙箱镜像与其他环境中使用的镜像保持一致时，请使用此方式。请参阅 [examples/sandbox/docker/docker_runner.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/docker/docker_runner.py)。
 
-### Docker 网络禁用
+### Docker 网络禁用 {#disable-docker-networking}
 
 当 Docker 沙箱不得访问网络时，请设置 `network_mode="none"`：
 
@@ -71,7 +71,7 @@ options = DockerSandboxClientOptions(
 
 唯一受支持的显式网络模式是 `"none"`；省略 `network_mode` 可保留 Docker 的默认行为。禁用网络的沙箱无法暴露端口，因此将 `network_mode="none"` 与非空的 `exposed_ports` 元组组合使用，会在选项验证期间失败。此设置会存储在沙箱会话状态中；如果 SDK 在恢复该状态时必须创建替代容器，此设置也会重新应用。
 
-## 挂载与远程存储
+## 挂载与远程存储 {#mounts-and-remote-storage}
 
 挂载条目描述要公开哪些存储；挂载策略描述沙箱后端如何附加这些存储。从 `agents.sandbox.entries` 导入内置挂载条目和通用策略。托管提供商策略可从 `agents.extensions.sandbox` 或提供商专属扩展包中获取。
 
@@ -97,7 +97,7 @@ options = DockerSandboxClientOptions(
 
 </div>
 
-## 支持的托管平台
+## 支持的托管平台 {#supported-hosted-platforms}
 
 当你需要托管环境时，通常可以继续使用相同的 `SandboxAgent` 定义，仅需更改 [`SandboxRunConfig`][agents.run_config.SandboxRunConfig] 中的沙箱客户端。
 
@@ -119,7 +119,7 @@ options = DockerSandboxClientOptions(
 
 </div>
 
-### Modal 沙箱规格
+### Modal 沙箱规格 {#size-modal-sandboxes}
 
 使用 `ModalSandboxClientOptions.cpu` 和 `ModalSandboxClientOptions.memory` 为新的 Modal 沙箱请求资源。单个值表示请求该数量的资源。包含两个元素的 `(request, limit)` 元组将第一个元素用作请求值，第二个元素用作限制值。内存值的单位为 MiB。
 

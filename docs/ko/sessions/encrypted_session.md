@@ -6,14 +6,14 @@ search:
 
 `EncryptedSession`은 모든 세션 구현에 투명한 암호화를 제공하여, 오래된 항목의 자동 만료와 함께 대화 데이터를 보호합니다.
 
-## 기능
+## 기능 {#features}
 
 - **투명한 암호화**: 모든 세션을 Fernet 암호화로 래핑합니다
 - **세션별 키**: HKDF 키 파생을 사용하여 세션마다 고유한 암호화를 적용합니다
 - **자동 만료**: TTL이 만료되면 오래된 항목을 조용히 건너뜁니다
 - **드롭인 대체**: 기존의 모든 세션 구현과 함께 작동합니다
 
-## 설치
+## 설치 {#installation}
 
 암호화된 세션에는 `encrypt` extra가 필요합니다:
 
@@ -21,7 +21,7 @@ search:
 pip install openai-agents[encrypt]
 ```
 
-## 빠른 시작
+## 빠른 시작 {#quick-start}
 
 ```python
 import asyncio
@@ -53,9 +53,9 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## 구성
+## 구성 {#configuration}
 
-### 암호화 키
+### 암호화 키 {#encryption-key}
 
 암호화 키는 Fernet 키이거나 임의의 문자열일 수 있습니다:
 
@@ -79,7 +79,7 @@ session = EncryptedSession(
 )
 ```
 
-### TTL(time to live)
+### TTL(time to live) {#ttl-time-to-live}
 
 암호화된 항목이 유효한 기간을 설정합니다:
 
@@ -101,9 +101,9 @@ session = EncryptedSession(
 )
 ```
 
-## 다양한 세션 유형과 함께 사용
+## 다양한 세션 유형과 함께 사용 {#usage-with-different-session-types}
 
-### SQLite 세션과 함께 사용
+### SQLite 세션과 함께 사용 {#with-sqlite-sessions}
 
 ```python
 from agents import SQLiteSession
@@ -119,7 +119,7 @@ session = EncryptedSession(
 )
 ```
 
-### SQLAlchemy 세션과 함께 사용
+### SQLAlchemy 세션과 함께 사용 {#with-sqlalchemy-sessions}
 
 ```python
 from agents.extensions.memory import EncryptedSession, SQLAlchemySession
@@ -147,7 +147,7 @@ session = EncryptedSession(
 
 
 
-## 키 파생
+## 키 파생 {#key-derivation}
 
 EncryptedSession은 HKDF(HMAC-based Key Derivation Function)를 사용하여 세션별로 고유한 암호화 키를 파생합니다:
 
@@ -161,7 +161,7 @@ EncryptedSession은 HKDF(HMAC-based Key Derivation Function)를 사용하여 세
 - 마스터 키 없이는 키를 파생할 수 없습니다
 - 서로 다른 세션 간에는 세션 데이터를 복호화할 수 없습니다
 
-## 자동 만료
+## 자동 만료 {#automatic-expiration}
 
 항목이 TTL을 초과하면 조회 중 자동으로 건너뜁니다:
 
@@ -173,7 +173,7 @@ items = await session.get_items()  # Only returns non-expired items
 result = await Runner.run(agent, "Continue conversation", session=session)
 ```
 
-## API 참조
+## API 참조 {#api-reference}
 
 - [`EncryptedSession`][agents.extensions.memory.encrypt_session.EncryptedSession] - 기본 클래스
 - [`Session`][agents.memory.session.Session] - 기본 세션 프로토콜

@@ -10,7 +10,7 @@ search:
 
     기본 Python 경로를 사용하려면 먼저 [빠른 시작](quickstart.md)을 읽어 보세요. 애플리케이션에서 서버 측 WebSocket과 SIP 중 무엇을 사용할지 결정하려면 [실시간 전송](transport.md)을 읽어 보세요. 브라우저 WebRTC 전송은 Python SDK에 포함되지 않습니다.
 
-## 개요
+## 개요 {#overview}
 
 실시간 에이전트는 Realtime API에 장기 연결을 유지하므로 모델이 텍스트와 오디오를 점진적으로 처리하고, 오디오 출력을 스트리밍하고, 도구를 호출하며, 매 턴마다 새로운 요청을 다시 시작하지 않고도 인터럽션(중단 처리)을 처리할 수 있습니다.
 
@@ -21,7 +21,7 @@ search:
 -   **RealtimeSession**: 입력을 보내고, 이벤트를 수신하고, 기록을 추적하고, 도구를 실행하는 라이브 세션
 -   **RealtimeModel**: 전송 추상화입니다. 기본값은 OpenAI의 서버 측 WebSocket 구현입니다.
 
-## 세션 수명 주기
+## 세션 수명 주기 {#session-lifecycle}
 
 일반적인 실시간 세션은 다음과 같습니다.
 
@@ -38,7 +38,7 @@ search:
 
 Realtime API 서버가 기본 WebSocket 연결을 정상적으로 종료하면 모델 전송은 `disconnected` [`RealtimeModelConnectionStatusEvent`][agents.realtime.model_events.RealtimeModelConnectionStatusEvent]를 내보낸 다음 [`RealtimeModelEndOfStreamEvent`][agents.realtime.model_events.RealtimeModelEndOfStreamEvent]를 내보냅니다. `RealtimeSession`는 두 이벤트를 모두 `raw_model_event` 내부로 전달하고, 이미 대기열에 있는 이벤트를 모두 처리한 다음 예외를 발생시키지 않고 비동기 순회를 종료합니다. 호출자가 시작한 `session.close()`은 이러한 서버 연결 해제 이벤트를 합성하지 않습니다. 예기치 않은 WebSocket 오류는 정상적인 서버 종료처럼 순회를 끝내는 대신 세션의 예외 경로를 통해 계속 처리됩니다.
 
-## 에이전트 및 세션 구성
+## 에이전트 및 세션 구성 {#agent-and-session-configuration}
 
 `RealtimeAgent`은 의도적으로 일반 `Agent` 유형보다 범위가 좁습니다.
 
@@ -91,7 +91,7 @@ runner = RealtimeRunner(
 
 전체 유형화 인터페이스는 [`RealtimeRunConfig`][agents.realtime.config.RealtimeRunConfig]과 [`RealtimeSessionModelSettings`][agents.realtime.config.RealtimeSessionModelSettings]을 참조하세요.
 
-### 입력 트랜스크립션 설정
+### 입력 트랜스크립션 설정 {#input-transcription-settings}
 
 입력 트랜스크립션은 `audio.input.transcription`에서 구성합니다. 지연 시간이 짧은 증분 트랜스크립트에는 `gpt-live-transcribe`을 사용하고, 오디오 턴이 커밋된 후 트랜스크립션을 시작해야 하거나 애플리케이션에 감지된 언어 출력이 필요한 경우 WebSocket에서 `gpt-transcribe`를 사용합니다. Agents SDK는 모델별 GA 트랜스크립션 설정을 중첩된 세션 구성으로 전달합니다.
 
@@ -145,9 +145,9 @@ WebSocket 기반 Realtime 세션에서 `gpt-transcribe`은 커밋된 오디오 �
 
 `audio.input.turn_detection`을 `None`로 설정하면 자동 턴 감지가 비활성화됩니다. 그러면 애플리케이션이 [수동 응답 제어](#manual-response-control)에 설명된 대로 오디오 턴을 커밋하고 응답 생성을 제어해야 합니다. 모델 동작, 유효성 검사 규칙, 지연 시간 지침은 OpenAI API의 [Realtime 트랜스크립션 가이드](https://developers.openai.com/api/docs/guides/realtime-transcription)를 참조하세요.
 
-## 입력 및 출력
+## 입력 및 출력 {#inputs-and-outputs}
 
-### 텍스트 및 구조화된 사용자 메시지
+### 텍스트 및 구조화된 사용자 메시지 {#text-and-structured-user-messages}
 
 일반 텍스트 또는 구조화된 Realtime 메시지에는 [`session.send_message()`][agents.realtime.session.RealtimeSession.send_message]를 사용합니다.
 
@@ -169,7 +169,7 @@ await session.send_message(message)
 
 구조화된 메시지는 Realtime 대화에 이미지 입력을 포함하는 주요 방법입니다. [`examples/realtime/app/server.py`](https://github.com/openai/openai-agents-python/tree/main/examples/realtime/app/server.py)의 웹 데모 예제는 이 방식으로 `input_image` 메시지를 전달합니다.
 
-### 오디오 입력
+### 오디오 입력 {#audio-input}
 
 가공되지 않은 오디오 바이트를 스트리밍하려면 [`session.send_audio()`][agents.realtime.session.RealtimeSession.send_audio]을 사용합니다.
 
@@ -185,7 +185,7 @@ await session.send_audio(audio_bytes, commit=True)
 
 더 낮은 수준의 제어가 필요한 경우 기본 모델 전송을 통해 `input_audio_buffer.commit`과 같은 Realtime API 클라이언트 이벤트를 직접 보낼 수도 있습니다.
 
-### 수동 응답 제어
+### 수동 응답 제어 {#manual-response-control}
 
 `session.send_message()`은 상위 수준 경로를 사용해 사용자 입력을 보내고 응답을 시작합니다. 일부 구성에서는 가공되지 않은 오디오 버퍼링이 동일한 동작을 자동으로 수행하지 **않습니다**.
 
@@ -213,7 +213,7 @@ await session.model.send_event(
 
 [`examples/realtime/twilio_sip/server.py`](https://github.com/openai/openai-agents-python/tree/main/examples/realtime/twilio_sip/server.py)의 SIP 예제는 시작 인사말을 강제로 생성하기 위해 가공되지 않은 `response.create`을 사용합니다.
 
-## 이벤트, 기록 및 인터럽션(중단 처리)
+## 이벤트, 기록 및 인터럽션(중단 처리) {#events-history-and-interruptions}
 
 `RealtimeSession`은 상위 수준 SDK 이벤트를 내보내는 동시에 필요할 때 가공되지 않은 모델 이벤트도 계속 전달합니다.
 
@@ -231,7 +231,7 @@ await session.model.send_event(
 
 UI 상태에 가장 유용한 이벤트는 일반적으로 `history_added`와 `history_updated`입니다. 이러한 이벤트는 사용자 메시지, 어시스턴트 메시지, 도구 호출을 포함한 세션의 로컬 기록을 `RealtimeItem` 객체로 제공합니다.
 
-### 사용량 집계
+### 사용량 집계 {#usage-accounting}
 
 완료된 모델 응답에 사용량이 포함된 경우 SDK의 OpenAI `RealtimeModel` 전송은 `raw_model_event` 내부에서 [`RealtimeModelUsageEvent`][agents.realtime.model_events.RealtimeModelUsageEvent]를 내보냅니다. `usage` 필드에는 해당 응답의 토큰 수가 포함되며, `input_tokens_details`와 `output_tokens_details`은 선택적 모달리티별 내역을 제공합니다.
 
@@ -255,7 +255,7 @@ async for event in session:
 
 사용량은 모델 제공자가 완료된 응답에 사용량을 포함한 경우에만 보고됩니다. 누적 값은 해당 `RealtimeSession`이 수신한 응답에 적용되며, 여러 세션에 걸친 합계가 아닙니다.
 
-### 인터럽션(중단 처리) 및 재생 추적
+### 인터럽션(중단 처리) 및 재생 추적 {#interruptions-and-playback-tracking}
 
 사용자가 어시스턴트를 중단하면 세션은 `audio_interrupted`을 내보내고, 서버 측 대화가 사용자가 실제로 들은 내용과 일치하도록 기록을 업데이트합니다.
 
@@ -263,9 +263,9 @@ async for event in session:
 
 [`examples/realtime/twilio/twilio_handler.py`](https://github.com/openai/openai-agents-python/tree/main/examples/realtime/twilio/twilio_handler.py)의 Twilio 예제에서 이 패턴을 확인할 수 있습니다.
 
-## 도구, 승인, 핸드오프 및 가드레일
+## 도구, 승인, 핸드오프 및 가드레일 {#tools-approvals-handoffs-and-guardrails}
 
-### 함수 도구
+### 함수 도구 {#function-tools}
 
 실시간 에이전트는 라이브 대화 중 함수 도구를 지원합니다.
 
@@ -286,7 +286,7 @@ agent = RealtimeAgent(
 )
 ```
 
-### 도구 승인
+### 도구 승인 {#tool-approvals}
 
 함수 도구를 실행하기 전에 사람의 승인을 요구하도록 설정할 수 있습니다. 이 경우 세션은 `tool_approval_required`을 내보내고 `approve_tool_call()` 또는 `reject_tool_call()`을 호출할 때까지 도구 실행을 일시 중지합니다.
 
@@ -300,7 +300,7 @@ async for event in session:
 
 구체적인 서버 측 승인 루프는 [`examples/realtime/app/server.py`](https://github.com/openai/openai-agents-python/tree/main/examples/realtime/app/server.py)를 참조하세요. 휴먼인더루프 문서의 [휴먼인더루프 (HITL)](../human_in_the_loop.md)에서도 이 흐름을 안내합니다.
 
-### 핸드오프
+### 핸드오프 {#handoffs}
 
 Realtime 핸드오프를 사용하면 한 에이전트가 라이브 대화를 다른 전문가에게 전달할 수 있습니다.
 
@@ -326,7 +326,7 @@ main_agent = RealtimeAgent(
 
 핸드오프로 직접 사용되는 `RealtimeAgent` 객체는 자동으로 래핑되며, `realtime_handoff(...)`을 사용하면 이름, 설명, 유효성 검사, 콜백, 가용성을 사용자 지정할 수 있습니다. Realtime 핸드오프는 일반 핸드오프의 `input_filter`을 지원하지 **않습니다**.
 
-### 가드레일
+### 가드레일 {#guardrails}
 
 실시간 에이전트는 에이전트 응답에 대한 출력 가드레일과 함수 도구 호출에 대한 입력 가드레일을 지원합니다. 출력 가드레일 검사는 디바운스됩니다. 각 검사는 모든 부분 델타마다 실행되는 대신 누적된 출력 텍스트 및 오디오 트랜스크립트 델타를 대상으로 실행되며, 예외를 발생시키는 대신 `guardrail_tripped`를 내보냅니다.
 
@@ -352,7 +352,7 @@ agent = RealtimeAgent(
 
 사용자 지정 `RealtimeModel` 전송은 동일한 소스 범위 오디오 중단 동작을 제공하기 위해 `RealtimeModelSendInterrupt.response_id`과 `playback_only`을 준수해야 합니다. 또한 텍스트 전용 출력 경로의 복구 메시지를 지원하려면 `RealtimeModel.send_event_if()`를 재정의해야 합니다. 구현은 전송에서 실제로 이벤트를 커밋하는 경계에서 제공된 조건을 다시 검사하거나, 조건 검사와 이벤트 커밋을 함께 직렬화해야 합니다. 기본 구현은 복구 메시지를 안전하게 건너뜁니다. 조건을 한 번 검사한 뒤 이벤트를 별도로 보내면 해당 검사와 이벤트 커밋 사이에 다른 응답이 시작될 수 있기 때문입니다. 응답 취소와 `guardrail_tripped` 이벤트는 계속 발생합니다.
 
-## SIP 및 전화 통신
+## SIP 및 전화 통신 {#sip-and-telephony}
 
 Python SDK는 [`OpenAIRealtimeSIPModel`][agents.realtime.openai_realtime.OpenAIRealtimeSIPModel]을 통해 일급 SIP 연결 흐름을 제공합니다.
 
@@ -375,7 +375,7 @@ async with await runner.run(
 
 먼저 전화를 수락해야 하고 수락 페이로드를 에이전트에서 파생된 세션 구성과 일치시키려면 `OpenAIRealtimeSIPModel.build_initial_session_payload(...)`을 사용합니다. 전체 흐름은 [`examples/realtime/twilio_sip/server.py`](https://github.com/openai/openai-agents-python/tree/main/examples/realtime/twilio_sip/server.py)에 나와 있습니다.
 
-## 저수준 접근 및 사용자 지정 엔드포인트
+## 저수준 접근 및 사용자 지정 엔드포인트 {#low-level-access-and-custom-endpoints}
 
 `session.model`를 통해 기본 전송 객체에 접근할 수 있습니다.
 
@@ -421,7 +421,7 @@ session = await runner.run(
 
 `headers`를 전달하면 SDK가 `Authorization`를 자동으로 추가하지 않습니다. 실시간 에이전트에서 기존 베타 경로(`/openai/realtime?api-version=...`)를 사용하지 마세요.
 
-## 추가 자료
+## 추가 자료 {#further-reading}
 
 -   [실시간 전송](transport.md)
 -   [빠른 시작](quickstart.md)

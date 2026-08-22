@@ -6,14 +6,14 @@ search:
 
 `EncryptedSession` は、任意のセッション実装に透過的な暗号化を提供し、古いアイテムの自動期限切れによって会話データを保護します。
 
-## 機能
+## 機能 {#features}
 
 - **透過的な暗号化**: 任意のセッションを Fernet 暗号化でラップします
 - **セッションごとのキー**: HKDF キー導出を使用して、セッションごとに一意の暗号化を行います
 - **自動期限切れ**: TTL が期限切れになると、古いアイテムは取得時に黙ってスキップされます
 - **ドロップイン置換**: 既存の任意のセッション実装で動作します
 
-## インストール
+## インストール {#installation}
 
 暗号化セッションには `encrypt` extra が必要です。
 
@@ -21,7 +21,7 @@ search:
 pip install openai-agents[encrypt]
 ```
 
-## クイックスタート
+## クイックスタート {#quick-start}
 
 ```python
 import asyncio
@@ -53,9 +53,9 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## 設定
+## 設定 {#configuration}
 
-### 暗号化キー
+### 暗号化キー {#encryption-key}
 
 暗号化キーには、Fernet キーまたは任意の文字列を指定できます。
 
@@ -79,7 +79,7 @@ session = EncryptedSession(
 )
 ```
 
-### TTL (有効期間)
+### TTL (有効期間) {#ttl-time-to-live}
 
 暗号化されたアイテムが有効であり続ける期間を設定します。
 
@@ -101,9 +101,9 @@ session = EncryptedSession(
 )
 ```
 
-## さまざまなセッションタイプでの使用
+## さまざまなセッションタイプでの使用 {#usage-with-different-session-types}
 
-### SQLite セッションでの使用
+### SQLite セッションでの使用 {#with-sqlite-sessions}
 
 ```python
 from agents import SQLiteSession
@@ -119,7 +119,7 @@ session = EncryptedSession(
 )
 ```
 
-### SQLAlchemy セッションでの使用
+### SQLAlchemy セッションでの使用 {#with-sqlalchemy-sessions}
 
 ```python
 from agents.extensions.memory import EncryptedSession, SQLAlchemySession
@@ -147,7 +147,7 @@ session = EncryptedSession(
 
 
 
-## キー導出
+## キー導出 {#key-derivation}
 
 EncryptedSession は HKDF (HMAC-based Key Derivation Function) を使用して、セッションごとに一意の暗号化キーを導出します。
 
@@ -161,7 +161,7 @@ EncryptedSession は HKDF (HMAC-based Key Derivation Function) を使用して�
 - マスターキーがなければキーを導出できません
 - セッションデータを異なるセッション間で復号できません
 
-## 自動期限切れ
+## 自動期限切れ {#automatic-expiration}
 
 アイテムが TTL を超えると、取得時に自動的にスキップされます。
 
@@ -173,7 +173,7 @@ items = await session.get_items()  # Only returns non-expired items
 result = await Runner.run(agent, "Continue conversation", session=session)
 ```
 
-## API リファレンス
+## API リファレンス {#api-reference}
 
 - [`EncryptedSession`][agents.extensions.memory.encrypt_session.EncryptedSession] - メインクラス
 - [`Session`][agents.memory.session.Session] - ベースセッションプロトコル

@@ -12,7 +12,7 @@ search:
 -   Agents as tools: 完全なハンドオフを行わずに、エージェントを呼び出し可能なツールとして公開します。
 -   実験的機能: Codex ツール: ツール呼び出しからワークスペーススコープの Codex タスクを実行します。
 
-## ツールタイプの選択
+## ツールタイプの選択 {#choosing-a-tool-type}
 
 このページをカタログとして使用し、管理するランタイムに対応するセクションに進んでください。
 
@@ -26,7 +26,7 @@ search:
 | ハンドオフせずに、あるエージェントから別のエージェントを呼び出し | [Agents as tools](#agents-as-tools) |
 | エージェントからワークスペーススコープの Codex タスクを実行 | [実験的機能: Codex ツール](#experimental-codex-tool) |
 
-## ホストされたツール
+## ホストされたツール {#hosted-tools}
 
 [`OpenAIResponsesModel`][agents.models.openai_responses.OpenAIResponsesModel] を使用する場合、OpenAI はいくつかの組み込みツールを提供します。
 
@@ -62,7 +62,7 @@ async def main():
     print(result.final_output)
 ```
 
-### ホストされたツール検索
+### ホストされたツール検索 {#hosted-tool-search}
 
 ツール検索を使用すると、OpenAI Responses モデルは大規模なツールセットの読み込みをランタイムまで遅延できるため、モデルは現在のターンに必要なサブセットのみを読み込みます。多数の関数ツール、名前空間グループ、またはホストされた MCP サーバーがあり、すべてのツールを事前に公開せずにツールスキーマのトークン数を削減したい場合に役立ちます。
 
@@ -126,7 +126,7 @@ print(result.final_output)
 -   名前空間による読み込みとトップレベルの遅延ツールの両方を扱う、完全に実行可能なコード例については、`examples/tools/tool_search.py` を参照してください。
 -   公式プラットフォームガイド: [ツール検索](https://developers.openai.com/api/docs/guides/tools-tool-search)。
 
-### プログラムによるツール呼び出し
+### プログラムによるツール呼び出し {#programmatic-tool-calling}
 
 プログラムによるツール呼び出しを使用すると、対応する OpenAI Responses モデルが JavaScript を生成し、対象ツールを呼び出して、その出力を組み合わせ、1 つの結果をモデルに返せます。ツール呼び出しのたびにモデルとのラウンドトリップを行わず、ループ、分岐、並列呼び出し、中間計算を活用できる範囲限定のワークフローに役立ちます。
 
@@ -180,7 +180,7 @@ print(result.final_output)
 -   完全な並行在庫計画のコード例については、`examples/tools/programmatic_tool_calling.py` を参照してください。
 -   公式プラットフォームガイド: [プログラムによるツール呼び出し](https://developers.openai.com/api/docs/guides/tools-programmatic-tool-calling)。
 
-### ホストされたコンテナシェルとスキル
+### ホストされたコンテナシェルとスキル {#hosted-container-shell-skills}
 
 `ShellTool` は、OpenAI がホストするコンテナでの実行もサポートします。ローカルランタイムではなく、管理されたコンテナでモデルにシェルコマンドを実行させたい場合は、このモードを使用してください。
 
@@ -229,7 +229,7 @@ print(result.final_output)
 -   完全なコード例については、`examples/tools/container_shell_skill_reference.py` と `examples/tools/container_shell_inline_skill.py` を参照してください。
 -   OpenAI プラットフォームガイド: [シェル](https://platform.openai.com/docs/guides/tools-shell)と[スキル](https://platform.openai.com/docs/guides/tools-skills)。
 
-## ローカルランタイムツール
+## ローカルランタイムツール {#local-runtime-tools}
 
 ローカルランタイムツールは、モデルのレスポンス自体の外部で実行されます。モデルが呼び出すタイミングを決定する点は変わりませんが、実際の処理はアプリケーションまたは設定された実行環境が行います。
 
@@ -245,7 +245,7 @@ print(result.final_output)
 
 有限のシェルアクションタイムアウトには、正の整数のミリ秒値を使用します。0 は実行プログラムの実装間で共通の意味を持たないため、SDK はローカルの `ShellTool` 実行プログラムを呼び出す前に、`0` と `None` の両方を明示的なタイムアウトなしとして扱います。その他の値は、実行プログラムの呼び出し前に拒否されます。これはタイムアウトフィールドに固有の動作です。キャプチャされる出力を空にするリクエストとして、`max_output_length=0` は引き続きサポートされます。
 
-### ComputerTool と Responses のコンピュータツール
+### ComputerTool と Responses のコンピュータツール {#computertool-and-the-responses-computer-tool}
 
 `ComputerTool` は引き続きローカルハーネスです。[`Computer`][agents.computer.Computer] または [`AsyncComputer`][agents.computer.AsyncComputer] の実装を提供すると、SDK がそのハーネスを OpenAI Responses API のコンピュータ操作インターフェースにマッピングします。
 
@@ -304,7 +304,7 @@ agent = Agent(
 )
 ```
 
-## 関数ツール
+## 関数ツール {#function-tools}
 
 任意の Python 関数をツールとして使用できます。Agents SDK がツールを自動的に設定します。
 
@@ -445,7 +445,7 @@ for tool in agent.tools:
     }
     ```
 
-### 関数ツールからの画像またはファイルの返却
+### 関数ツールからの画像またはファイルの返却 {#returning-images-or-files-from-function-tools}
 
 テキスト出力に加えて、関数ツールの出力として 1 つ以上の画像またはファイルを返せます。そのためには、次のいずれかを返します。
 
@@ -453,7 +453,7 @@ for tool in agent.tools:
 -   ファイル: [`ToolOutputFileContent`][agents.tool.ToolOutputFileContent]（または TypedDict 版の [`ToolOutputFileContentDict`][agents.tool.ToolOutputFileContentDict]）
 -   テキスト: 文字列、文字列化可能なオブジェクト、または [`ToolOutputText`][agents.tool.ToolOutputText]（または TypedDict 版の [`ToolOutputTextDict`][agents.tool.ToolOutputTextDict]）
 
-### カスタム関数ツール
+### カスタム関数ツール {#custom-function-tools}
 
 Python 関数をツールとして使用したくない場合もあります。必要に応じて、[`FunctionTool`][agents.tool.FunctionTool] を直接作成できます。次の項目を指定する必要があります。
 
@@ -493,7 +493,7 @@ tool = FunctionTool(
 )
 ```
 
-### 引数と docstring の自動解析
+### 引数と docstring の自動解析 {#automatic-argument-and-docstring-parsing}
 
 前述のとおり、関数シグネチャを自動的に解析してツールのスキーマを抽出し、docstring を解析してツールと個々の引数の説明を抽出します。これについて、いくつか留意点があります。
 
@@ -502,7 +502,7 @@ tool = FunctionTool(
 
 スキーマ抽出のコードは、[`agents.function_schema`][] にあります。
 
-### Pydantic Field による引数の制約と説明
+### Pydantic Field による引数の制約と説明 {#constraining-and-describing-arguments-with-pydantic-field}
 
 Pydantic の [`Field`](https://docs.pydantic.dev/latest/concepts/fields/) を使用すると、ツール引数に制約（数値の最小値／最大値、文字列の長さやパターンなど）と説明を追加できます。Pydantic と同様に、デフォルト値ベースの形式（`arg: int = Field(..., ge=1)`）と `Annotated`（`arg: Annotated[int, Field(..., ge=1)]`）の両方がサポートされます。生成される JSON スキーマと検証には、これらの制約が含まれます。
 
@@ -522,7 +522,7 @@ def score_b(score: Annotated[int, Field(..., ge=0, le=100, description="Score fr
     return f"Score recorded: {score}"
 ```
 
-### 関数ツールのタイムアウト
+### 関数ツールのタイムアウト {#function-tool-timeouts}
 
 `@function_tool(timeout=...)` を使用すると、非同期関数ツールに呼び出し単位のタイムアウトを設定できます。
 
@@ -577,7 +577,7 @@ except ToolTimeoutError as e:
 
     タイムアウト設定は、非同期の `@function_tool` ハンドラーでのみサポートされます。
 
-### 関数ツールのエラー処理
+### 関数ツールのエラー処理 {#handling-errors-in-function-tools}
 
 `@function_tool` を介して関数ツールを作成する場合、`failure_error_function` を渡せます。これは、ツール呼び出しがクラッシュした場合に LLM へエラーレスポンスを提供する関数です。
 
@@ -609,7 +609,7 @@ def get_user_profile(user_id: str) -> str:
 
 `FunctionTool` オブジェクトを手動で作成する場合は、`on_invoke_tool` 関数内でエラーを処理する必要があります。
 
-## Agents as tools
+## Agents as tools {#agents-as-tools}
 
 ワークフローによっては、制御をハンドオフするのではなく、中央のエージェントで専門エージェントのネットワークをオーケストレーションしたい場合があります。これは、エージェントをツールとしてモデル化することで実現できます。
 
@@ -655,7 +655,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### ツールエージェントのカスタマイズ
+### ツールエージェントのカスタマイズ {#customizing-tool-agents}
 
 `agent.as_tool` は、エージェントをツールに変換するための便利なメソッドです。`max_turns`、`run_config`、`hooks`、`previous_response_id`、`conversation_id`、`session`、`needs_approval` など、一般的なランタイムオプションをサポートします。また、`parameters`、`input_builder`、`include_input_schema` による構造化入力もサポートします。
 
@@ -681,7 +681,7 @@ async def run_my_agent() -> str:
     return str(result.final_output)
 ```
 
-### ツールエージェントの構造化入力
+### ツールエージェントの構造化入力 {#structured-input-for-tool-agents}
 
 デフォルトでは、`Agent.as_tool()` は文字列フィールド `input`（`{"input": "..."}`）を 1 つ持つオブジェクトを想定しますが、`parameters`（Pydantic モデル型または dataclass 型）を渡すことで、構造化スキーマを公開できます。
 
@@ -711,11 +711,11 @@ translator_tool = translator_agent.as_tool(
 
 完全に実行可能なコード例については、`examples/agent_patterns/agents_as_tools_structured.py` を参照してください。
 
-### ツールエージェントの承認ゲート
+### ツールエージェントの承認ゲート {#approval-gates-for-tool-agents}
 
 `Agent.as_tool(..., needs_approval=...)` は、`function_tool` と同じ承認フローを使用します。承認が必要な場合は実行が一時停止し、保留中の項目が `result.interruptions` に表示されます。その後、`result.to_state()` を使用し、`state.approve(...)` または `state.reject(...)` を呼び出してから再開してください。完全な一時停止／再開パターンについては、[Human-in-the-loop ガイド](human_in_the_loop.md)を参照してください。
 
-### カスタム出力抽出
+### カスタム出力抽出 {#custom-output-extraction}
 
 場合によっては、中央のエージェントに返す前に、ツールエージェントの出力を変更したいことがあります。これは、次のような場合に役立ちます。
 
@@ -744,7 +744,7 @@ json_tool = data_agent.as_tool(
 
 カスタム抽出プログラム内では、ネストされた [`RunResult`][agents.result.RunResult] から [`agent_tool_invocation`][agents.result.RunResultBase.agent_tool_invocation] にもアクセスできます。これは、ネストされた実行結果を後処理する際に、外側のツール名、呼び出し ID、raw 引数が必要な場合に役立ちます。[実行結果ガイド](results.md#agent-as-tool-metadata)を参照してください。
 
-### ネストされたエージェント実行のストリーミング
+### ネストされたエージェント実行のストリーミング {#streaming-nested-agent-runs}
 
 `as_tool` に `on_stream` コールバックを渡すと、ネストされたエージェントが出力するストリーミングイベントをリッスンしながら、ストリームの完了後に最終出力を返せます。
 
@@ -772,7 +772,7 @@ billing_agent_tool = billing_agent.as_tool(
 - モデルのツール呼び出しを介してツールが呼び出された場合、`tool_call` が存在します。直接呼び出した場合は、`None` のままになる可能性があります。
 - 完全に実行可能なサンプルについては、`examples/agent_patterns/agents_as_tools_streaming.py` を参照してください。
 
-### 条件付きツール有効化
+### 条件付きツール有効化 {#conditional-tool-enabling}
 
 `is_enabled` パラメーターを使用すると、ランタイムでエージェントツールを条件付きで有効または無効にできます。これにより、コンテキスト、ユーザー設定、ランタイム条件に基づいて、LLM が利用できるツールを動的に絞り込めます。
 
@@ -842,7 +842,7 @@ asyncio.run(main())
 -   異なるツール設定の A/B テスト
 -   ランタイム状態に基づく動的なツール絞り込み
 
-## 実験的機能: Codex ツール
+## 実験的機能: Codex ツール {#experimental-codex-tool}
 
 `codex_tool` は Codex CLI をラップし、エージェントがツール呼び出し中にワークスペーススコープのタスク（シェル、ファイル編集、MCP ツール）を実行できるようにします。このインターフェースは実験的機能であり、変更される可能性があります。
 

@@ -18,7 +18,7 @@ search:
 
 バグの修正、メモリの生成、スナップショットの再開、そのメモリを使用したフォローアップの検証実行を含む、完全な 2 回実行のコード例については、[examples/sandbox/memory.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/memory.py) を参照してください。メモリレイアウトを分離したマルチターン、マルチエージェントのコード例については、[examples/sandbox/memory_multi_agent_multiturn.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/memory_multi_agent_multiturn.py) を参照してください。
 
-## メモリの有効化
+## メモリの有効化 {#enable-memory}
 
 サンドボックスエージェントのケイパビリティとして `Memory()` を追加します。
 
@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix="sandbox-memory-example-") as snapshot_d
 
 `Memory()` は、メモリの読み取りと生成の両方を有効にします。メモリを読み取る必要はあるものの、新しいメモリを生成すべきでないエージェントには、`Memory(generate=None)` を使用します。たとえば、内部エージェント、サブエージェント、チェッカー、単発のツールエージェントによる実行では、有用な情報があまり追加されない場合があります。後で使用するメモリを実行で生成する必要はあるものの、既存のメモリがその実行に影響することをユーザーが望まない場合は、`Memory(read=None)` を使用します。
 
-## メモリの読み取り
+## メモリの読み取り {#read-memory}
 
 メモリの読み取りには段階的開示が使用されます。実行開始時に、SDK は一般的に役立つヒント、ユーザーの好み、利用可能なメモリをまとめた小さなサマリー（`memory_summary.md`）をエージェントの開発者プロンプトに注入します。これにより、エージェントは過去の作業が関連する可能性を判断するのに十分なコンテキストを得られます。
 
@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix="sandbox-memory-example-") as snapshot_d
 
 メモリは古くなる可能性があります。エージェントは、メモリをあくまで参考情報として扱い、現在の環境を信頼するよう指示されます。デフォルトでは、メモリの読み取りで `live_update` が有効になっているため、エージェントが古くなったメモリを検出すると、同じ実行内で設定済みの `MEMORY.md` を更新できます。エージェントがメモリを読み取る必要はあるものの、実行中に変更すべきでない場合は、ライブ更新を無効にしてください。たとえば、レイテンシーが重視される実行が該当します。
 
-## メモリの生成
+## メモリの生成 {#generate-memory}
 
 実行が終了すると、サンドボックスランタイムはその実行セグメントを会話ファイルに追記します。蓄積された会話ファイルは、サンドボックスセッションの終了時に処理されます。
 
@@ -101,7 +101,7 @@ memory = Memory(
 
 最近の未加工メモリが `max_raw_memories_for_consolidation`（デフォルトは 256）を超えると、フェーズ 2 は最新の会話から得たメモリのみを保持し、それより古いものを削除します。新しさは、会話が最後に更新された時刻に基づきます。この忘却メカニズムにより、メモリに最新の環境を反映しやすくなります。
 
-## マルチターン会話
+## マルチターン会話 {#multi-turn-conversations}
 
 マルチターンのサンドボックスチャットでは、通常の SDK `Session` を同じライブサンドボックスセッションと組み合わせて使用します。
 
@@ -141,7 +141,7 @@ async with sandbox:
 3. `RunConfig.group_id`（上記のいずれも存在しない場合）
 4. 安定した識別子が存在しない場合は、実行ごとに生成される ID
 
-## 異なるレイアウトによるエージェントごとのメモリ分離
+## 異なるレイアウトによるエージェントごとのメモリ分離 {#use-different-layouts-to-isolate-memory-for-different-agents}
 
 メモリの分離は、エージェント名ではなく `MemoryLayoutConfig` に基づきます。同じレイアウトと同じメモリ会話 ID を持つエージェントは、1 つのメモリ会話と 1 つの統合済みメモリを共有します。異なるレイアウトを持つエージェントは、同じサンドボックスワークスペースを共有している場合でも、ロールアウトファイル、未加工メモリ、`MEMORY.md`、`memory_summary.md` を個別に保持します。
 

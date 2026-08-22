@@ -11,7 +11,7 @@ search:
 1. 입력 가드레일은 최초 사용자 입력에 대해 실행됩니다
 2. 출력 가드레일은 최종 에이전트 출력에 대해 실행됩니다
 
-## 워크플로 경계
+## 워크플로 경계 {#workflow-boundaries}
 
 가드레일은 에이전트와 도구에 연결되지만, 워크플로에서 모두 같은 시점에 실행되는 것은 아닙니다.
 
@@ -21,7 +21,7 @@ search:
 
 매니저, 핸드오프 또는 위임된 전문 에이전트가 포함된 워크플로에서 각 사용자 정의 함수 도구 호출 전후에 검사가 필요하다면, 에이전트 수준의 입력/출력 가드레일에만 의존하지 말고 도구 가드레일을 사용하세요.
 
-## 입력 가드레일
+## 입력 가드레일 {#input-guardrails}
 
 입력 가드레일은 다음 3단계로 실행됩니다.
 
@@ -33,7 +33,7 @@ search:
 
     입력 가드레일은 사용자 입력에 대해 실행되도록 설계되었으므로 에이전트가 *첫 번째* 에이전트인 경우에만 해당 에이전트의 가드레일이 실행됩니다. 그렇다면 왜 `guardrails` 속성을 `Runner.run`에 전달하지 않고 에이전트에 지정하는지 궁금할 수 있습니다. 이는 가드레일이 실제 에이전트와 관련되는 경우가 많기 때문입니다. 에이전트마다 서로 다른 가드레일을 실행하므로 코드를 함께 배치하면 가독성이 향상됩니다.
 
-### 실행 모드
+### 실행 모드 {#execution-modes}
 
 입력 가드레일은 두 가지 실행 모드를 지원합니다.
 
@@ -41,7 +41,7 @@ search:
 
 - **차단 실행** (`run_in_parallel=False`): 가드레일이 에이전트보다 *먼저* 실행되어 완료됩니다. 가드레일 트립와이어가 작동하면 에이전트가 실행되지 않으므로 토큰 소비와 도구 실행을 방지할 수 있습니다. 비용을 최적화하거나 도구 호출로 발생할 수 있는 부작용을 방지하려는 경우에 적합합니다.
 
-## 출력 가드레일
+## 출력 가드레일 {#output-guardrails}
 
 출력 가드레일은 다음 3단계로 실행됩니다.
 
@@ -59,7 +59,7 @@ search:
 
 터미널 함수 도구 출력은 에이전트 수준 출력 가드레일이 값을 검사하기 전에 도구가 이미 실행되었으므로 추가 처리가 필요합니다. [`Agent.tool_use_behavior`][agents.agent.Agent.tool_use_behavior]에 따라 해당 도구 결과가 최종 출력이 되고 출력 트립와이어가 이를 거부하는 경우, SDK는 검증된 필드로 함수 호출/출력 쌍을 다시 구성할 수 있을 때만 재현 가능한 유효한 쌍을 유지합니다. 유지되는 `function_call_output` 페이로드는 고정 텍스트 `"Output withheld by an output guardrail."`로 대체됩니다. 원래 도구 출력 페이로드는 세션, `RunState`, 스트리밍 결과 상태 또는 샌드박스 메모리 입력에 유지되지 않습니다. SDK는 함수 인수를 포함하여 재현에 필요한 검증된 함수 호출 메타데이터를 유지하므로, 해당 메타데이터에는 거부된 출력에도 나타난 데이터가 포함될 수 있습니다. 현재 응답의 [`OutputGuardrailResult`][agents.guardrail.OutputGuardrailResult] 객체도 `agent_output`을 고정 텍스트로 대체하고 `output_info`을 비웁니다. 현재 응답의 [`ToolOutputGuardrailResult`][agents.tool_guardrails.ToolOutputGuardrailResult] 객체는 허용/거부 동작 유형을 유지하지만, 페이로드를 포함하는 `output_info`과 거부 메시지를 동일한 텍스트로 대체합니다. 이전에 수락된 턴과 가드레일 결과는 변경되지 않습니다. 응답에 추론 또는 SDK가 안전하게 정리할 수 없는 다른 형식이 포함된 경우, SDK는 거부된 출력 페이로드를 유지하는 대신 현재 응답의 전체 후행 부분을 폐기합니다. 예외를 발생시킨 가드레일 함수는 거부 판정을 반환하지 않은 것이므로, 완료된 터미널 도구 턴에는 위에서 설명한 예외 저장 동작이 적용됩니다.
 
-## 도구 가드레일
+## 도구 가드레일 {#tool-guardrails}
 
 도구 가드레일은 **`FunctionTool` 인스턴스**를 래핑하며, 해당 도구의 실행 전후에 호출을 검증하거나 차단할 수 있게 합니다. 도구 자체에 구성되며 해당 도구가 호출될 때마다 실행됩니다.
 
@@ -70,7 +70,7 @@ search:
 
 자세한 내용은 아래 코드 스니펫을 참조하세요.
 
-## 트립와이어
+## 트립와이어 {#tripwires}
 
 에이전트 입력이나 출력이 가드레일을 통과하지 못하면 가드레일은 트립와이어로 이를 알릴 수 있습니다. 러너는 즉시 `InputGuardrailTripwireTriggered` 또는 `OutputGuardrailTripwireTriggered` 예외를 발생시키고 에이전트 실행을 중단합니다. 도구 가드레일은 이에 대응하는 `ToolInputGuardrailTripwireTriggered` 및 `ToolOutputGuardrailTripwireTriggered` 예외를 사용합니다.
 
@@ -78,7 +78,7 @@ search:
 
 반면 도구 트립와이어 예외는 트립와이어를 작동시킨 `guardrail`와 `output`을 직접 노출합니다. 해당 예외의 `run_data.tool_input_guardrail_results` 및 `run_data.tool_output_guardrail_results` 목록에는 실패 전에 완료된 턴에서 누적된 결과가 유지되며, 트립와이어를 작동시킨 결과는 예외의 `output`를 통해 확인할 수 있습니다. `MaxTurnsExceeded`과 같이 러너가 관리하는 다른 실패도 완료된 도구 가드레일 결과를 이 목록에 유지합니다. `stream_events()`에서 예외가 발생한 후 스트리밍 결과는 동일하게 누적된 에이전트 및 도구 가드레일 결과 목록을 노출합니다. 러너가 관리하는 실행 경로 외부에서 예외가 발생하면 `run_data`는 `None`일 수 있습니다.
 
-## 가드레일 구현
+## 가드레일 구현 {#implementing-a-guardrail}
 
 입력을 받아 [`GuardrailFunctionOutput`][agents.guardrail.GuardrailFunctionOutput]을 반환하는 함수를 제공해야 합니다. 이 예제에서는 내부적으로 에이전트를 실행하여 이를 구현합니다.
 

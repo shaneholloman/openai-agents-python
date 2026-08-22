@@ -6,7 +6,7 @@ search:
 
 SDK を使用したさまざまなサンプル実装は、[リポジトリ](https://github.com/openai/openai-agents-python/tree/main/examples)の examples セクションで確認できます。コード例は、さまざまなパターンや機能を示す複数のカテゴリーに分かれています。
 
-## カテゴリー
+## カテゴリー {#categories}
 
 - **[agent_patterns](https://github.com/openai/openai-agents-python/tree/main/examples/agent_patterns):** このカテゴリーのコード例では、次のような一般的なエージェント設計パターンを示します。
 

@@ -10,7 +10,7 @@ search:
 
 对于OpenAI模型，SDK 默认使用 Responses API，但这里的区别在于编排：`Agent` 加上 `Runner`，可让 SDK 为你管理轮次、工具、安全防护措施、任务转移和会话。如果你希望自行控制该循环，请改为直接使用 Responses API。
 
-## 后续指南选择
+## 后续指南选择 {#choose-the-next-guide}
 
 可将本页面作为定义智能体的中心入口。根据你接下来需要做出的决策，跳转至相应的相邻指南。
 
@@ -25,7 +25,7 @@ search:
 | 检查最终输出、运行项或可恢复状态 | [结果](results.md) |
 | 共享本地依赖项和运行时状态 | [上下文管理](context.md) |
 
-## 基本配置
+## 基本配置 {#basic-configuration}
 
 智能体最常用的属性包括：
 
@@ -67,7 +67,7 @@ agent = Agent(
 
 本节中的所有内容均适用于 `Agent`。`SandboxAgent` 基于相同理念构建，并额外添加了 `default_manifest`、`base_instructions`、`capabilities` 和 `run_as`，用于工作区作用域内的运行。请参阅[沙箱智能体概念](sandbox/guide.md)。
 
-## 提示词模板
+## 提示词模板 {#prompt-templates}
 
 通过设置 `prompt`，你可以引用在OpenAI平台中创建的提示词模板。当通过 Responses API 访问OpenAI模型时，此功能可用。
 
@@ -126,7 +126,7 @@ result = await Runner.run(
 )
 ```
 
-## 上下文
+## 上下文 {#context}
 
 智能体以其 `context` 类型作为泛型参数。上下文是一种依赖注入工具：它是由你创建并传递给 `Runner.run()` 的对象，随后会传递给每个智能体、工具、任务转移等，并作为智能体运行所需依赖项和状态的集合。你可以提供任何 Python 对象作为上下文。
 
@@ -154,7 +154,7 @@ agent = Agent[UserContext](
 )
 ```
 
-## 输出类型
+## 输出类型 {#output-types}
 
 默认情况下，智能体生成纯文本（即 `str`）输出。如果你希望智能体生成特定类型的输出，可以使用 `output_type` 参数。常见选择是使用 [Pydantic](https://docs.pydantic.dev/) 对象，但我们支持任何可以封装在 Pydantic [TypeAdapter](https://docs.pydantic.dev/latest/api/type_adapter/) 中的类型，例如 dataclass、列表、TypedDict 等。
 
@@ -179,7 +179,7 @@ agent = Agent(
 
     传入 `output_type` 后，即表示要求模型使用 [structured outputs](https://platform.openai.com/docs/guides/structured-outputs)，而不是常规纯文本响应。
 
-## 多智能体系统设计模式
+## 多智能体系统设计模式 {#multi-agent-system-design-patterns}
 
 多智能体系统有多种设计方式，但我们通常会看到两种具有广泛适用性的模式：
 
@@ -188,7 +188,7 @@ agent = Agent(
 
 有关更多详细信息，请参阅[智能体构建实用指南](https://cdn.openai.com/business-guides-and-resources/a-practical-guide-to-building-agents.pdf)。
 
-### 管理器（agents as tools）
+### 管理器（agents as tools） {#manager-agents-as-tools}
 
 `customer_facing_agent` 负责处理所有用户交互，并调用作为工具公开的专业子智能体。请在[工具](tools.md#agents-as-tools)文档中了解更多信息。
 
@@ -217,7 +217,7 @@ customer_facing_agent = Agent(
 )
 ```
 
-### 任务转移
+### 任务转移 {#handoffs}
 
 配置的任务转移目标是智能体可以委派任务的子智能体。发生任务转移时，被委派的智能体会接收对话历史记录并接管对话。此模式支持模块化的专业智能体，使其能够出色完成单一任务。请在[任务转移](handoffs.md)文档中了解更多信息。
 
@@ -238,7 +238,7 @@ triage_agent = Agent(
 )
 ```
 
-## 动态指令
+## 动态指令 {#dynamic-instructions}
 
 在大多数情况下，你可以在创建智能体时提供指令。不过，你也可以通过函数提供动态指令。该函数将接收智能体和上下文，并且必须返回提示词。普通函数和 `async` 函数均可接受。
 
@@ -257,7 +257,7 @@ agent = Agent[UserContext](
 )
 ```
 
-## 生命周期事件（钩子）
+## 生命周期事件（钩子） {#lifecycle-events-hooks}
 
 有时，你可能希望观察智能体的生命周期。例如，你可能希望在特定事件发生时记录事件日志、预取数据或记录用量。
 
@@ -302,11 +302,11 @@ print(result.final_output)
 
 有关完整的回调接口，请参阅[生命周期 API 参考](ref/lifecycle.md)。
 
-## 安全防护措施
+## 安全防护措施 {#guardrails}
 
 安全防护措施允许你在智能体运行的同时并行检查/验证用户输入，并在智能体生成输出后对其进行检查/验证。例如，你可以筛查用户输入和智能体输出是否与任务相关。请在[安全防护措施](guardrails.md)文档中了解更多信息。
 
-## 智能体克隆与复制
+## 智能体克隆与复制 {#cloningcopying-agents}
 
 通过在智能体上使用 `clone()` 方法，你可以复制一个智能体，并可选择更改任意属性。
 
@@ -323,7 +323,7 @@ robot_agent = pirate_agent.clone(
 )
 ```
 
-## 强制使用工具
+## 强制使用工具 {#forcing-tool-use}
 
 提供工具列表并不总是意味着 LLM 会使用工具。你可以通过设置 [`ModelSettings.tool_choice`][agents.model_settings.ModelSettings.tool_choice] 强制使用工具。有效值包括：
 
@@ -351,7 +351,7 @@ agent = Agent(
 )
 ```
 
-## 工具使用行为
+## 工具使用行为 {#tool-use-behavior}
 
 `Agent` 配置中的 `tool_use_behavior` 参数控制工具输出的处理方式：
 

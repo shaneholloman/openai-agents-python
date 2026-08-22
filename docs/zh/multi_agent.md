@@ -11,7 +11,7 @@ search:
 
 你可以混合搭配使用这些模式。每种模式都有各自的权衡，具体如下所述。
 
-## 基于 LLM 的智能体编排
+## 基于 LLM 的智能体编排 {#orchestrating-via-llm}
 
 智能体是配备了指令、工具和任务转移能力的 LLM。这意味着，面对开放式任务时，LLM 可以自主规划如何处理该任务，使用工具执行操作和获取数据，并通过任务转移将任务委派给子智能体。例如，研究智能体可以配备以下能力：
 
@@ -21,7 +21,7 @@ search:
 -   通过代码执行进行数据分析
 -   将任务转移给擅长规划、报告撰写等工作的专业智能体。
 
-### SDK 核心模式
+### SDK 核心模式 {#core-sdk-patterns}
 
 在 Python SDK 中，最常见的是以下两种编排模式：
 
@@ -44,7 +44,7 @@ search:
 
 如果你想了解这种编排方式背后的 SDK 核心基础组件，请先参阅[工具](tools.md)、[任务转移](handoffs.md)和[运行智能体](running_agents.md)。
 
-## 基于代码的智能体编排
+## 基于代码的智能体编排 {#orchestrating-via-code}
 
 虽然基于 LLM 的编排功能强大，但基于代码的编排可以让任务在速度、成本和性能方面更具确定性和可预测性。常见模式包括：
 
@@ -55,7 +55,7 @@ search:
 
 我们在 [`examples/agent_patterns`](https://github.com/openai/openai-agents-python/tree/main/examples/agent_patterns) 中提供了许多代码示例。
 
-## 相关指南
+## 相关指南 {#related-guides}
 
 -   [智能体](agents.md)：组合模式和智能体配置。
 -   [工具](tools.md#agents-as-tools)：`Agent.as_tool()` 和管理器式编排。

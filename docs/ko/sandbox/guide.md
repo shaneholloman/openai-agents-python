@@ -32,7 +32,7 @@ search:
 
 외부 런타임은 계속해서 승인, 트레이싱, 핸드오프와 실행 재개에 필요한 상태 추적을 담당합니다. 샌드박스 세션은 명령, 파일 변경, 환경 격리를 담당합니다. 이러한 역할 분리는 모델의 핵심 요소입니다.
 
-### 구성 요소 간의 관계
+### 구성 요소 간의 관계 {#how-the-pieces-fit-together}
 
 샌드박스 실행은 에이전트 정의와 실행별 샌드박스 구성을 결합합니다. 러너는 에이전트를 준비하고 활성 샌드박스 세션에 바인딩하며, 이후 실행을 위해 상태를 저장할 수 있습니다.
 
@@ -60,7 +60,7 @@ flowchart LR
 
 셸 액세스가 가끔 사용하는 도구 중 하나일 뿐이라면 [도구 가이드](../tools.md)의 호스티드 셸부터 시작하세요. 워크스페이스 격리, 샌드박스 클라이언트 선택 또는 샌드박스 세션 재개 동작이 설계의 일부라면 샌드박스 에이전트를 사용하세요.
 
-## 사용 시점
+## 사용 시점 {#when-to-use-them}
 
 샌드박스 에이전트는 다음과 같은 워크스페이스 중심 워크플로에 적합합니다.
 
@@ -72,13 +72,13 @@ flowchart LR
 
 파일 또는 상태를 유지하며 변경 가능한 파일 시스템에 액세스할 필요가 없다면 계속 `Agent` 을 사용하세요. 셸 액세스가 가끔 필요한 기능일 뿐이라면 호스티드 셸을 추가하고, 워크스페이스 경계 자체가 기능의 일부라면 샌드박스 에이전트를 사용하세요.
 
-## 샌드박스 클라이언트 선택
+## 샌드박스 클라이언트 선택 {#choose-a-sandbox-client}
 
 macOS 또는 Linux에서 로컬 개발을 할 때는 `UnixLocalSandboxClient` 로 시작하세요. Windows에서는 `DockerSandboxClient` 또는 호스티드 공급자를 사용하세요. 지원되는 모든 플랫폼에서 컨테이너 격리나 이미지 동등성이 필요하면 `DockerSandboxClient` 로 전환하고, 공급자가 관리하는 실행이 필요하면 호스티드 공급자로 전환하세요.
 
 대부분의 경우 `SandboxAgent` 정의는 그대로 유지하고 [`SandboxRunConfig`][agents.run_config.SandboxRunConfig] 에서 샌드박스 클라이언트와 해당 옵션만 변경합니다. 로컬, Docker, 호스티드, 원격 마운트 옵션은 [샌드박스 클라이언트](clients.md)를 참조하세요.
 
-## 핵심 구성 요소
+## 핵심 구성 요소 {#core-pieces}
 
 <div class="sandbox-nowrap-first-column-table" markdown="1">
 
@@ -113,7 +113,7 @@ macOS 또는 Linux에서 로컬 개발을 할 때는 `UnixLocalSandboxClient` �
 3. 기본 제공 또는 사용자 지정 기능을 추가합니다.
 4. `RunConfig(sandbox=SandboxRunConfig(...))` 에서 각 실행이 샌드박스 세션을 가져오는 방법을 결정합니다.
 
-## 샌드박스 실행 준비 과정
+## 샌드박스 실행 준비 과정 {#how-a-sandbox-run-is-prepared}
 
 실행 시 러너는 해당 정의를 구체적인 샌드박스 기반 실행으로 변환합니다.
 
@@ -127,7 +127,7 @@ macOS 또는 Linux에서 로컬 개발을 할 때는 `UnixLocalSandboxClient` �
 
 이러한 준비 단계 때문에 `default_manifest`, `instructions`, `base_instructions`, `capabilities`, `run_as` 은 `SandboxAgent` 을 설계할 때 고려해야 할 주요 샌드박스별 옵션입니다.
 
-## `SandboxAgent` 옵션
+## `SandboxAgent` 옵션 {#sandboxagent-options}
 
 일반적인 `Agent` 필드에 추가되는 샌드박스별 옵션은 다음과 같습니다.
 
@@ -145,13 +145,13 @@ macOS 또는 Linux에서 로컬 개발을 할 때는 `UnixLocalSandboxClient` �
 
 샌드박스 클라이언트 선택, 샌드박스 세션 재사용, 매니페스트 재정의, 스냅샷 선택은 에이전트가 아니라 [`SandboxRunConfig`][agents.run_config.SandboxRunConfig] 에 속합니다.
 
-### `default_manifest`
+### `default_manifest` {#default_manifest}
 
 `default_manifest` 는 러너가 이 에이전트의 새 샌드박스 세션을 생성할 때 사용하는 기본 [`Manifest`][agents.sandbox.manifest.Manifest] 입니다. 에이전트가 일반적으로 시작할 때 필요한 파일, 저장소, 보조 자료, 출력 디렉터리, 마운트에 사용하세요.
 
 이는 기본값일 뿐입니다. 실행에서 `SandboxRunConfig(manifest=...)` 으로 재정의할 수 있으며, 재사용되거나 재개된 샌드박스 세션은 기존 워크스페이스 상태를 유지합니다.
 
-### `instructions` 및 `base_instructions`
+### `instructions` 및 `base_instructions` {#instructions-and-base_instructions}
 
 다른 프롬프트에서도 유지되어야 하는 짧은 규칙에는 `instructions` 을 사용하세요. `SandboxAgent` 에서 이러한 instructions는 SDK의 샌드박스 기본 프롬프트 뒤에 추가되므로, 기본 제공 샌드박스 지침을 유지하면서 자체 역할, 워크플로, 성공 기준을 추가할 수 있습니다.
 
@@ -179,7 +179,7 @@ SDK 샌드박스 기본 프롬프트를 대체하려는 경우에만 `base_instr
 
 `instructions` 을 생략해도 SDK는 기본 샌드박스 프롬프트를 포함합니다. 저수준 래퍼에는 이것으로 충분하지만, 대부분의 사용자 대상 에이전트는 여전히 명시적인 `instructions` 을 제공해야 합니다.
 
-### `capabilities`
+### `capabilities` {#capabilities}
 
 기능은 샌드박스 네이티브 동작을 `SandboxAgent` 에 연결합니다. 실행이 시작되기 전에 워크스페이스를 구성하고, 샌드박스별 instructions를 추가하고, 활성 샌드박스 세션에 바인딩되는 도구를 노출하며, 해당 에이전트의 모델 동작이나 입력 처리를 조정할 수 있습니다.
 
@@ -214,9 +214,9 @@ SDK 샌드박스 기본 프롬프트를 대체하려는 경우에만 `base_instr
 
 요구 사항에 맞는다면 기본 제공 기능을 우선 사용하세요. 기본 제공 기능이 지원하지 않는 샌드박스별 도구 또는 instructions 구성 요소가 필요한 경우에만 사용자 지정 기능을 작성하세요.
 
-## 개념
+## 개념 {#concepts_1}
 
-### 매니페스트
+### 매니페스트 {#manifest}
 
 [`Manifest`][agents.sandbox.manifest.Manifest] 는 새 샌드박스 세션의 워크스페이스를 설명합니다. 워크스페이스 `root` 설정, 파일 및 디렉터리 선언, 로컬 파일 복사, Git 저장소 복제, 원격 스토리지 마운트 연결, 환경 변수 설정, 사용자 또는 그룹 정의, 워크스페이스 외부의 특정 절대 경로에 대한 액세스 허용을 지원합니다.
 
@@ -262,7 +262,7 @@ Docker가 컨테이너 내부의 절대 POSIX `path` 에 다른 절대 호스트
 
 스냅샷과 `persist_workspace()` 에는 여전히 워크스페이스 루트만 포함됩니다. 추가로 권한이 부여된 경로는 런타임 액세스이며, 영구 워크스페이스 상태가 아닙니다.
 
-### 권한
+### 권한 {#permissions}
 
 `Permissions` 는 매니페스트 항목의 파일 시스템 권한을 제어합니다. 이는 샌드박스가 구체화하는 파일에 관한 것이며, 모델 권한, 승인 정책 또는 API 자격 증명에 관한 것이 아닙니다.
 
@@ -338,7 +338,7 @@ result = await Runner.run(
 
 파일 수준 공유 규칙도 필요한 경우 사용자를 매니페스트 그룹 및 항목의 `group` 메타데이터와 결합하세요. `run_as` 사용자는 샌드박스 네이티브 작업을 실행하는 주체를 제어하며, `Permissions` 은 샌드박스가 워크스페이스를 구체화한 후 해당 사용자가 읽고 쓰고 실행할 수 있는 파일을 제어합니다.
 
-### SnapshotSpec
+### SnapshotSpec {#snapshotspec}
 
 `SnapshotSpec` 는 저장된 워크스페이스 콘텐츠를 새 샌드박스 세션이 복원할 위치와 다시 저장할 위치를 지정합니다. 이는 샌드박스 워크스페이스의 스냅샷 정책이며, `session_state` 는 특정 샌드박스 백엔드를 재개하기 위한 직렬화된 연결 상태입니다.
 
@@ -363,7 +363,7 @@ run_config = RunConfig(
 
 `snapshot` 을 생략하면 런타임은 가능한 경우 기본 로컬 스냅샷 위치를 사용하려고 합니다. 이를 설정할 수 없으면 무작동 스냅샷으로 대체합니다. 마운트된 경로와 임시 경로는 영구 워크스페이스 콘텐츠로 스냅샷에 복사되지 않습니다.
 
-### 샌드박스 수명 주기
+### 샌드박스 수명 주기 {#sandbox-lifecycle}
 
 수명 주기 모드는 **SDK 소유**와 **개발자 소유** 두 가지입니다.
 
@@ -439,11 +439,11 @@ finally:
 
 `stop()` 는 스냅샷 기반 워크스페이스 콘텐츠만 저장하며 샌드박스를 종료하지 않습니다. `aclose()` 는 전체 세션 정리 경로입니다. 중지 전 훅을 실행하고, `stop()` 을 호출하고, 샌드박스 리소스를 종료하고, 세션 범위 종속성을 닫습니다.
 
-## `SandboxRunConfig` 옵션
+## `SandboxRunConfig` 옵션 {#sandboxrunconfig-options}
 
 [`SandboxRunConfig`][agents.run_config.SandboxRunConfig] 는 샌드박스 세션의 출처와 새 세션의 초기화 방법을 결정하는 실행별 옵션을 보유합니다.
 
-### 샌드박스 소스
+### 샌드박스 소스 {#sandbox-source}
 
 다음 옵션은 러너가 샌드박스 세션을 재사용, 재개 또는 생성할지 결정합니다.
 
@@ -464,7 +464,7 @@ finally:
 3. 그렇지 않고 `run_config.sandbox.session_state` 을 전달하면 명시적으로 직렬화된 해당 샌드박스 세션 상태에서 재개합니다.
 4. 그렇지 않으면 새 샌드박스 세션을 생성합니다. 이 새 세션에는 제공된 경우 `run_config.sandbox.manifest` 을 사용하고, 제공되지 않은 경우 `agent.default_manifest` 을 사용합니다.
 
-### 새 세션 입력
+### 새 세션 입력 {#fresh-session-inputs}
 
 다음 옵션은 러너가 새 샌드박스 세션을 생성할 때만 적용됩니다.
 
@@ -478,7 +478,7 @@ finally:
 
 </div>
 
-### 모델 대상 작업 디렉터리
+### 모델 대상 작업 디렉터리 {#model-facing-working-directory}
 
 여러 실행에서 하나의 샌드박스 세션을 공유하면서 서로 다른 하위 디렉터리에서 작업해야 할 때 POSIX 워크스페이스 상대 디렉터리로 `cwd` 을 설정하세요. 러너가 `cwd` 을 검증할 때 해당 디렉터리가 존재하고 구성된 샌드박스 사용자가 액세스할 수 있어야 합니다. 새 세션의 경우 러너가 먼저 매니페스트를 구체화하므로 이 검증 전에 매니페스트가 디렉터리를 생성할 수 있습니다.
 
@@ -503,7 +503,7 @@ result = await Runner.run(
 
 경로를 포함하는 사용자 지정 기능은 모델이 제공한 상대 경로를 해석할 때 바인딩된 [`SandboxWorkspaceScope`][agents.sandbox.workspace_paths.SandboxWorkspaceScope] 을 적용해야 합니다. 하나의 샌드박스 세션을 공유하면서 모델 대상 작업 디렉터리를 분리하는 두 개의 동시 실행은 [examples/sandbox/shared_session_workdirs.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/shared_session_workdirs.py)를 참조하세요.
 
-### 구체화 제어
+### 구체화 제어 {#materialization-controls}
 
 `concurrency_limits` 은 병렬로 실행할 수 있는 샌드박스 구체화 작업의 양을 제어합니다. 대규모 매니페스트 또는 로컬 디렉터리 복사에 더 엄격한 리소스 제어가 필요하면 `SandboxConcurrencyLimits(manifest_entries=..., local_dir_files=...)` 를 사용하세요. 특정 제한을 비활성화하려면 해당 값을 `None` 으로 설정하세요.
 
@@ -517,7 +517,7 @@ result = await Runner.run(
 - 주입된 활성 세션: 실행 중인 샌드박스 `session` 을 전달하면 기능 기반 매니페스트 업데이트에서 호환되는 비마운트 항목을 추가할 수 있습니다. `manifest.root`, `manifest.environment`, `manifest.users`, `manifest.groups` 를 변경하거나, 기존 항목을 제거하거나, 항목 유형을 교체하거나, 마운트 항목을 추가 또는 변경할 수는 없습니다.
 - 러너 API: `SandboxAgent` 실행은 계속 일반적인 `Runner.run()`, `Runner.run_sync()`, `Runner.run_streamed()` API를 사용합니다.
 
-## 전체 예제: 코딩 작업
+## 전체 예제: 코딩 작업 {#full-example-coding-task}
 
 다음 코딩 스타일 예제는 기본 시작점으로 적합합니다.
 
@@ -600,15 +600,15 @@ if __name__ == "__main__":
 
 [examples/sandbox/docs/coding_task.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/docs/coding_task.py)를 참조하세요. 이 예제는 Unix 로컬 실행에서 결정론적으로 검증할 수 있도록 작은 셸 기반 저장소를 사용합니다. 실제 작업 저장소는 물론 Python, JavaScript 또는 다른 무엇이든 사용할 수 있습니다.
 
-## 일반적인 패턴
+## 일반적인 패턴 {#common-patterns}
 
 위의 전체 예제에서 시작하세요. 많은 경우 동일한 `SandboxAgent` 을 그대로 유지하면서 샌드박스 클라이언트, 샌드박스 세션 소스 또는 워크스페이스 소스만 변경할 수 있습니다.
 
-### 샌드박스 클라이언트 전환
+### 샌드박스 클라이언트 전환 {#switch-sandbox-clients}
 
 에이전트 정의는 그대로 유지하고 실행 구성만 변경하세요. 컨테이너 격리나 이미지 동등성이 필요하면 Docker를 사용하고, 공급자가 관리하는 실행이 필요하면 호스티드 공급자를 사용하세요. 예제와 공급자 옵션은 [샌드박스 클라이언트](clients.md)를 참조하세요.
 
-### 워크스페이스 재정의
+### 워크스페이스 재정의 {#override-the-workspace}
 
 에이전트 정의는 그대로 유지하고 새 세션 매니페스트만 교체하세요.
 
@@ -632,7 +632,7 @@ run_config = RunConfig(
 
 에이전트를 다시 구성하지 않고 동일한 에이전트 역할을 여러 저장소, 패킷 또는 작업 번들에 실행하려면 이를 사용하세요. 위의 검증된 코딩 예제는 일회성 재정의 대신 `default_manifest` 을 사용하는 동일한 패턴을 보여 줍니다.
 
-### 샌드박스 세션 주입
+### 샌드박스 세션 주입 {#inject-a-sandbox-session}
 
 명시적인 수명 주기 제어, 실행 후 검사 또는 출력 복사가 필요하면 활성 샌드박스 세션을 주입하세요.
 
@@ -657,7 +657,7 @@ async with sandbox:
 
 실행 후 워크스페이스를 검사하거나 이미 시작된 샌드박스 세션에서 스트리밍하려면 이를 사용하세요. [examples/sandbox/docs/coding_task.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/docs/coding_task.py) 및 [examples/sandbox/docker/docker_runner.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/docker/docker_runner.py)를 참조하세요.
 
-### 세션 상태에서 재개
+### 세션 상태에서 재개 {#resume-from-session-state}
 
 `RunState` 외부에서 샌드박스 상태를 이미 직렬화했다면 러너가 해당 상태에서 다시 연결하도록 하세요.
 
@@ -682,7 +682,7 @@ run_config = RunConfig(
 
 세션 상태 및 `RunState` 직렬화에서는 클라우드 마운트 자격 증명, 자격 증명을 포함하는 보조 구성, 컨테이너 내부 자격 증명 노출 승인도 제거됩니다. 마운트된 세션 재개를 지원하는 백엔드의 경우 상태에 삭제된 마운트 권한 정보가 포함되어 있다면 현재 신뢰할 수 있는 매니페스트를 `SandboxRunConfig.manifest` 또는 `agent.default_manifest` 를 통해 제공하세요. 이름이 `"data"` 인 마운트 항목에 마운트 범위 승인이 필요하면 재개 전에 `trusted_manifest = trusted_manifest.with_in_container_mount_credential_exposure_acknowledged("data")` 을 사용하여 복사된 매니페스트를 유지하세요. 광범위한 권한에는 `trusted_manifest = trusted_manifest.with_in_container_mount_broad_credential_exposure_acknowledged("data")` 를 사용하고, 마운트에서 두 권한 클래스를 모두 사용하는 경우 두 메서드를 모두 호출하세요. 승인이 필요한 모든 정확한 마운트 경로를 전달하세요. Agents SDK는 현재 신뢰할 수 있는 매니페스트의 자격 증명 없는 마운트 토폴로지가 저장된 상태와 정확히 일치하는 경우에만 자격 증명을 복원합니다. 신뢰할 수 있는 구성이 없거나 일치하지 않으면 샌드박스가 시작되기 전에 재개가 실패합니다. 직렬화된 상태 자체로는 절대 권한이 부여되지 않습니다. `VercelSandboxClient` 은 마운트된 세션을 재개할 수 없으므로 신뢰할 수 있는 매니페스트로 새 샌드박스를 시작하세요.
 
-### 스냅샷에서 시작
+### 스냅샷에서 시작 {#start-from-a-snapshot}
 
 저장된 파일과 아티팩트로 새 샌드박스를 초기화하세요.
 
@@ -703,7 +703,7 @@ run_config = RunConfig(
 
 새 샌드박스 세션을 생성하는 실행이 `agent.default_manifest` 만 사용하는 대신 저장된 워크스페이스 콘텐츠에서 시작해야 할 때 이를 사용하세요. 로컬 스냅샷 흐름은 [examples/sandbox/memory.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/memory.py)를, 원격 스냅샷 클라이언트는 [examples/sandbox/sandbox_agent_with_remote_snapshot.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/sandbox_agent_with_remote_snapshot.py)를 참조하세요.
 
-### Git에서 스킬 로드
+### Git에서 스킬 로드 {#load-skills-from-git}
 
 로컬 스킬 소스를 저장소 기반 소스로 교체하세요.
 
@@ -718,7 +718,7 @@ capabilities = Capabilities.default() + [
 
 스킬 번들에 자체 릴리스 주기가 있거나 여러 샌드박스에서 공유해야 할 때 이를 사용하세요. [examples/sandbox/tax_prep.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/tax_prep.py)를 참조하세요.
 
-### 도구로 노출
+### 도구로 노출 {#expose-as-tools}
 
 도구 에이전트는 자체 샌드박스 경계를 사용하거나 상위 실행의 활성 샌드박스를 재사용할 수 있습니다. 재사용은 빠른 읽기 전용 탐색 에이전트에 유용합니다. 다른 샌드박스를 생성하거나, 초기화하거나, 스냅샷하는 비용 없이 상위 실행이 사용하는 정확한 워크스페이스를 검사할 수 있습니다.
 
@@ -832,7 +832,7 @@ rollout_agent.as_tool(
 
 도구 에이전트가 자유롭게 변경하거나, 신뢰할 수 없는 명령을 실행하거나, 다른 백엔드/이미지를 사용해야 할 때 별도의 샌드박스를 사용하세요. [examples/sandbox/sandbox_agents_as_tools.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/sandbox_agents_as_tools.py)를 참조하세요.
 
-### 로컬 도구 및 MCP와의 결합
+### 로컬 도구 및 MCP와의 결합 {#combine-with-local-tools-and-mcp}
 
 동일한 에이전트에서 일반 도구를 계속 사용하면서 샌드박스 워크스페이스를 유지하세요.
 
@@ -851,13 +851,13 @@ agent = SandboxAgent(
 
 워크스페이스 검사가 에이전트 작업의 일부일 뿐일 때 이를 사용하세요. [examples/sandbox/sandbox_agent_with_tools.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/sandbox_agent_with_tools.py)를 참조하세요.
 
-## 메모리
+## 메모리 {#memory}
 
 이후 샌드박스 에이전트 실행이 이전 실행에서 학습해야 한다면 `Memory` 기능을 사용하세요. 메모리는 SDK의 대화형 `Session` 메모리와 별개입니다. 학습한 내용을 샌드박스 워크스페이스 내부의 파일로 정제한 다음 이후 실행에서 해당 파일을 읽을 수 있습니다.
 
 설정, 읽기/생성 동작, 멀티턴 대화, 레이아웃 격리는 [에이전트 메모리](memory.md)를 참조하세요.
 
-## 구성 패턴
+## 구성 패턴 {#composition-patterns}
 
 단일 에이전트 패턴을 이해한 다음에는 더 큰 시스템에서 샌드박스 경계를 어디에 둘지 결정해야 합니다.
 
@@ -873,7 +873,7 @@ agent = SandboxAgent(
 - 샌드박스를 사용하지 않는 에이전트가 워크스페이스 격리가 필요한 워크플로 부분만 샌드박스 에이전트로 핸드오프
 - 오케스트레이터가 여러 샌드박스 에이전트를 도구로 노출하며, 일반적으로 각 `Agent.as_tool(...)` 호출마다 별도의 샌드박스 `RunConfig` 을 사용해 각 도구에 자체 격리 워크스페이스 제공
 
-### 턴과 샌드박스 실행
+### 턴과 샌드박스 실행 {#turns-and-sandbox-runs}
 
 핸드오프와 에이전트 도구 호출을 별도로 설명하면 이해하기 쉽습니다.
 
@@ -886,7 +886,7 @@ agent = SandboxAgent(
 - 핸드오프에서는 샌드박스 에이전트가 해당 실행의 활성 에이전트가 되므로 승인이 동일한 최상위 실행에 유지됩니다.
 - `Agent.as_tool(...)` 에서는 샌드박스 도구 에이전트 내부에서 발생한 승인이 외부 실행에 계속 표시되지만, 저장된 중첩 실행 상태에서 제공되며 외부 실행이 재개될 때 중첩 샌드박스 실행을 재개합니다.
 
-## 추가 자료
+## 추가 자료 {#further-reading}
 
 - [빠른 시작](../sandbox_agents.md): 샌드박스 에이전트 하나를 실행합니다.
 - [샌드박스 클라이언트](clients.md): 로컬, Docker, 호스티드, 마운트 옵션을 선택합니다.

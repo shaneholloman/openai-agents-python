@@ -18,7 +18,7 @@ search:
 
 有关完整的两次运行代码示例，请参阅 [examples/sandbox/memory.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/memory.py)。该示例会修复一个错误、生成记忆、恢复快照，并在后续验证器运行中使用该记忆。有关采用独立记忆布局的多轮、多智能体代码示例，请参阅 [examples/sandbox/memory_multi_agent_multiturn.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/memory_multi_agent_multiturn.py)。
 
-## 记忆的启用
+## 记忆的启用 {#enable-memory}
 
 将 `Memory()` 作为一项功能添加到沙盒智能体中。
 
@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix="sandbox-memory-example-") as snapshot_d
 
 `Memory()` 会同时启用记忆读取和生成。对于应读取记忆但不应生成新记忆的智能体，请使用 `Memory(generate=None)`——例如，由内部智能体、子智能体、检查器或一次性工具智能体执行的运行通常不会提供太多有价值的信息。如果运行应生成供日后使用的记忆，但用户不希望该运行受现有记忆影响，请使用 `Memory(read=None)`。
 
-## 记忆的读取
+## 记忆的读取 {#read-memory}
 
 记忆读取采用渐进式披露方式。在运行开始时，SDK 会将一个简短摘要（`memory_summary.md`）注入智能体的开发者提示词，其中包含普遍有用的技巧、用户偏好以及可用记忆。这可为智能体提供足够的上下文，使其能够判断先前工作是否可能相关。
 
@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix="sandbox-memory-example-") as snapshot_d
 
 记忆可能会过时。智能体会被要求仅将记忆视为参考，并以当前环境为准。默认情况下，记忆读取会启用 `live_update`，因此如果智能体发现记忆已过时，可以在同一次运行中更新已配置的 `MEMORY.md`。如果智能体应读取记忆但不应在运行期间修改记忆，请禁用实时更新，例如对延迟敏感的运行。
 
-## 记忆的生成
+## 记忆的生成 {#generate-memory}
 
 一次运行结束后，沙盒运行时会将该运行片段追加到对话文件中。累积的对话文件会在沙盒会话关闭时进行处理。
 
@@ -101,7 +101,7 @@ memory = Memory(
 
 如果近期原始记忆数量超过 `max_raw_memories_for_consolidation`（默认值为 256），阶段 2 将只保留最新对话中的记忆并删除较旧的记忆。新旧顺序以对话最后更新时间为准。这种遗忘机制有助于让记忆反映最新环境。
 
-## 多轮对话
+## 多轮对话 {#multi-turn-conversations}
 
 对于多轮沙盒聊天，请将常规 SDK `Session` 与同一个实时沙盒会话结合使用：
 
@@ -141,7 +141,7 @@ async with sandbox:
 3. `RunConfig.group_id`，当上述两者均不存在时
 4. 为每次运行生成的 ID，当不存在稳定标识符时
 
-## 不同智能体的记忆隔离布局
+## 不同智能体的记忆隔离布局 {#use-different-layouts-to-isolate-memory-for-different-agents}
 
 记忆隔离基于 `MemoryLayoutConfig`，而不是智能体名称。具有相同布局和相同记忆对话 ID 的智能体会共享一个记忆对话和一份整合后的记忆。具有不同布局的智能体则会分别保存各自的运行文件、原始记忆、`MEMORY.md` 和 `memory_summary.md`，即使它们共享同一个沙盒工作区也是如此。
 

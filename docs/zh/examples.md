@@ -6,7 +6,7 @@ search:
 
 请查看[仓库](https://github.com/openai/openai-agents-python/tree/main/examples)的代码示例部分，其中提供了多种使用 SDK 的实现。代码示例分为多个类别，展示了不同的模式和功能。
 
-## 类别
+## 类别 {#categories}
 
 - **[agent_patterns](https://github.com/openai/openai-agents-python/tree/main/examples/agent_patterns)：**此类别中的代码示例展示了常见的智能体设计模式，例如
 

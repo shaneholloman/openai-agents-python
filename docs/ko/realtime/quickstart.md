@@ -10,13 +10,13 @@ Python SDK의 실시간 에이전트는 WebSocket 전송을 통해 OpenAI Realti
 
     Python SDK는 브라우저 WebRTC 전송을 제공하지 **않습니다**. 이 페이지에서는 서버 측 WebSocket을 통해 Python으로 관리하는 실시간 세션만 다룹니다. 서버 측 오케스트레이션, 도구, 승인 및 전화 통신 통합에는 이 SDK를 사용하세요. [실시간 전송](transport.md)도 참고하세요.
 
-## 사전 요구 사항
+## 사전 요구 사항 {#prerequisites}
 
 -   Python 3.10 이상
 -   OpenAI API 키
 -   OpenAI Agents SDK에 대한 기본 지식
 
-## 설치
+## 설치 {#installation}
 
 아직 설치하지 않았다면 OpenAI Agents SDK를 설치합니다.
 
@@ -24,9 +24,9 @@ Python SDK의 실시간 에이전트는 WebSocket 전송을 통해 OpenAI Realti
 pip install openai-agents
 ```
 
-## 서버 측 실시간 세션 생성
+## 서버 측 실시간 세션 생성 {#create-a-server-side-realtime-session}
 
-### 1. 실시간 구성 요소 가져오기
+### 1. 실시간 구성 요소 가져오기 {#1-import-the-realtime-components}
 
 ```python
 import asyncio
@@ -34,7 +34,7 @@ import asyncio
 from agents.realtime import RealtimeAgent, RealtimeRunner
 ```
 
-### 2. 시작 에이전트 정의
+### 2. 시작 에이전트 정의 {#2-define-the-starting-agent}
 
 ```python
 agent = RealtimeAgent(
@@ -43,7 +43,7 @@ agent = RealtimeAgent(
 )
 ```
 
-### 3. 러너 구성
+### 3. 러너 구성 {#3-configure-the-runner}
 
 새 코드에는 중첩된 `audio.input` / `audio.output` 세션 설정 구조를 사용하는 것이 좋습니다. 새 실시간 에이전트에는 `gpt-realtime-2.1`부터 사용하세요.
 
@@ -72,7 +72,7 @@ runner = RealtimeRunner(
 )
 ```
 
-### 4. 세션 시작 및 입력 전송
+### 4. 세션 시작 및 입력 전송 {#4-start-the-session-and-send-input}
 
 `runner.run()`는 `RealtimeSession`를 반환합니다. 세션 컨텍스트에 진입하면 연결이 열립니다.
 
@@ -102,12 +102,12 @@ if __name__ == "__main__":
 
 `session.send_message()`는 일반 문자열 또는 구조화된 실시간 메시지를 받습니다. raw 오디오 청크에는 [`session.send_audio()`][agents.realtime.session.RealtimeSession.send_audio]을 사용하세요.
 
-## 이 빠른 시작에서 다루지 않는 내용
+## 이 빠른 시작에서 다루지 않는 내용 {#what-this-quickstart-does-not-include}
 
 -   마이크 캡처 및 스피커 재생 코드. [`examples/realtime`](https://github.com/openai/openai-agents-python/tree/main/examples/realtime)의 실시간 코드 예제를 참고하세요.
 -   SIP / 전화 통신 연결 흐름. [실시간 전송](transport.md) 및 [SIP 섹션](guide.md#sip-and-telephony)을 참고하세요.
 
-## 주요 설정
+## 주요 설정 {#key-settings}
 
 기본 세션이 작동한 후 일반적으로 가장 먼저 사용하는 설정은 다음과 같습니다.
 
@@ -126,7 +126,7 @@ if __name__ == "__main__":
 
 전체 스키마는 [`RealtimeRunConfig`][agents.realtime.config.RealtimeRunConfig] 및 [`RealtimeSessionModelSettings`][agents.realtime.config.RealtimeSessionModelSettings]을 참고하세요.
 
-## 연결 옵션
+## 연결 옵션 {#connection-options}
 
 환경에 API 키를 설정합니다.
 
@@ -151,7 +151,7 @@ session = await runner.run(model_config={"api_key": "your-api-key"})
 
 Azure OpenAI에 연결할 때는 `model_config["url"]`를 GA Realtime 엔드포인트 URL로 설정하고 헤더를 명시적으로 전달하세요. 실시간 에이전트에는 레거시 베타 경로(`/openai/realtime?api-version=...`)를 사용하지 마세요. 자세한 내용은 [실시간 에이전트 가이드](guide.md#low-level-access-and-custom-endpoints)를 참고하세요.
 
-## 다음 단계
+## 다음 단계 {#next-steps}
 
 -   서버 측 WebSocket과 SIP 중에서 선택하려면 [실시간 전송](transport.md)을 읽어보세요.
 -   수명 주기, 구조화된 입력, 승인, 핸드오프, 가드레일 및 저수준 제어에 관한 내용은 [실시간 에이전트 가이드](guide.md)를 읽어보세요.

@@ -12,7 +12,7 @@ search:
 
 이러한 기본 구성 요소를 Python과 함께 사용하면 도구와 에이전트 간의 복잡한 관계를 표현할 수 있으며, 가파른 학습 곡선 없이 실제 애플리케이션을 구축할 수 있습니다. 또한 SDK에는 에이전트 기반 흐름을 시각화하고 디버깅할 뿐만 아니라 평가하고 애플리케이션에 맞게 모델을 파인튜닝할 수도 있는 **트레이싱** 기능이 내장되어 있습니다.
 
-## Agents SDK를 사용하는 이유
+## Agents SDK를 사용하는 이유 {#why-use-the-agents-sdk}
 
 SDK는 다음 두 가지 설계 원칙을 따릅니다.
 
@@ -34,7 +34,7 @@ SDK의 주요 기능은 다음과 같습니다.
 -   **휴먼인더루프 (HITL)**: 에이전트 실행 중 사람이 참여할 수 있도록 하는 내장 메커니즘입니다.
 -   **트레이싱**: 워크플로를 시각화하고 디버깅하며 모니터링하기 위한 내장 트레이싱 기능으로, OpenAI의 평가, 파인튜닝, 증류 도구 모음을 지원합니다.
 
-## Agents SDK와 Responses API의 선택
+## Agents SDK와 Responses API의 선택 {#agents-sdk-or-responses-api}
 
 SDK는 OpenAI 모델에 기본적으로 Responses API를 사용하지만, 모델 호출을 더 높은 수준의 런타임으로 래핑합니다.
 
@@ -51,13 +51,13 @@ SDK는 OpenAI 모델에 기본적으로 Responses API를 사용하지만, 모델
 
 전체 애플리케이션에서 하나만 선택할 필요는 없습니다. 많은 애플리케이션이 관리형 워크플로에는 SDK를 사용하고, 저수준 경로에는 Responses API를 직접 호출합니다.
 
-## 설치
+## 설치 {#installation}
 
 ```bash
 pip install openai-agents
 ```
 
-## Hello world 예제
+## Hello world 예제 {#hello-world-example}
 
 ```python
 from agents import Agent, Runner
@@ -78,14 +78,14 @@ print(result.final_output)
 export OPENAI_API_KEY=sk-...
 ```
 
-## 시작 안내
+## 시작 안내 {#start-here}
 
 -   [빠른 시작](quickstart.md)에서 첫 번째 텍스트 기반 에이전트를 구축합니다.
 -   그런 다음 [에이전트 실행](running_agents.md#choose-a-memory-strategy)에서 턴 간 상태를 유지할 방법을 결정합니다.
 -   작업이 실제 파일, 리포지토리 또는 에이전트별로 격리된 워크스페이스 상태에 의존한다면 [샌드박스 에이전트 빠른 시작](sandbox_agents.md)을 읽어 보세요.
 -   핸드오프와 관리자 스타일 오케스트레이션 중 하나를 선택하려면 [에이전트 오케스트레이션](multi_agent.md)을 읽어 보세요.
 
-## 경로 선택
+## 경로 선택 {#choose-your-path}
 
 수행하려는 작업은 알지만 어느 페이지에서 설명하는지 모를 때 이 표를 사용하세요.
 

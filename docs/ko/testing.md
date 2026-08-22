@@ -8,7 +8,7 @@ SDK는 에이전트 워크플로, Sandbox 세션, Realtime 세션 및 Voice 파�
 
 이러한 유틸리티를 사용하여 애플리케이션과 SDK가 관리하는 오케스트레이션을 테스트할 수 있습니다. 여기에는 도구 실행, 핸드오프, 가드레일, 재시도, 스트리밍, 세션 동작, Sandbox 기능, Realtime 이벤트 처리 및 Voice 파이프라인 구성이 포함됩니다. 외부 모델, 네트워크 프로토콜, Sandbox 공급자 또는 오디오 시스템이 관리하는 동작에는 실제 공급자 어댑터나 통합 환경을 사용하세요.
 
-## 필요한 레시피 찾기
+## 필요한 레시피 찾기 {#find-the-recipe-you-need}
 
 | 원하는 작업 | 사용 항목 | 이동 위치 |
 | --- | --- | --- |
@@ -26,7 +26,7 @@ SDK는 에이전트 워크플로, Sandbox 세션, Realtime 세션 및 Voice 파�
 | 정적 또는 스트리밍 Voice 파이프라인 테스트 | `ScriptedSTTModel`, `ScriptedTTSModel` 및 스크립트된 워크플로나 실제 워크플로 | [Voice 파이프라인 테스트](#test-a-voice-pipeline) |
 | 공급자 직렬화 또는 전송 페이로드 테스트 | 제어된 네트워크 전송을 사용하는 실제 공급자 어댑터 | [올바른 경계 선택](#choose-the-correct-boundary) |
 
-## 가져오기
+## 가져오기 {#imports}
 
 테스트 API는 대체하는 런타임 경계와 나란히 위치합니다.
 
@@ -38,9 +38,9 @@ SDK는 에이전트 워크플로, Sandbox 세션, Realtime 세션 및 Voice 파�
 
 테스트 심벌은 의도적으로 최상위 `agents` 가져오기에서 제외됩니다.
 
-## 에이전트 워크플로 레시피
+## 에이전트 워크플로 레시피 {#agent-workflow-recipes}
 
-### 고정 응답 반환
+### 고정 응답 반환 {#return-a-fixed-response}
 
 예상되는 각 모델 호출마다 정규화된 출력 항목 시퀀스를 하나씩 전달합니다. 출력 시퀀스 축약형은 하나의 요청에 대해 결정론적인 응답 ID와 사용량을 받습니다.
 
@@ -71,7 +71,7 @@ async def test_fixed_response() -> None:
 
 결정론적 워크플로 테스트는 `model.assert_complete()`로 마무리하세요. 이 메서드는 구성된 모든 단계를 소비하기 전에 워크플로가 중지된 경우를 포착합니다.
 
-### 도구 워크플로 테스트
+### 도구 워크플로 테스트 {#test-a-tool-workflow}
 
 도구를 호출하는 모델 응답 하나와 최종 답변을 생성하는 두 번째 응답을 스크립트로 구성합니다. 이러한 모델 호출 사이에서 실제 SDK 도구 파이프라인이 실행됩니다.
 
@@ -117,7 +117,7 @@ async def test_tool_workflow() -> None:
 
 이 패턴은 도구 입력 검증, 실행, 결과 변환, 훅, 가드레일 및 다음 모델 턴을 포괄합니다. Python 함수를 직접 호출하면 이러한 SDK 동작을 우회하게 됩니다.
 
-### 요청에서 응답 도출
+### 요청에서 응답 도출 {#derive-a-response-from-the-request}
 
 응답이 실제로 정규화된 모델 호출에 따라 달라지거나 모델 경계에서 검증해야 할 때 `ModelStep.respond()`을 사용하세요. 응답자는 동기식 또는 비동기식일 수 있으며 `ScriptedModel`이 허용하는 모든 단계 형식을 반환할 수 있습니다.
 
@@ -151,7 +151,7 @@ async def test_request_aware_response() -> None:
 
 `ScriptedModel`은 `ModelStep`, 이에 해당하는 딕셔너리 형식, `ModelResponse`, 정규화된 출력 항목 시퀀스 또는 예외를 허용합니다. 응답이 호출에 따라 달라지지 않을 때는 고정 출력 시퀀스를 사용하는 것이 좋습니다. 고정 스크립트를 사용하면 예상하지 못한 턴을 더 쉽게 진단할 수 있습니다.
 
-### 모델 호출 검사
+### 모델 호출 검사 {#inspect-model-calls}
 
 `ScriptedModel`은 선택된 단계를 해결하거나 예외를 발생시키기 전에 각 호출을 기록합니다.
 
@@ -168,7 +168,7 @@ async def test_request_aware_response() -> None:
 
 하나의 테스트에서 모델 단계를 점진적으로 추가해야 할 때는 `enqueue()` 또는 `extend()`을 사용하세요. 독립적인 시나리오에는 새 `ScriptedModel`를 생성하세요. 이 유틸리티는 소비된 단계나 호출 기록을 재설정하지 않습니다.
 
-### 스트리밍 테스트
+### 스트리밍 테스트 {#test-streaming}
 
 일반 응답 단계는 `Runner.run()`과 `Runner.run_streamed()`을 모두 지원합니다. 일반적인 어시스턴트 메시지, 추론 항목, 함수 호출 및 패치 적용 호출의 경우 `ScriptedModel`가 정규화된 시작, 델타, 항목 완료 및 최종 응답 이벤트를 생성합니다. 최종 응답에는 전체 출력과 사용량이 포함됩니다.
 
@@ -185,7 +185,7 @@ step = ModelStep.stream(
 
 자동 스트리밍은 증분 수명 주기가 구현되지 않은 정규화된 출력 항목 유형을 거부합니다. 이러한 항목에는 부분적인 이벤트 시퀀스에 의존하지 말고 `ModelStep.stream(...)`을 사용하세요.
 
-### 모델 실패 주입
+### 모델 실패 주입 {#inject-model-failures}
 
 모델 호출 하나를 실패시키려면 `ModelStep.raise_error()`를 사용하세요. 선택적 재시도 권고는 해당 스크립트 오류에만 적용됩니다.
 
@@ -202,7 +202,7 @@ step = ModelStep.raise_error(
 
 러너의 재시도 정책에 따라 권고가 추가 시도를 유발할지 결정됩니다. 각 재시도는 또 다른 모델 호출이며 다음 스크립트 단계를 소비합니다. Python 헬퍼는 고정된 `ModelRetryAdvice` 값을 허용합니다. 재시도 권고 자체가 시도마다 동적으로 달라져야 하는 경우 사용자 지정 `Model`을 사용하세요.
 
-### 워크플로 드리프트 감지
+### 워크플로 드리프트 감지 {#detect-workflow-drift}
 
 스크립트된 호출을 예상 워크플로 형태로 간주하세요. 추가 모델 요청이 발생하면 `UnexpectedModelCall`가 발생하며, 조기에 종료되면 `assert_complete()`이 보고할 단계가 남습니다.
 
@@ -214,9 +214,9 @@ step = ModelStep.raise_error(
 | `UnexpectedModelCall` | `call`, `call_index` | 스크립트가 끝난 후 워크플로가 또 다른 모델 호출을 수행함 |
 | `UnconsumedModelSteps` | `remaining_steps` | 모든 단계를 사용하기 전에 워크플로가 종료됨 |
 
-## Sandbox 에이전트 레시피
+## Sandbox 에이전트 레시피 {#sandbox-agent-recipes}
 
-### Sandbox 에이전트 워크플로 테스트
+### Sandbox 에이전트 워크플로 테스트 {#test-a-sandbox-agent-workflow}
 
 `ScriptedModel`과 `scripted_sandbox_session()`를 결합하면 로컬 컨테이너나 원격 Sandbox를 생성하지 않고도 실제 `SandboxAgent` 런타임을 실행할 수 있습니다. 모델 스크립트는 기능 도구를 선택하고, Sandbox 스크립트는 해당 `SandboxSession` 메서드가 반환할 값을 정의합니다.
 
@@ -279,7 +279,7 @@ async def test_sandbox_workflow() -> None:
 
 이 테스트는 정규화된 SDK 경계 두 개를 통과합니다. 도구 인수 검증, 기능 라우팅, Sandbox 세션 호출, 다음 모델 턴으로의 도구 결과 전달 및 최종 출력 처리를 포괄합니다. 실제 모델이 명령을 선택하는지 또는 실제 Sandbox 공급자가 이를 어떻게 실행하는지는 테스트하지 않습니다.
 
-### Sandbox 단계 구성
+### Sandbox 단계 구성 {#configure-sandbox-steps}
 
 일치하는 각 Sandbox 호출은 하나의 전역 FIFO 시퀀스에서 다음 단계를 소비합니다. 메서드 불일치, 매처 거부 또는 매처 예외가 발생하면 해당 단계는 대기 상태로 남습니다. `method`을 설정하고 결과를 정확히 하나 선택하며, 호출 세부 정보가 중요한 경우에만 `match`을 추가하세요.
 
@@ -303,9 +303,9 @@ async def test_sandbox_workflow() -> None:
 
 반환되는 객체는 세션 자체입니다. 이를 `RunConfig(sandbox={"session": sandbox})`에 직접 전달하세요. 래퍼 `.session` 속성은 없습니다.
 
-## Realtime 레시피
+## Realtime 레시피 {#realtime-recipes}
 
-### Realtime 세션 테스트
+### Realtime 세션 테스트 {#test-a-realtime-session}
 
 `ScriptedRealtimeModel`는 Python SDK의 정규화된 `RealtimeModel` 경계를 구현합니다. 각 `RealtimeStep`는 발신 `RealtimeModelSendEvent` 하나와 일치한 다음 정규화된 수신 `RealtimeModelEvent` 객체를 내보내거나 주입된 오류를 발생시킵니다.
 
@@ -361,7 +361,7 @@ async def test_realtime_message() -> None:
 
 연결 중에 수신 이벤트를 내보내려면 `connect_events`을 사용하세요. 수명 주기 실패에는 `connect_error` 또는 `close_error`를 사용하고, 일치한 전송 하나와 관련된 실패에는 `RealtimeStep(error=...)`을 사용하세요. 한 단계에는 `emit`와 `error`를 동시에 정의할 수 없습니다.
 
-### Realtime 도구 워크플로 테스트
+### Realtime 도구 워크플로 테스트 {#test-a-realtime-tool-workflow}
 
 실제 함수 도구를 `RealtimeAgent`에 연결하고 정규화된 도구 호출을 내보낸 다음 SDK가 모델 경계를 통해 도구 출력을 전송하는지 확인합니다. `async_tool_calls`을 `False`로 설정하면 이 간단한 예제가 테스트 전용 대기 메커니즘 없이 연결 중에 완료됩니다.
 
@@ -421,7 +421,7 @@ async def test_realtime_tool_workflow() -> None:
 
 이 테스트는 실제 Realtime 도구 조회, 인수 검증, 실행 및 출력 라우팅을 수행합니다. 실제 모델이 해당 도구를 선택한다는 사실까지 입증하지는 않습니다.
 
-### Realtime 호출 및 수명 주기 검사
+### Realtime 호출 및 수명 주기 검사 {#inspect-realtime-calls-and-lifecycle}
 
 | 멤버 | 포함 내용 |
 | --- | --- |
@@ -441,9 +441,9 @@ async def test_realtime_tool_workflow() -> None:
 | `UnconsumedRealtimeSteps` | `remaining_steps` | 예상된 모든 전송을 사용하기 전에 세션이 종료됨 |
 | `RealtimeScriptError` | 없음 | 연결이 끊긴 상태에서 전송하는 등 잘못된 수명 주기 상태에서 스크립트가 사용됨 |
 
-## Voice 파이프라인 레시피
+## Voice 파이프라인 레시피 {#voice-pipeline-recipes}
 
-### Voice 파이프라인 테스트
+### Voice 파이프라인 테스트 {#test-a-voice-pipeline}
 
 스크립트된 STT 및 TTS 모델을 `SingleAgentVoiceWorkflow`, 그리고 `ScriptedModel`이 지원하는 에이전트와 결합하면 공급자 요청 없이 전체 음성-텍스트 변환 -> 에이전트 -> 텍스트-음성 변환 파이프라인을 테스트할 수 있습니다.
 
@@ -501,7 +501,7 @@ workflow = ScriptedVoiceWorkflow(
 
 `start` 단계는 `on_start()`에서 소비됩니다. `VoicePipeline`은 `StreamedAudioInput`에 대해서만 `on_start()`을 호출합니다. 정적 `AudioInput` 실행은 `start`를 소비하지 않습니다. 각 일반 턴은 전사 결과를 기록하고 구성된 결과 하나를 소비합니다. 문자열 하나는 하나의 프래그먼트이며, 문자열 시퀀스는 텍스트 분할 및 TTS 전에 프래그먼트 경계를 제어합니다.
 
-### 스트리밍 전사 테스트
+### 스트리밍 전사 테스트 {#test-streamed-transcription}
 
 `ScriptedSTTModel`는 정적 `transcriptions`과 독립적으로 스크립트된 스트리밍 `sessions`을 허용합니다. 세션은 `ScriptedTranscriptionSession`, 전사 턴 시퀀스, 예외 또는 단일 문자열일 수 있습니다.
 
@@ -515,7 +515,7 @@ stt = ScriptedSTTModel(sessions=[session])
 
 `ScriptedTranscriptionSession`을 닫으면 반복이 중지되고 건너뛴 턴이 남아 `assert_complete()`에서 보고됩니다. 마찬가지로 `ScriptedTTSModel`은 호출마다 `TTSResult`, 바이트 청크 시퀀스 또는 예외 하나를 소비합니다.
 
-### Voice 호출 검사
+### Voice 호출 검사 {#inspect-voice-calls}
 
 | 구성 요소 | 기록된 내역 |
 | --- | --- |
@@ -532,7 +532,7 @@ stt = ScriptedSTTModel(sessions=[session])
 
 테스트에서 구성한 모든 스크립트형 Voice 구성 요소에 `assert_complete()`을 호출하세요. `ScriptedSTTModel.assert_complete()`은 자신이 생성한 전사 세션의 턴도 검사합니다.
 
-## 올바른 경계 선택
+## 올바른 경계 선택 {#choose-the-correct-boundary}
 
 모델 공급자에 의존하지 않고 SDK 실행 루프, 도구, 핸드오프, 가드레일, 세션, 재시도 또는 정규화된 스트리밍을 테스트해야 할 때 `ScriptedModel`을 사용하세요.
 
@@ -544,7 +544,7 @@ WebSocket 연결을 열지 않고 `RealtimeSession` 동작 또는 `RealtimeAgent
 
 이러한 유틸리티를 Responses API 또는 Chat Completions 요청 직렬화, 인증 헤더, 공급자 기본값, HTTP 페이로드, 공급자 스트림 청크, Realtime 전송 프레임 또는 공급자별 수명 주기 동작을 테스트하는 데 사용하지 마세요. 이러한 테스트에는 실제 어댑터를 유지하면서 해당 네트워크 경계를 대체하거나 제어하세요. `openai` v3에서는 OpenAI 어댑터 테스트에 `httpx2` 요청, 응답, 전송 및 예외 타입을 사용해야 합니다. 레거시 `httpx`은 Agents SDK의 핵심 종속성이 아닙니다.
 
-## 최종 체크리스트
+## 최종 체크리스트 {#final-checklist}
 
 - 정규화된 모델, Sandbox 세션, Realtime 모델 또는 Voice 파이프라인 경계가 관리하는 상호작용만 스크립트로 구성합니다.
 - 비공개 러너 상태 대신 중요한 공개 요청 또는 호출 필드를 검증합니다.
@@ -555,7 +555,7 @@ WebSocket 연결을 열지 않고 `RealtimeSession` 동작 또는 `RealtimeAgent
 - 사람이 읽을 수 있는 메시지를 파싱하는 대신 구조화된 오류 필드를 검증합니다.
 - 공급자 전송 테스트는 제어된 네트워크 전송을 사용하는 실제 어댑터에서 수행합니다.
 
-## 범위 및 현재 제한 사항
+## 범위 및 현재 제한 사항 {#scope-and-current-limitations}
 
 테스트 모듈은 의도적으로 다음 기능을 제공하지 않습니다.
 
@@ -568,7 +568,7 @@ WebSocket 연결을 열지 않고 `RealtimeSession` 동작 또는 `RealtimeAgent
 
 테스트에 잘못된 형식의 스트림, 제어된 일시 중지 또는 동시성, 정확한 취소, 혹은 스크립트형 유틸리티가 보존할 수 없는 수명 주기 경계가 필요한 경우 해당 공개 인터페이스의 사용자 지정 구현을 사용하세요. 테스트에 그 특수한 경계를 문서화하세요.
 
-## API 레퍼런스
+## API 레퍼런스 {#api-reference}
 
 - [`agents.testing`](ref/testing.md)
 - [`agents.realtime.testing`](ref/realtime/testing.md)

@@ -12,13 +12,13 @@ search:
 
 SDK は、ファイルのステージング、ファイルシステムツール、シェルアクセス、サンドボックスのライフサイクル、スナップショット、プロバイダー固有の連携を自分で組み合わせることなく、この実行基盤を提供します。通常の `Agent` と `Runner` のフローを維持したまま、ワークスペース用の `Manifest`、サンドボックスネイティブツールの機能、作業の実行場所を指定する `SandboxRunConfig` を追加します。
 
-## 前提条件
+## 前提条件 {#prerequisites}
 
 - Python 3.10 以降
 - OpenAI Agents SDK に関する基本的な知識
 - サンドボックスクライアント。ローカル開発では、まず `UnixLocalSandboxClient` を使用します。
 
-## インストール
+## インストール {#installation}
 
 SDK をまだインストールしていない場合：
 
@@ -32,7 +32,7 @@ Docker ベースのサンドボックスの場合：
 pip install "openai-agents[docker]"
 ```
 
-## ローカルサンドボックスエージェントの作成
+## ローカルサンドボックスエージェントの作成 {#create-a-local-sandbox-agent}
 
 この例では、`repo/` 配下にローカルリポジトリをステージングし、ローカルスキルを遅延読み込みして、実行時にランナーが Unix ローカルのサンドボックスセッションを作成します。
 
@@ -96,7 +96,7 @@ if __name__ == "__main__":
 
 [examples/sandbox/docs/coding_task.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/docs/coding_task.py) を参照してください。このコード例では、シェルベースの小さなリポジトリを使用しているため、Unix ローカルでの実行全体にわたって決定論的に検証できます。
 
-## 主な選択肢
+## 主な選択肢 {#key-choices}
 
 基本的な実行が機能した後、多くの方が次に検討する選択肢は以下のとおりです。
 
@@ -108,7 +108,7 @@ if __name__ == "__main__":
 - `SandboxRunConfig.client`：サンドボックスのバックエンド
 - `SandboxRunConfig.session`、`session_state`、または `snapshot`：後続の実行を以前の作業に再接続する方法
 
-## 次のステップ
+## 次のステップ {#where-to-go-next}
 
 - [概念](sandbox/guide.md)：マニフェスト、機能、権限、スナップショット、実行設定、構成パターンについて説明します。
 - [サンドボックスクライアント](sandbox/clients.md)：Unix ローカル、Docker、ホステッドプロバイダー、マウント戦略を選択します。

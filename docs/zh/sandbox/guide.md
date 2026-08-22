@@ -32,7 +32,7 @@ search:
 
 外层运行时仍负责审批、追踪、任务转移，以及跟踪恢复运行所需的状态。沙箱会话负责命令、文件变更和环境隔离。这种职责划分是该模型的核心组成部分。
 
-### 各组件的组合方式
+### 各组件的组合方式 {#how-the-pieces-fit-together}
 
 沙箱运行会将智能体定义与每次运行的沙箱配置组合起来。运行器会准备智能体，将其绑定到实时沙箱会话，并可保存状态供后续运行使用。
 
@@ -60,7 +60,7 @@ flowchart LR
 
 如果 shell 访问只是您偶尔使用的一项工具，请先参阅[工具指南](../tools.md)中的托管 shell。当工作区隔离、沙箱客户端选择或沙箱会话恢复行为属于设计的一部分时，再使用沙箱智能体。
 
-## 适用场景
+## 适用场景 {#when-to-use-them}
 
 沙箱智能体非常适合以工作区为中心的工作流，例如：
 
@@ -72,13 +72,13 @@ flowchart LR
 
 如果您不需要访问文件或使用有状态、可变的文件系统，请继续使用 `Agent`。如果 shell 访问只是一项偶尔使用的功能，请添加托管 shell；如果工作区边界本身就是功能的一部分，请使用沙箱智能体。
 
-## 沙箱客户端的选择
+## 沙箱客户端的选择 {#choose-a-sandbox-client}
 
 在 macOS 或 Linux 上进行本地开发时，请从 `UnixLocalSandboxClient` 开始。在 Windows 上，请改用 `DockerSandboxClient` 或托管提供商。在任何受支持的平台上，当您需要容器隔离或镜像一致性时，请迁移到 `DockerSandboxClient`；当您需要由提供商管理执行时，请迁移到托管提供商。
 
 在大多数情况下，`SandboxAgent` 定义保持不变，只需在 [`SandboxRunConfig`][agents.run_config.SandboxRunConfig] 中更改沙箱客户端及其选项。有关本地、Docker、托管和远程挂载选项，请参阅[沙箱客户端](clients.md)。
 
-## 核心组件
+## 核心组件 {#core-pieces}
 
 <div class="sandbox-nowrap-first-column-table" markdown="1">
 
@@ -113,7 +113,7 @@ flowchart LR
 3. 添加内置或自定义功能。
 4. 在 `RunConfig(sandbox=SandboxRunConfig(...))` 中决定每次运行应如何获得其沙箱会话。
 
-## 沙箱运行的准备过程
+## 沙箱运行的准备过程 {#how-a-sandbox-run-is-prepared}
 
 在运行时，运行器会将该定义转换为具体的沙箱支持运行：
 
@@ -127,7 +127,7 @@ flowchart LR
 
 正是由于这些准备步骤，在设计 `SandboxAgent` 时，`default_manifest`、`instructions`、`base_instructions`、`capabilities` 和 `run_as` 才是需要重点考虑的主要沙箱专用选项。
 
-## `SandboxAgent` 选项
+## `SandboxAgent` 选项 {#sandboxagent-options}
 
 除常规的 `Agent` 字段外，还提供以下沙箱专用选项：
 
@@ -145,13 +145,13 @@ flowchart LR
 
 沙箱客户端选择、沙箱会话复用、清单覆盖和快照选择应放在 [`SandboxRunConfig`][agents.run_config.SandboxRunConfig] 中，而不是智能体上。
 
-### `default_manifest`
+### `default_manifest` {#default_manifest}
 
 `default_manifest` 是运行器为此智能体创建新沙箱会话时使用的默认 [`Manifest`][agents.sandbox.manifest.Manifest]。使用它指定智能体通常应从哪些文件、仓库、辅助材料、输出目录和挂载点开始。
 
 这只是默认值。运行可以通过 `SandboxRunConfig(manifest=...)` 覆盖它，而复用或恢复的沙箱会话会保留其现有工作区状态。
 
-### `instructions` 和 `base_instructions`
+### `instructions` 和 `base_instructions` {#instructions-and-base_instructions}
 
 对于应在不同提示词中保持有效的简短规则，请使用 `instructions`。在 `SandboxAgent` 中，这些指令会追加到 SDK 的沙箱基础提示词之后，因此您可以保留内置沙箱指导，同时添加自己的角色、工作流和成功标准。
 
@@ -179,7 +179,7 @@ flowchart LR
 
 如果省略 `instructions`，SDK 仍会包含默认沙箱提示词。对于底层包装器而言，这已经足够，但大多数面向用户的智能体仍应提供显式的 `instructions`。
 
-### `capabilities`
+### `capabilities` {#capabilities}
 
 功能可将沙箱原生行为附加到 `SandboxAgent`。它们可以在运行开始前调整工作区、追加沙箱专用指令、公开绑定到实时沙箱会话的工具，并调整该智能体的模型行为或输入处理方式。
 
@@ -214,9 +214,9 @@ flowchart LR
 
 如果内置功能符合需求，请优先使用它们。仅当您需要内置功能未涵盖的沙箱专用工具或指令接口时，才编写自定义功能。
 
-## 概念
+## 概念 {#concepts_1}
 
-### 清单
+### 清单 {#manifest}
 
 [`Manifest`][agents.sandbox.manifest.Manifest] 描述新沙箱会话的工作区。它可以设置工作区 `root`、声明文件和目录、复制本地文件、克隆 Git 仓库、附加远程存储挂载点、设置环境变量、定义用户或组，以及授予对工作区外特定绝对路径的访问权限。
 
@@ -262,7 +262,7 @@ manifest = Manifest(
 
 快照和 `persist_workspace()` 仍然只包含工作区根目录。额外授权的路径属于运行时访问权限，而不是持久工作区状态。
 
-### 权限
+### 权限 {#permissions}
 
 `Permissions` 控制清单条目的文件系统权限。它涉及沙箱实体化的文件，而非模型权限、审批策略或 API 凭据。
 
@@ -338,7 +338,7 @@ result = await Runner.run(
 
 如果还需要文件级共享规则，请将用户与清单组及条目 `group` 元数据结合使用。`run_as` 用户控制谁执行沙箱原生操作；在沙箱实体化工作区后，`Permissions` 控制该用户可以读取、写入或执行哪些文件。
 
-### SnapshotSpec
+### SnapshotSpec {#snapshotspec}
 
 `SnapshotSpec` 指定新沙箱会话应从何处恢复已保存的工作区内容，以及将其持久化回何处。它是沙箱工作区的快照策略，而 `session_state` 是用于恢复特定沙箱后端的序列化连接状态。
 
@@ -363,7 +363,7 @@ run_config = RunConfig(
 
 如果省略 `snapshot`，运行时会尽可能尝试使用默认的本地快照位置。如果无法设置，则回退到空操作快照。挂载路径和临时路径不会作为持久工作区内容复制到快照中。
 
-### 沙箱生命周期
+### 沙箱生命周期 {#sandbox-lifecycle}
 
 生命周期分为两种模式：**SDK 管理型**和**开发者管理型**。
 
@@ -439,11 +439,11 @@ finally:
 
 `stop()` 只持久化由快照支持的工作区内容；它不会拆除沙箱。`aclose()` 是完整的会话清理路径：它会运行停止前钩子、调用 `stop()`、关闭沙箱资源，并关闭会话范围的依赖项。
 
-## `SandboxRunConfig` 选项
+## `SandboxRunConfig` 选项 {#sandboxrunconfig-options}
 
 [`SandboxRunConfig`][agents.run_config.SandboxRunConfig] 包含每次运行的选项，用于决定沙箱会话的来源，以及应如何初始化新会话。
 
-### 沙箱来源
+### 沙箱来源 {#sandbox-source}
 
 以下选项决定运行器应复用、恢复还是创建沙箱会话：
 
@@ -464,7 +464,7 @@ finally:
 3. 否则，如果传入 `run_config.sandbox.session_state`，运行器会从该显式序列化沙箱会话状态恢复。
 4. 否则，运行器会创建新的沙箱会话。对于该新会话，如果提供了 `run_config.sandbox.manifest`，则使用它；否则使用 `agent.default_manifest`。
 
-### 新会话输入
+### 新会话输入 {#fresh-session-inputs}
 
 以下选项仅在运行器创建新的沙箱会话时有效：
 
@@ -478,7 +478,7 @@ finally:
 
 </div>
 
-### 面向模型的工作目录
+### 面向模型的工作目录 {#model-facing-working-directory}
 
 当多次运行应共享一个沙箱会话，但需要在不同子目录中操作时，请将 `cwd` 设置为相对于工作区的 POSIX 目录。运行器验证 `cwd` 时，该目录必须存在，并且已配置的沙箱用户必须能够访问它。对于新会话，运行器会先实体化清单，因此清单可以在验证前创建该目录。
 
@@ -503,7 +503,7 @@ result = await Runner.run(
 
 带路径的自定义功能在解析模型提供的相对路径时，必须应用其绑定的 [`SandboxWorkspaceScope`][agents.sandbox.workspace_paths.SandboxWorkspaceScope]。有关共享一个沙箱会话、同时保持各自面向模型的工作目录相互独立的两个并发运行，请参阅 [examples/sandbox/shared_session_workdirs.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/shared_session_workdirs.py)。
 
-### 实体化控制
+### 实体化控制 {#materialization-controls}
 
 `concurrency_limits` 控制可并行运行的沙箱实体化工作量。当大型清单或本地目录复制需要更严格的资源控制时，请使用 `SandboxConcurrencyLimits(manifest_entries=..., local_dir_files=...)`。将任一值设置为 `None` 可禁用对应限制。
 
@@ -517,7 +517,7 @@ result = await Runner.run(
 - 注入的实时会话：如果传入正在运行的沙箱 `session`，由功能驱动的清单更新可以添加兼容的非挂载条目，但不能更改 `manifest.root`、`manifest.environment`、`manifest.users` 或 `manifest.groups`；也不能删除现有条目、替换条目类型，或添加或更改挂载条目。
 - 运行器 API：`SandboxAgent` 执行仍使用常规的 `Runner.run()`、`Runner.run_sync()` 和 `Runner.run_streamed()` API。
 
-## 完整示例：编码任务
+## 完整示例：编码任务 {#full-example-coding-task}
 
 以下编码风格示例是一个良好的默认起点：
 
@@ -600,15 +600,15 @@ if __name__ == "__main__":
 
 请参阅 [examples/sandbox/docs/coding_task.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/docs/coding_task.py)。它使用一个基于 shell 的微型仓库，因此可以在 Unix 本地运行中以确定性方式验证该示例。当然，您的实际任务仓库可以使用 Python、JavaScript 或任何其他语言。
 
-## 常见模式
+## 常见模式 {#common-patterns}
 
 请从上面的完整示例开始。在许多情况下，同一个 `SandboxAgent` 可以保持不变，只需更改沙箱客户端、沙箱会话来源或工作区来源。
 
-### 沙箱客户端的切换
+### 沙箱客户端的切换 {#switch-sandbox-clients}
 
 保持智能体定义不变，只更改运行配置。如果需要容器隔离或镜像一致性，请使用 Docker；如果需要由提供商管理执行，请使用托管提供商。有关代码示例和提供商选项，请参阅[沙箱客户端](clients.md)。
 
-### 工作区的覆盖
+### 工作区的覆盖 {#override-the-workspace}
 
 保持智能体定义不变，只替换新会话清单：
 
@@ -632,7 +632,7 @@ run_config = RunConfig(
 
 当同一智能体角色需要针对不同仓库、资料包或任务包运行，而无需重新构建智能体时，请使用此模式。上面经过验证的编码示例展示了相同模式，但它使用 `default_manifest`，而不是一次性覆盖。
 
-### 沙箱会话的注入
+### 沙箱会话的注入 {#inject-a-sandbox-session}
 
 当您需要显式控制生命周期、在运行后进行检查或复制输出时，请注入实时沙箱会话：
 
@@ -657,7 +657,7 @@ async with sandbox:
 
 当您希望在运行后检查工作区，或通过已启动的沙箱会话进行流式传输时，请使用此模式。请参阅 [examples/sandbox/docs/coding_task.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/docs/coding_task.py) 和 [examples/sandbox/docker/docker_runner.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/docker/docker_runner.py)。
 
-### 会话状态的恢复
+### 会话状态的恢复 {#resume-from-session-state}
 
 如果您已在 `RunState` 外部序列化沙箱状态，请让运行器从该状态重新连接：
 
@@ -682,7 +682,7 @@ run_config = RunConfig(
 
 会话状态和 `RunState` 序列化还会移除云挂载凭据、包含凭据的辅助配置，以及对容器内凭据暴露的确认。对于支持恢复已挂载会话的后端，当状态包含已遮盖的挂载权限时，请通过 `SandboxRunConfig.manifest` 或 `agent.default_manifest` 提供当前受信任清单。当名为 `"data"` 的挂载条目需要挂载范围的确认时，请在恢复前使用 `trusted_manifest = trusted_manifest.with_in_container_mount_credential_exposure_acknowledged("data")` 保留复制的清单。对于广泛权限，请使用 `trusted_manifest = trusted_manifest.with_in_container_mount_broad_credential_exposure_acknowledged("data")`；当挂载使用两类权限时，请调用这两种方法。请传入需要确认的每个确切挂载路径。只有当前受信任清单具有与持久化状态完全相同且不含凭据的挂载拓扑时，Agents SDK 才会恢复凭据。缺失或不匹配的受信任配置会导致恢复在沙箱启动前失败；序列化状态本身绝不会授予权限。`VercelSandboxClient` 无法恢复已挂载会话，因此应改为使用受信任清单启动新沙箱。
 
-### 快照的使用
+### 快照的使用 {#start-from-a-snapshot}
 
 使用已保存的文件和产物初始化新沙箱：
 
@@ -703,7 +703,7 @@ run_config = RunConfig(
 
 当创建新沙箱会话的运行应从已保存的工作区内容开始，而不只是从 `agent.default_manifest` 开始时，请使用此模式。有关本地快照流程，请参阅 [examples/sandbox/memory.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/memory.py)；有关远程快照客户端，请参阅 [examples/sandbox/sandbox_agent_with_remote_snapshot.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/sandbox_agent_with_remote_snapshot.py)。
 
-### 从 Git 加载技能
+### 从 Git 加载技能 {#load-skills-from-git}
 
 将本地技能源替换为由仓库支持的技能源：
 
@@ -718,7 +718,7 @@ capabilities = Capabilities.default() + [
 
 当技能包有自己的发布节奏，或应在多个沙箱间共享时，请使用此模式。请参阅 [examples/sandbox/tax_prep.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/tax_prep.py)。
 
-### 工具形式的公开
+### 工具形式的公开 {#expose-as-tools}
 
 工具智能体既可以拥有自己的沙箱边界，也可以复用父级运行中的实时沙箱。复用适用于快速的只读探索智能体：它可以检查父级运行正在使用的确切工作区，而无需承担创建、填充或快照另一个沙箱的成本。
 
@@ -832,7 +832,7 @@ rollout_agent.as_tool(
 
 当工具智能体应自由修改内容、运行不受信任的命令，或使用不同后端/镜像时，请使用独立沙箱。请参阅 [examples/sandbox/sandbox_agents_as_tools.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/sandbox_agents_as_tools.py)。
 
-### 与本地工具和 MCP 的组合
+### 与本地工具和 MCP 的组合 {#combine-with-local-tools-and-mcp}
 
 保留沙箱工作区，同时在同一个智能体上使用普通工具：
 
@@ -851,13 +851,13 @@ agent = SandboxAgent(
 
 当工作区检查只是智能体工作的一部分时，请使用此模式。请参阅 [examples/sandbox/sandbox_agent_with_tools.py](https://github.com/openai/openai-agents-python/blob/main/examples/sandbox/sandbox_agent_with_tools.py)。
 
-## 记忆
+## 记忆 {#memory}
 
 当未来的沙箱智能体运行应从之前的运行中学习时，请使用 `Memory` 功能。该记忆与 SDK 的对话式 `Session` 记忆不同：它会将经验提炼为沙箱工作区内的文件，后续运行可以读取这些文件。
 
 有关设置、读取/生成行为、多轮对话和布局隔离，请参阅[智能体记忆](memory.md)。
 
-## 组合模式
+## 组合模式 {#composition-patterns}
 
 明确单智能体模式后，下一个设计问题是沙箱边界在大型系统中应位于何处。
 
@@ -873,7 +873,7 @@ agent = SandboxAgent(
 - 非沙箱智能体仅针对工作流中需要工作区隔离的部分，将任务转移给沙箱智能体
 - 编排器将多个沙箱智能体公开为工具，通常为每次 `Agent.as_tool(...)` 调用提供单独的沙箱 `RunConfig`，使每个工具拥有自己的隔离工作区
 
-### 轮次与沙箱运行
+### 轮次与沙箱运行 {#turns-and-sandbox-runs}
 
 分别说明任务转移和智能体即工具调用会更容易理解。
 
@@ -886,7 +886,7 @@ agent = SandboxAgent(
 - 使用任务转移时，审批仍属于同一个顶层运行，因为沙箱智能体现在是该运行中的活跃智能体
 - 使用 `Agent.as_tool(...)` 时，沙箱工具智能体内部触发的审批仍会呈现在外层运行中，但它们来自已存储的嵌套运行状态，并会在外层运行恢复时恢复嵌套沙箱运行
 
-## 延伸阅读
+## 延伸阅读 {#further-reading}
 
 - [快速入门](../sandbox_agents.md)：运行一个沙箱智能体。
 - [沙箱客户端](clients.md)：选择本地、Docker、托管和挂载选项。

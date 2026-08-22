@@ -8,7 +8,7 @@ SDK 为智能体工作流、沙箱会话、Realtime 会话和语音管线提供�
 
 使用这些工具测试由应用和 SDK 管理的编排：工具执行、任务转移、安全防护措施、重试、流式传输、会话行为、沙箱能力、Realtime 事件处理和语音管线组合。对于由外部模型、网络协议、沙箱提供商或音频系统管理的行为，请使用真实的提供商适配器或集成环境。
 
-## 配方选择
+## 配方选择 {#find-the-recipe-you-need}
 
 | 目标 | 使用 | 参阅 |
 | --- | --- | --- |
@@ -26,7 +26,7 @@ SDK 为智能体工作流、沙箱会话、Realtime 会话和语音管线提供�
 | 测试静态或流式语音管线 | `ScriptedSTTModel`、`ScriptedTTSModel`，以及脚本化或真实的工作流 | [语音管线测试](#test-a-voice-pipeline) |
 | 测试提供商序列化或线上传输载荷 | 使用受控网络传输的真实提供商适配器 | [正确边界选择](#choose-the-correct-boundary) |
 
-## 导入
+## 导入 {#imports}
 
 测试 API 与其替代的运行时边界位于同一位置：
 
@@ -38,9 +38,9 @@ SDK 为智能体工作流、沙箱会话、Realtime 会话和语音管线提供�
 
 测试符号有意不包含在顶层 `agents` 导入中。
 
-## 智能体工作流配方
+## 智能体工作流配方 {#agent-workflow-recipes}
 
-### 固定响应返回
+### 固定响应返回 {#return-a-fixed-response}
 
 为每个预期的模型调用传入一个规范化输出项序列。输出序列简写会为一个请求接收确定性的响应 ID 和用量。
 
@@ -71,7 +71,7 @@ async def test_fixed_response() -> None:
 
 使用 `model.assert_complete()` 完成确定性工作流测试。它可以捕获工作流在消耗所有已配置步骤之前停止的情况。
 
-### 工具工作流测试
+### 工具工作流测试 {#test-a-tool-workflow}
 
 编写一个调用工具的模型响应脚本，再编写一个生成最终答案的响应脚本。真实的 SDK 工具管线会在这些模型调用之间运行。
 
@@ -117,7 +117,7 @@ async def test_tool_workflow() -> None:
 
 此模式涵盖工具输入验证、执行、结果转换、钩子、安全防护措施和下一轮模型调用。直接调用 Python 函数会绕过这些 SDK 行为。
 
-### 从请求派生响应
+### 从请求派生响应 {#derive-a-response-from-the-request}
 
 当响应确实依赖于规范化模型调用，或者断言应位于模型边界时，请使用 `ModelStep.respond()`。响应器可以是同步或异步的，并且可以返回 `ScriptedModel` 接受的任何步骤形式。
 
@@ -151,7 +151,7 @@ async def test_request_aware_response() -> None:
 
 `ScriptedModel` 接受 `ModelStep`、等效的字典形式、`ModelResponse`、规范化输出项序列或异常。当响应不依赖调用时，优先使用固定输出序列，因为固定脚本更容易诊断意外轮次。
 
-### 模型调用检查
+### 模型调用检查 {#inspect-model-calls}
 
 `ScriptedModel` 会在解析每个调用或引发所选步骤之前记录该调用。
 
@@ -168,7 +168,7 @@ async def test_request_aware_response() -> None:
 
 当一个测试需要逐步追加模型步骤时，请使用 `enqueue()` 或 `extend()`。对于独立场景，请创建新的 `ScriptedModel`；该工具不会重置已消耗的步骤或调用历史记录。
 
-### 流式传输测试
+### 流式传输测试 {#test-streaming}
 
 普通响应步骤同时支持 `Runner.run()` 和 `Runner.run_streamed()`。对于常见的智能体消息、推理项、函数调用和应用补丁调用，`ScriptedModel` 会生成规范化的开始、增量、项目完成和终止响应事件。终止响应包含完整的输出和用量。
 
@@ -185,7 +185,7 @@ step = ModelStep.stream(
 
 自动流式传输会拒绝尚未实现增量生命周期的规范化输出项类型。对于这些项目，请使用 `ModelStep.stream(...)`，而不要依赖不完整的事件序列。
 
-### 模型故障注入
+### 模型故障注入 {#inject-model-failures}
 
 使用 `ModelStep.raise_error()` 使一次模型调用失败。可选的重试建议属于该特定脚本错误：
 
@@ -202,7 +202,7 @@ step = ModelStep.raise_error(
 
 运行器的重试策略决定该建议是否会触发另一次尝试。每次重试都是另一次模型调用，并会消耗下一个脚本步骤。Python 辅助工具接受固定的 `ModelRetryAdvice` 值；如果重试建议本身需要根据尝试次数动态变化，请使用自定义 `Model`。
 
-### 工作流漂移检测
+### 工作流漂移检测 {#detect-workflow-drift}
 
 将脚本化调用视为预期的工作流形态。额外的模型请求会引发 `UnexpectedModelCall`；提前退出则会留下步骤，供 `assert_complete()` 报告。
 
@@ -214,9 +214,9 @@ step = ModelStep.raise_error(
 | `UnexpectedModelCall` | `call`、`call_index` | 脚本结束后，工作流又进行了一次模型调用 |
 | `UnconsumedModelSteps` | `remaining_steps` | 工作流在使用所有步骤之前结束 |
 
-## 沙箱智能体配方
+## 沙箱智能体配方 {#sandbox-agent-recipes}
 
-### 沙箱智能体工作流测试
+### 沙箱智能体工作流测试 {#test-a-sandbox-agent-workflow}
 
 将 `ScriptedModel` 与 `scripted_sandbox_session()` 组合使用，可以在不创建本地容器或远程沙箱的情况下运行真实的 `SandboxAgent` 运行时。模型脚本选择一个能力工具，而沙箱脚本定义对应的 `SandboxSession` 方法返回什么内容。
 
@@ -279,7 +279,7 @@ async def test_sandbox_workflow() -> None:
 
 此测试跨越两个规范化 SDK 边界。它涵盖工具参数验证、能力路由、沙箱会话调用、将工具结果传递到下一轮模型调用，以及最终输出处理。它不会测试真实模型是否会选择该命令，也不会测试真实沙箱提供商如何执行该命令。
 
-### 沙箱步骤配置
+### 沙箱步骤配置 {#configure-sandbox-steps}
 
 每个匹配的沙箱调用都会消耗一个全局 FIFO 序列中的下一个步骤。方法不匹配、匹配器拒绝或匹配器异常都会使该步骤保持待处理状态。设置 `method`，仅选择一种结果，并且仅当调用详情很重要时才添加 `match`。
 
@@ -303,9 +303,9 @@ async def test_sandbox_workflow() -> None:
 
 返回的对象就是会话本身。请将其直接传给 `RunConfig(sandbox={"session": sandbox})`；不存在包装器 `.session` 属性。
 
-## Realtime 配方
+## Realtime 配方 {#realtime-recipes}
 
-### Realtime 会话测试
+### Realtime 会话测试 {#test-a-realtime-session}
 
 `ScriptedRealtimeModel` 实现 Python SDK 的规范化 `RealtimeModel` 边界。每个 `RealtimeStep` 匹配一个出站 `RealtimeModelSendEvent`，然后发出规范化的入站 `RealtimeModelEvent` 对象或引发注入的错误。
 
@@ -361,7 +361,7 @@ async def test_realtime_message() -> None:
 
 使用 `connect_events` 在连接期间发出入站事件。使用 `connect_error` 或 `close_error` 注入生命周期故障，并使用 `RealtimeStep(error=...)` 注入与一次匹配发送相关的故障。一个步骤不能同时定义 `emit` 和 `error`。
 
-### Realtime 工具工作流测试
+### Realtime 工具工作流测试 {#test-a-realtime-tool-workflow}
 
 将真实的函数工具附加到 `RealtimeAgent`，发出规范化工具调用，并预期 SDK 通过模型边界发送工具输出。将 `async_tool_calls` 设置为 `False`，可使这个小型代码示例在连接期间完成，而无需测试专用的等待机制。
 
@@ -421,7 +421,7 @@ async def test_realtime_tool_workflow() -> None:
 
 这会运行真实的 Realtime 工具查找、参数验证、执行和输出路由。它无法证明真实模型会选择该工具。
 
-### Realtime 调用与生命周期检查
+### Realtime 调用与生命周期检查 {#inspect-realtime-calls-and-lifecycle}
 
 | 成员 | 内容 |
 | --- | --- |
@@ -441,9 +441,9 @@ async def test_realtime_tool_workflow() -> None:
 | `UnconsumedRealtimeSteps` | `remaining_steps` | 会话在使用所有预期发送之前结束 |
 | `RealtimeScriptError` | 无 | 脚本在无效的生命周期状态下使用，例如在断开连接时发送 |
 
-## 语音管线配方
+## 语音管线配方 {#voice-pipeline-recipes}
 
-### 语音管线测试
+### 语音管线测试 {#test-a-voice-pipeline}
 
 将脚本化 STT 和 TTS 模型与 `SingleAgentVoiceWorkflow` 以及由 `ScriptedModel` 支持的智能体组合使用，可以在不发出提供商请求的情况下测试完整的语音转文本 -> 智能体 -> 文本转语音管线。
 
@@ -501,7 +501,7 @@ workflow = ScriptedVoiceWorkflow(
 
 `start` 步骤由 `on_start()` 消耗。`VoicePipeline` 仅针对 `StreamedAudioInput` 调用 `on_start()`；静态 `AudioInput` 运行不会消耗 `start`。每个普通轮次都会记录其转录结果，并消耗一个已配置结果。一个字符串代表一个片段；字符串序列可在文本拆分和 TTS 之前控制片段边界。
 
-### 流式转录测试
+### 流式转录测试 {#test-streamed-transcription}
 
 `ScriptedSTTModel` 接受静态 `transcriptions` 和独立脚本化的流式 `sessions`。会话可以是 `ScriptedTranscriptionSession`、转录轮次序列、异常或单个字符串：
 
@@ -515,7 +515,7 @@ stt = ScriptedSTTModel(sessions=[session])
 
 关闭 `ScriptedTranscriptionSession` 会停止迭代，并留下跳过的轮次供 `assert_complete()` 报告。类似地，`ScriptedTTSModel` 每次调用会消耗一个 `TTSResult`、字节块序列或异常。
 
-### 语音调用检查
+### 语音调用检查 {#inspect-voice-calls}
 
 | 组件 | 记录的历史 |
 | --- | --- |
@@ -532,7 +532,7 @@ stt = ScriptedSTTModel(sessions=[session])
 
 请对测试配置的每个脚本化语音组件调用 `assert_complete()`。`ScriptedSTTModel.assert_complete()` 还会检查其创建的转录会话中的轮次。
 
-## 正确边界选择
+## 正确边界选择 {#choose-the-correct-boundary}
 
 当测试需要运行 SDK 运行循环、工具、任务转移、安全防护措施、会话、重试或规范化流式传输，而不依赖模型提供商时，请使用 `ScriptedModel`。
 
@@ -544,7 +544,7 @@ stt = ScriptedSTTModel(sessions=[session])
 
 请勿使用这些工具测试 Responses API 或 Chat Completions 请求序列化、身份验证标头、提供商默认值、HTTP 载荷、提供商流分块、Realtime 线上传输帧或提供商特定的生命周期行为。对于这些测试，请保留真实适配器，并替换或控制其网络边界。使用 `openai` v3 时，OpenAI 适配器测试应使用 `httpx2` 的请求、响应、传输和异常类型；旧版 `httpx` 不是 Agents SDK 的核心依赖项。
 
-## 最终检查清单
+## 最终检查清单 {#final-checklist}
 
 - 仅为规范化模型、沙箱会话、Realtime 模型或语音管线边界所管理的交互编写脚本。
 - 断言重要的公共请求或调用字段，而不是运行器私有状态。
@@ -555,7 +555,7 @@ stt = ScriptedSTTModel(sessions=[session])
 - 断言结构化错误字段，而不是解析供人阅读的消息。
 - 使用带受控网络传输的真实适配器进行提供商线上传输测试。
 
-## 范围与当前限制
+## 范围与当前限制 {#scope-and-current-limitations}
 
 测试模块有意不提供：
 
@@ -568,7 +568,7 @@ stt = ScriptedSTTModel(sessions=[session])
 
 当测试需要格式错误的流、受控暂停或并发、精确取消，或脚本化工具无法保留的生命周期边界时，请使用对应公共接口的自定义实现。在测试中记录该专用边界。
 
-## API 参考
+## API 参考 {#api-reference}
 
 - [`agents.testing`](ref/testing.md)
 - [`agents.realtime.testing`](ref/realtime/testing.md)

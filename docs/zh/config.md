@@ -16,7 +16,7 @@ search:
 -   [模型](models/index.md)：了解模型选择和提供商配置。
 -   [追踪](tracing.md)：了解每次运行的追踪元数据和自定义追踪处理器。
 
-## 配置对象与字典
+## 配置对象与字典 {#configuration-objects-and-dictionaries}
 
 SDK 定义的配置参数通常既接受相应的强类型设置对象，也接受包含相同字段的字典。这适用于类型注解中包含字典的智能体、运行、模型、会话、沙箱和语音配置边界。SDK 定义的嵌套设置类型也可以使用字典。
 
@@ -35,7 +35,7 @@ agent = Agent(
 
 SDK 会将这些字典规范化为相应的设置对象。对于 SDK 定义的 dataclass 配置类型，未知字段会引发 `TypeError`，这有助于尽早发现拼写错误的选项名称。请查看参数的类型注解或 API 参考文档，以确认特定配置边界是否接受字典。
 
-## API 密钥与客户端
+## API 密钥与客户端 {#api-keys-and-clients}
 
 默认情况下，SDK 使用 `OPENAI_API_KEY` 环境变量处理 LLM 请求和追踪。SDK 首次创建OpenAI客户端时才会解析该密钥（延迟初始化），因此请在首次调用模型之前设置该环境变量。如果无法在应用启动前设置该环境变量，可以使用 [set_default_openai_key()][agents.set_default_openai_key] 函数设置密钥。
 
@@ -57,7 +57,7 @@ set_default_openai_client(custom_client)
 
 向 [`OpenAIProvider`][agents.models.openai_provider.OpenAIProvider] 传入显式客户端后，该客户端将负责管理其连接和账户设置。请勿同时向 `OpenAIProvider` 传入 `api_key`、`base_url`、`websocket_base_url`、`organization` 或 `project`；将 `openai_client` 与其中任何参数结合使用时，会引发 [`UserError`][agents.exceptions.UserError]，而不是静默忽略重复值。请在构造 `AsyncOpenAI` 时设置所需值。
 
-### 使用 `openai` v3 的自定义 HTTP 客户端
+### 使用 `openai` v3 的自定义 HTTP 客户端 {#custom-http-clients-with-openai-v3}
 
 0.21.0 版本要求使用 `openai>=3.0.0,<4`。默认OpenAI提供商使用 HTTPX2，因此大多数应用不需要直接配置 HTTP 客户端。如果应用向 `AsyncOpenAI` 传入 `http_client=`，请为自定义客户端及其传输层相关选项使用 HTTPX2 类型：
 
@@ -96,7 +96,7 @@ from agents import set_default_openai_api
 set_default_openai_api("chat_completions")
 ```
 
-## OpenAI提供商默认配置
+## OpenAI提供商默认配置 {#openai-provider-defaults}
 
 使用 SDK OpenAI后端的提供商在将模型名称字符串映射到模型时，也会读取 SDK 全局默认配置。使用 [`set_default_openai_responses_transport()`][agents.set_default_openai_responses_transport] 可使OpenAI Responses 模型默认使用 WebSocket 传输：
 
@@ -128,7 +128,7 @@ set_default_openai_agent_registration(
 
 如果未设置 SDK 默认值，使用 SDK OpenAI后端的提供商会回退到 `OPENAI_AGENT_HARNESS_ID` 环境变量。配置 harness ID 后，SDK 会将其作为 `agent_harness_id` 添加到追踪元数据中，除非 `RunConfig.trace_metadata` 中已存在该键。
 
-## 追踪
+## 追踪 {#tracing}
 
 追踪默认处于启用状态。默认情况下，它使用与上一节中的模型请求相同的OpenAI API 密钥，即环境变量中的密钥或设置的默认密钥。可以使用 [`set_tracing_export_api_key`][agents.set_tracing_export_api_key] 函数专门设置用于追踪的 API 密钥。
 
@@ -200,7 +200,7 @@ export OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA=0
 
 有关完整的追踪控制选项，请参阅[追踪指南](tracing.md)。
 
-## 调试日志
+## 调试日志 {#debug-logging}
 
 SDK 定义了两个 Python 日志记录器（`openai.agents` 和 `openai.agents.tracing`），默认不附加处理器。日志遵循应用的 Python 日志配置。
 
@@ -231,7 +231,7 @@ logger.setLevel(logging.WARNING)
 logger.addHandler(logging.StreamHandler())
 ```
 
-### 日志与诊断信息中的敏感数据
+### 日志与诊断信息中的敏感数据 {#sensitive-data-in-logs-and-diagnostics}
 
 某些日志和诊断异常可能包含敏感数据，例如模型或工具的输入和输出。
 

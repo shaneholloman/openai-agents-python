@@ -16,7 +16,7 @@ Agents SDK에는 기본 제공 트레이싱 기능이 포함되어 있어 에이
 
 ***Zero Data Retention(ZDR) 정책에 따라 OpenAI API를 사용하는 조직에서는 트레이싱을 사용할 수 없습니다.***
 
-## 트레이스와 스팬
+## 트레이스와 스팬 {#traces-and-spans}
 
 -   **트레이스**는 단일 "워크플로"의 시작부터 끝까지 이어지는 작업을 나타냅니다. 트레이스는 여러 스팬으로 구성되며 다음 속성을 가집니다.
     -   `workflow_name`: 논리적 워크플로 또는 앱의 이름입니다. 예를 들면 "코드 생성" 또는 "고객 서비스"입니다.
@@ -30,7 +30,7 @@ Agents SDK에는 기본 제공 트레이싱 기능이 포함되어 있어 에이
     -   이 스팬의 상위 스팬이 있는 경우 이를 가리키는 `parent_id`
     -   스팬에 관한 정보인 `span_data`. 예를 들어 `AgentSpanData`에는 에이전트 정보가, `GenerationSpanData`에는 LLM 생성 정보 등이 포함됩니다.
 
-## 기본 트레이싱
+## 기본 트레이싱 {#default-tracing}
 
 SDK는 기본적으로 다음 항목을 트레이싱합니다.
 
@@ -62,7 +62,7 @@ result = await Runner.run(
 
 또한 [사용자 지정 트레이싱 프로세서](#custom-tracing-processors)를 설정하여 트레이스를 다른 대상으로 전송할 수 있습니다. 기존 대상을 대체하거나 보조 대상으로 사용할 수 있습니다.
 
-## 장기 실행 워커와 즉시 내보내기
+## 장기 실행 워커와 즉시 내보내기 {#long-running-workers-and-immediate-exports}
 
 기본 [`BatchTraceProcessor`][agents.tracing.processors.BatchTraceProcessor]는 몇 초마다 백그라운드에서 트레이스를 내보내며, 인메모리 큐가 크기 트리거에 도달하면 더 일찍 내보냅니다. 또한 프로세스가 종료될 때 최종 플러시를 수행합니다. Celery, RQ, Dramatiq 또는 FastAPI 백그라운드 작업과 같은 장기 실행 워커에서는 별도의 코드 없이도 일반적으로 트레이스가 자동으로 내보내지지만, 각 작업이 완료된 직후에는 트레이스 대시보드에 표시되지 않을 수 있습니다.
 
@@ -105,7 +105,7 @@ async def run(prompt: str, background_tasks: BackgroundTasks):
 
 [`flush_traces()`][agents.tracing.flush_traces]은 현재 버퍼링된 트레이스와 스팬을 내보낼 때까지 실행을 차단합니다. 따라서 일부만 생성된 트레이스를 플러시하지 않도록 `trace()`가 닫힌 후 호출하세요. 기본 내보내기 지연 시간이 허용 가능한 경우에는 이 호출을 생략할 수 있습니다.
 
-## 상위 수준 트레이스
+## 상위 수준 트레이스 {#higher-level-traces}
 
 여러 `run()` 호출을 단일 트레이스에 포함해야 하는 경우가 있습니다. 전체 코드를 `trace()`으로 래핑하면 됩니다.
 
@@ -124,7 +124,7 @@ async def main():
 
 1. 두 `Runner.run` 호출이 `with trace()`으로 래핑되므로, 각 실행이 별도의 트레이스를 생성하지 않고 두 실행 모두 하나의 전체 트레이스에 포함됩니다.
 
-## 트레이스 생성
+## 트레이스 생성 {#creating-traces}
 
 [`trace()`][agents.tracing.trace] 함수를 사용하여 트레이스를 생성할 수 있습니다. 트레이스는 시작하고 종료해야 합니다. 다음 두 가지 방법을 사용할 수 있습니다.
 
@@ -133,13 +133,13 @@ async def main():
 
 현재 트레이스는 Python [`contextvar`](https://docs.python.org/3/library/contextvars.html)를 통해 추적됩니다. 따라서 동시성 환경에서도 자동으로 작동합니다. 트레이스를 직접 시작하고 종료하는 경우 현재 트레이스를 업데이트하려면 `mark_as_current`를 `start()`에 전달하고 `reset_current`을 `finish()`에 전달하세요.
 
-## 스팬 생성
+## 스팬 생성 {#creating-spans}
 
 다양한 [`*_span()`][agents.tracing.create] 메서드를 사용하여 스팬을 생성할 수 있습니다. 일반적으로 스팬을 직접 생성할 필요는 없습니다. 사용자 지정 스팬 정보를 추적할 수 있도록 [`custom_span()`][agents.tracing.custom_span] 함수가 제공됩니다.
 
 스팬은 자동으로 현재 트레이스에 포함되며 가장 가까운 현재 스팬 아래에 중첩됩니다. 현재 스팬은 Python [`contextvar`](https://docs.python.org/3/library/contextvars.html)를 통해 추적됩니다.
 
-## 민감한 데이터
+## 민감한 데이터 {#sensitive-data}
 
 일부 스팬은 잠재적으로 민감한 데이터를 캡처할 수 있습니다.
 
@@ -149,7 +149,7 @@ async def main():
 
 기본적으로 `trace_include_sensitive_data`은 `True`입니다. 앱을 실행하기 전에 `OPENAI_AGENTS_TRACE_INCLUDE_SENSITIVE_DATA` 환경 변수를 `true/1` 또는 `false/0`으로 내보내면 코드 없이 기본값을 설정할 수 있습니다.
 
-## 사용자 지정 트레이싱 프로세서
+## 사용자 지정 트레이싱 프로세서 {#custom-tracing-processors}
 
 트레이싱의 상위 수준 아키텍처는 다음과 같습니다.
 
@@ -162,7 +162,7 @@ async def main():
 2. [`set_trace_processors()`][agents.tracing.set_trace_processors]을 사용하면 기본 프로세서를 자체 트레이스 프로세서로 **교체**할 수 있습니다. 이 경우 이를 수행하는 `TracingProcessor`을 포함하지 않는 한 트레이스가 OpenAI 백엔드로 전송되지 않습니다.
 
 
-## 비 OpenAI 모델을 사용한 트레이싱
+## 비 OpenAI 모델을 사용한 트레이싱 {#tracing-with-non-openai-models}
 
 비 OpenAI 모델을 사용할 때 트레이싱 익스포터에 OpenAI API 키를 제공하면 트레이싱을 비활성화하지 않고도 OpenAI 트레이스 대시보드에서 무료 트레이싱을 사용할 수 있습니다. 어댑터 선택 및 설정 시 주의 사항은 모델 가이드의 [서드 파티 어댑터](models/index.md#third-party-adapters) 섹션을 참조하세요.
 
@@ -197,15 +197,15 @@ await Runner.run(
 )
 ```
 
-## 추가 참고 사항
+## 추가 참고 사항 {#additional-notes}
 - OpenAI 트레이스 대시보드에서 무료 트레이스를 확인할 수 있습니다.
 
 
-## 에코시스템 통합
+## 에코시스템 통합 {#ecosystem-integrations}
 
 다음 커뮤니티 및 벤더 통합은 OpenAI Agents SDK의 트레이싱 API 인터페이스를 지원합니다.
 
-### 외부 트레이싱 프로세서 목록
+### 외부 트레이싱 프로세서 목록 {#external-tracing-processors-list}
 
 -   [Weights & Biases](https://weave-docs.wandb.ai/guides/integrations/openai_agents)
 -   [Arize-Phoenix](https://docs.arize.com/phoenix/tracing/integrations-tracing/openai-agents-sdk)

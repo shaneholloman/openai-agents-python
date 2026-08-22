@@ -10,7 +10,7 @@ search:
 
 非同期イテレーターが終了するまで、`result.stream_events()` を受け取り続けてください。ストリーミング実行はイテレーターが終了するまで完了しません。また、セッションの永続化、承認の記録管理、履歴の圧縮などの後処理は、最後に表示されるトークンが到着した後に完了する場合があります。ループが終了すると、`result.is_complete` に最終的な実行状態が反映されます。
 
-## Raw レスポンスイベント
+## Raw レスポンスイベント {#raw-response-events}
 
 [`RawResponsesStreamEvent`][agents.stream_events.RawResponsesStreamEvent] オブジェクトは、LLM から直接渡される raw イベントをラップします。各オブジェクトの `data` フィールドには、`response.created` や `response.output_text.delta` などの型を持つ OpenAI Responses API イベントが含まれます。これらのイベントは、応答メッセージが生成され次第、ユーザーにストリーミングする場合に役立ちます。
 
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-## ストリーミングと承認
+## ストリーミングと承認 {#streaming-and-approvals}
 
 ストリーミングは、ツールの承認待ちで一時停止する実行にも対応しています。ツールに承認が必要な場合、`result.stream_events()` が終了し、保留中の承認が [`RunResultStreaming.interruptions`][agents.result.RunResultStreaming.interruptions] に公開されます。`result.to_state()` を使用して実行結果を [`RunState`][agents.run_state.RunState] に変換し、中断を承認または拒否してから、`Runner.run_streamed(...)` で再開します。
 
@@ -59,7 +59,7 @@ if result.interruptions:
 
 一時停止と再開の手順全体については、[Human-in-the-loop ガイド](human_in_the_loop.md)を参照してください。
 
-## 現在のターン後のストリーミング停止
+## 現在のターン後のストリーミング停止 {#cancel-streaming-after-the-current-turn}
 
 ストリーミング実行を途中で停止する必要がある場合は、[`result.cancel()`][agents.result.RunResultStreaming.cancel] を呼び出します。デフォルトでは、実行は直ちに停止します。停止する前に現在のターンを正常に完了させるには、代わりに `result.cancel(mode="after_turn")` を呼び出します。
 
@@ -71,11 +71,11 @@ if result.interruptions:
 - ストリーミング実行がツールの承認待ちで停止した場合、それを新しいターンとして扱わないでください。ストリームを最後まで受け取り、`result.interruptions` を確認して、代わりに `result.to_state()` から再開します。
 - 次のモデル呼び出しの前に、取得したセッション履歴と新しいユーザー入力をどのように統合するかをカスタマイズするには、[`RunConfig.session_input_callback`][agents.run.RunConfig.session_input_callback] を使用します。そこで新しいターンの項目を書き換えた場合、その書き換え後のバージョンがそのターンについて永続化されます。
 
-## 実行項目イベントとエージェントイベント
+## 実行項目イベントとエージェントイベント {#run-item-events-and-agent-events}
 
 [`RunItemStreamEvent`][agents.stream_events.RunItemStreamEvent] は、より上位レベルのイベントです。項目の生成が完全に完了した時点で通知されます。これにより、トークンごとではなく、「メッセージが生成された」「ツールが実行された」などの単位で進捗状況を通知できます。同様に、[`AgentUpdatedStreamEvent`][agents.stream_events.AgentUpdatedStreamEvent] は、現在のエージェントが変更されたとき（たとえば、ハンドオフの結果として）に更新を提供します。
 
-### 実行項目イベント名
+### 実行項目イベント名 {#run-item-event-names}
 
 `RunItemStreamEvent.name` では、次の固定されたセマンティックイベント名を使用します。
 

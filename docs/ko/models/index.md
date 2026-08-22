@@ -9,7 +9,7 @@ Agents SDK는 다음 두 가지 방식으로 OpenAI 모델을 즉시 사용할 �
 -   **권장**: 새로운 [Responses API](https://platform.openai.com/docs/api-reference/responses)를 사용하여 OpenAI API를 호출하는 [`OpenAIResponsesModel`][agents.models.openai_responses.OpenAIResponsesModel]
 -   [Chat Completions API](https://platform.openai.com/docs/api-reference/chat)를 사용하여 OpenAI API를 호출하는 [`OpenAIChatCompletionsModel`][agents.models.openai_chatcompletions.OpenAIChatCompletionsModel]
 
-## 모델 설정 선택
+## 모델 설정 선택 {#choosing-a-model-setup}
 
 먼저 설정에 맞는 가장 간단한 방식을 선택합니다.
 
@@ -23,7 +23,7 @@ Agents SDK는 다음 두 가지 방식으로 OpenAI 모델을 즉시 사용할 �
 | 고급 OpenAI Responses 요청 설정 조정 | OpenAI Responses 경로에서 `ModelSettings` 사용 | [고급 OpenAI Responses 설정](#advanced-openai-responses-settings) |
 | OpenAI 이외의 프로바이더 또는 혼합 프로바이더 라우팅에 서드 파티 어댑터 사용 | 지원되는 베타 어댑터를 비교하고 배포할 프로바이더 경로 검증 | [서드 파티 어댑터](#third-party-adapters) |
 
-## OpenAI 모델
+## OpenAI 모델 {#openai-models}
 
 OpenAI 모델만 사용하는 대부분의 앱에서는 기본 OpenAI 프로바이더와 문자열 모델 이름을 사용하고 Responses 모델 경로를 유지하는 방식을 권장합니다.
 
@@ -31,7 +31,7 @@ OpenAI 모델만 사용하는 대부분의 앱에서는 기본 OpenAI 프로바�
 
 `gpt-5.6-sol` 같은 다른 모델로 전환하려는 경우 두 가지 방법으로 에이전트를 구성할 수 있습니다.
 
-### 기본 모델
+### 기본 모델 {#default-model}
 
 먼저, 사용자 지정 모델을 설정하지 않은 모든 에이전트에서 특정 모델을 일관되게 사용하려면 에이전트를 실행하기 전에 `OPENAI_DEFAULT_MODEL` 환경 변수를 설정합니다.
 
@@ -57,7 +57,7 @@ result = await Runner.run(
 )
 ```
 
-#### GPT-5 모델
+#### GPT-5 모델 {#gpt-5-models}
 
 이러한 방식으로 `gpt-5.6-sol` 같은 GPT-5 모델을 사용하면 SDK가 기본 `ModelSettings`을 적용합니다. 대부분의 사용 사례에 가장 적합한 설정이 사용됩니다. 기본 모델의 추론 수준을 조정하려면 자체 `ModelSettings`을 전달합니다.
 
@@ -100,7 +100,7 @@ agent = Agent(
 
 `context="all_turns"`을 사용할 때는 `previous_response_id`, 서버 측 Responses API 대화 또는 다음 요청에 이전 추론 항목을 포함하는 방식으로 대화를 보존합니다. 상태 비저장 `store=False` 호출의 경우 응답에서 `reasoning.encrypted_content`을 요청한 다음, 다음 요청의 입력에 해당 추론 항목을 포함합니다.
 
-#### ComputerTool 모델 선택
+#### ComputerTool 모델 선택 {#computertool-model-selection}
 
 에이전트에 [`ComputerTool`][agents.tool.ComputerTool]이 포함된 경우 실제 Responses 요청의 최종 모델에 따라 SDK가 전송하는 컴퓨터 도구 페이로드가 결정됩니다. 명시적인 `gpt-5.5` 요청은 정식 출시된 기본 제공 `computer` 도구를 사용하고, 명시적인 `computer-use-preview` 요청은 이전 `computer_use_preview` 페이로드를 유지합니다.
 
@@ -110,11 +110,11 @@ agent = Agent(
 
 프리뷰 호환 요청은 `environment`과 디스플레이 크기를 미리 직렬화해야 합니다. 따라서 [`ComputerProvider`][agents.tool.ComputerProvider] 팩토리를 사용하는 프롬프트 관리 흐름에서는 구체적인 `Computer` 또는 `AsyncComputer` 인스턴스를 전달하거나, 요청을 보내기 전에 정식 출시 선택기를 강제해야 합니다. 전체 마이그레이션 세부 정보는 [도구](../tools.md#computertool-and-the-responses-computer-tool)를 참조하세요.
 
-#### GPT-5 이외의 모델
+#### GPT-5 이외의 모델 {#non-gpt-5-models}
 
 사용자 지정 `model_settings` 없이 GPT-5 이외의 모델 이름을 전달하면 SDK는 모든 모델과 호환되는 범용 `ModelSettings`으로 되돌아갑니다.
 
-### Responses 전용 도구 기능
+### Responses 전용 도구 기능 {#responses-only-tool-features}
 
 다음 도구 기능은 OpenAI Responses 모델에서만 지원됩니다.
 
@@ -125,11 +125,11 @@ agent = Agent(
 
 이러한 기능은 Chat Completions 모델과 Responses 이외의 백엔드에서 거부됩니다. 지연 로딩 도구를 사용할 때는 에이전트에 `ToolSearchTool()`을 추가하고, 네임스페이스 이름이나 지연 로딩 전용 함수 이름을 직접 강제하는 대신 모델이 `auto` 또는 `required` 도구 선택을 통해 도구를 로드하도록 합니다. 설정 세부 정보와 현재 제약 조건은 [호스티드 툴 검색](../tools.md#hosted-tool-search) 및 [프로그래밍 방식 도구 호출](../tools.md#programmatic-tool-calling)을 참조하세요.
 
-### Responses WebSocket 전송
+### Responses WebSocket 전송 {#responses-websocket-transport}
 
 기본적으로 OpenAI Responses API 요청은 HTTP 전송을 사용합니다. OpenAI Responses 프로바이더 경로를 사용할 때 WebSocket 전송을 사용하도록 설정할 수 있습니다.
 
-#### 기본 설정
+#### 기본 설정 {#basic-setup}
 
 ```python
 from agents import set_default_openai_responses_transport
@@ -141,7 +141,7 @@ set_default_openai_responses_transport("websocket")
 
 SDK가 모델 이름을 모델 인스턴스로 해석할 때 전송 방식이 선택됩니다. 구체적인 [`Model`][agents.models.interface.Model] 객체를 전달하면 해당 전송 방식은 이미 고정되어 있습니다. [`OpenAIResponsesWSModel`][agents.models.openai_responses.OpenAIResponsesWSModel]은 WebSocket을 사용하고, [`OpenAIResponsesModel`][agents.models.openai_responses.OpenAIResponsesModel]은 HTTP를 사용하며, [`OpenAIChatCompletionsModel`][agents.models.openai_chatcompletions.OpenAIChatCompletionsModel]은 Chat Completions를 유지합니다. `RunConfig(model_provider=...)`을 전달하면 전역 기본값 대신 해당 프로바이더가 전송 방식을 제어합니다.
 
-#### 프로바이더 또는 실행 수준 설정
+#### 프로바이더 또는 실행 수준 설정 {#provider-or-run-level-setup}
 
 프로바이더별 또는 실행별로 WebSocket 전송을 구성할 수도 있습니다.
 
@@ -188,7 +188,7 @@ result = await Runner.run(
 )
 ```
 
-#### `MultiProvider`을 사용한 고급 라우팅
+#### `MultiProvider`을 사용한 고급 라우팅 {#advanced-routing-with-multiprovider}
 
 접두사 기반 모델 라우팅이 필요한 경우(예: 하나의 실행에서 `openai/...` 및 `any-llm/...` 모델 이름 혼합) [`MultiProvider`][agents.MultiProvider]을 사용하고 그곳에 `openai_use_responses_websocket=True`을 설정합니다.
 
@@ -229,7 +229,7 @@ result = await Runner.run(
 
 사용자 지정 OpenAI 호환 엔드포인트 또는 프록시를 사용하는 경우 WebSocket 전송에는 호환되는 WebSocket `/responses` 엔드포인트도 필요합니다. 이러한 설정에서는 `websocket_base_url`을 명시적으로 설정해야 할 수 있습니다.
 
-#### 참고 사항
+#### 참고 사항 {#notes}
 
 -   이는 [Realtime API](../realtime/guide.md)가 아니라 WebSocket 전송을 사용하는 Responses API입니다. Chat Completions에는 적용되지 않습니다. OpenAI 이외의 프로바이더에는 해당 프로바이더가 Responses WebSocket `/responses` 엔드포인트를 지원하는 경우에만 적용됩니다.
 -   환경에 `websockets` 패키지가 아직 없으면 설치합니다.
@@ -239,13 +239,13 @@ result = await Runner.run(
 -   [Responses API WebSocket 서비스](https://developers.openai.com/api/docs/guides/websocket-mode)는 각 연결에서 한 번에 하나의 응답을 처리하며, 각 연결을 60분으로 제한합니다. 이 제한에 도달하면 새 연결을 엽니다. 병렬 실행이 필요할 때는 여러 연결을 사용합니다.
 -   서비스는 연결 로컬 메모리에 가장 최근 응답만 보관합니다. 실패한 `4xx` 또는 `5xx` 턴은 `previous_response_id`이 참조하는 응답을 해당 메모리에서 제거합니다. 다시 연결한 후에도 저장된 응답을 사용할 수 있으면 계속 진행할 수 있지만, `store=False` 및 ZDR 흐름에는 영구 저장된 대체 수단이 없습니다. `previous_response_id=None`로 새 체인을 시작하고 전체 입력 컨텍스트를 보내거나, 로컬에서 관리하는 세션 상태로 해당 컨텍스트를 다시 구성합니다.
 
-### 호스티드 멀티 에이전트(실험적)
+### 호스티드 멀티 에이전트(실험적) {#hosted-multi-agent-experimental}
 
 OpenAI Responses API 호스티드 멀티 에이전트 베타를 사용하면 GPT-5.6 루트 모델이 서버에서 호스트되는 하위 에이전트를 생성하고 조정할 수 있습니다. Agents SDK는 일반적인 `Runner`을 계속 사용할 수 있습니다. 호스티드 오케스트레이션은 서비스에서 유지되고, 개발자가 정의한 함수 도구는 애플리케이션에서 실행됩니다.
 
 이 통합은 실험적이며 로컬 함수 출력을 `response.inject`을 사용하여 활성 호스티드 에이전트에 반환할 수 있도록 Responses WebSocket 전송을 사용합니다. `client.beta.responses.connect`을 제공하는 `openai[realtime]` 버전 2.45.0 이상의 빌드가 필요합니다. 인터페이스와 베타 항목 스키마는 정식 출시 전에 변경될 수 있습니다.
 
-#### 모델 구성
+#### 모델 구성 {#configure-the-model}
 
 실험적 모듈에서 모델을 가져와 SDK `Agent`에 할당합니다.
 
@@ -262,7 +262,7 @@ agent = Agent(
 
 `OpenAIHostedMultiAgentModel`을 생성하면 `multi_agent.enabled`이 활성화되고 `OpenAI-Beta: responses_multi_agent=v1` WebSocket 헤더가 전송됩니다. `openai_client`이 제공되지 않으면 모델은 기본 OpenAI 클라이언트를 사용합니다. `max_concurrent_subagents`이 생략되면 서비스 기본값이 사용됩니다.
 
-#### 로컬 함수 도구
+#### 로컬 함수 도구 {#local-function-tools}
 
 모든 호스티드 에이전트는 요청에 구성된 모델과 도구를 공유합니다. Responses API는 어떤 호스티드 에이전트가 함수를 호출할지 결정합니다. 일반 SDK Runner는 함수를 로컬에서 실행하고 동일한 호출 ID가 있는 `function_call_output`을 활성 WebSocket 응답에 삽입합니다. 이를 통해 서비스가 원래 호스티드 호출자를 다시 시작할 수 있습니다. 함수 실행에는 Runner의 일반 가드레일, 후크 및 실패 변환이 계속 적용됩니다. SDK 도구 승인 인터럽션(중단 처리)은 지원되지 않습니다. `needs_approval` 설정이 `False`이 아닌 함수 도구는 요청이 전송되기 전에 거부됩니다.
 
@@ -285,13 +285,13 @@ def lookup_document(ctx: ToolContext[Any], section: str) -> str:
 
 호스티드 에이전트 이름은 관찰용 메타데이터이며 로컬 라우팅 메커니즘이 아닙니다. SDK가 제공하는 호출 ID를 사용하여 출력을 라우팅합니다. 부작용이 있는 도구의 경우 해당 호출 ID를 멱등성 키로 사용하고 도구 실행 전이나 도중에 애플리케이션 코드에서 필요한 권한 부여를 적용합니다. 이 모델에 `needs_approval`을 사용하지 마세요. 도구 인수와 출력은 Responses API 경계를 통과합니다.
 
-#### 출력 및 스트리밍 동작
+#### 출력 및 스트리밍 동작 {#output-and-streaming-behavior}
 
 단계가 `final_answer`이며 `/root`에 귀속된 메시지만 일반 최종 메시지가 됩니다. 실험적 어댑터는 상위 수준 `RunResult`에서 하위 에이전트 메시지와 호스티드 오케스트레이션 레코드를 필터링합니다. SDK는 이러한 레코드를 로컬 함수로 실행하지 않습니다.
 
 raw 스트리밍에서는 호스티드 출력 항목 및 `response.inject.created` 확인을 포함한 베타 Responses 이벤트가 계속 노출됩니다. 어댑터는 함수 호출이 준비되면 하나의 활성 프로바이더 응답을 SDK에 표시되는 논리적 모델 턴으로 나눈 다음, Runner가 출력을 생성하면 동일한 프로바이더 응답을 다시 시작합니다. raw 호스티드 항목 또는 `ToolContext`과 함께 `get_hosted_agent_metadata()`을 사용하여 항목이나 도구 호출이 귀속된 호스티드 에이전트를 식별합니다.
 
-#### SDK 오케스트레이션과의 관계
+#### SDK 오케스트레이션과의 관계 {#relationship-to-sdk-orchestration}
 
 호스티드 멀티 에이전트는 SDK 핸드오프 및 Agents-as-tools와 별개입니다.
 
@@ -299,7 +299,7 @@ raw 스트리밍에서는 호스티드 출력 항목 및 `response.inject.create
 -   SDK 핸드오프는 활성 로컬 SDK `Agent`을 변경합니다. 모든 호스티드 에이전트가 동일한 핸드오프 도구를 받아 소유권 충돌이 발생하므로 이 실험적 모델을 사용할 때는 핸드오프가 거부됩니다.
 -   Agents-as-tools는 계속 사용할 수 있지만, 이를 사용하면 중첩된 클라이언트 측 및 서버 측 오케스트레이션이 생성됩니다. 추가 지연 시간, 비용 및 도구 노출을 신중하게 평가하세요.
 
-#### 현재 제한 사항
+#### 현재 제한 사항 {#current-limitations}
 
 실험적 모델은 `reasoning.summary`, `max_tool_calls`, 호출자가 제공하는 `multi_agent` 또는 `betas` 재정의를 거부합니다. Responses `/compact` 엔드포인트는 베타에서 지원되지 않습니다. 다만 서비스가 각 호스티드 에이전트 컨텍스트를 독립적으로 자동 압축하므로 명시적인 `context_management.compact_threshold`을 사용할 수 있습니다.
 
@@ -307,11 +307,11 @@ raw 스트리밍에서는 호스티드 출력 항목 및 `response.inject.create
 
 기본 Responses API 베타 동작은 [OpenAI 멀티 에이전트 가이드](https://developers.openai.com/api/docs/guides/tools-multi-agent)를 참조하세요. 비스트리밍 및 스트리밍 SDK 사용법은 [`examples/agent_patterns/hosted_multi_agent_beta.py`](https://github.com/openai/openai-agents-python/tree/main/examples/agent_patterns/hosted_multi_agent_beta.py)을 참조하세요.
 
-## OpenAI 이외의 모델
+## OpenAI 이외의 모델 {#non-openai-models}
 
 OpenAI 이외의 프로바이더가 필요한 경우 SDK의 기본 제공 프로바이더 통합 지점으로 시작합니다. 많은 설정에서는 서드 파티 어댑터를 추가하지 않아도 충분합니다. 각 패턴의 예제는 [examples/model_providers](https://github.com/openai/openai-agents-python/tree/main/examples/model_providers/)에 있습니다.
 
-### OpenAI 이외의 프로바이더 통합 방법
+### OpenAI 이외의 프로바이더 통합 방법 {#ways-to-integrate-non-openai-providers}
 
 | 접근 방식 | 사용 시점 | 범위 |
 | --- | --- | --- |
@@ -343,7 +343,7 @@ agent= Agent(name="Helping Agent", instructions="You are a Helping Agent", model
 
     이 예제에서는 여전히 많은 LLM 프로바이더가 Responses API를 지원하지 않으므로 Chat Completions API/모델을 사용합니다. LLM 프로바이더가 Responses를 지원한다면 Responses를 사용하는 것이 좋습니다.
 
-## 하나의 워크플로에서 모델 혼합
+## 하나의 워크플로에서 모델 혼합 {#mixing-models-in-one-workflow}
 
 단일 워크플로 내에서 에이전트마다 다른 모델을 사용할 수 있습니다. 예를 들어 분류에는 더 작고 빠른 모델을 사용하고, 복잡한 작업에는 더 크고 성능이 뛰어난 모델을 사용할 수 있습니다. [`Agent`][agents.Agent]를 구성할 때 다음 방법 중 하나로 특정 모델을 선택할 수 있습니다.
 
@@ -407,11 +407,11 @@ english_agent = Agent(
 )
 ```
 
-## 고급 OpenAI Responses 설정
+## 고급 OpenAI Responses 설정 {#advanced-openai-responses-settings}
 
 OpenAI Responses 경로에서 더 세부적인 제어가 필요한 경우 `ModelSettings`부터 사용합니다.
 
-### 일반적인 고급 `ModelSettings` 옵션
+### 일반적인 고급 `ModelSettings` 옵션 {#common-advanced-modelsettings-options}
 
 OpenAI Responses API를 사용할 때 여러 요청 필드에는 이미 직접 대응하는 `ModelSettings` 필드가 있으므로 해당 필드에 `extra_args`을 사용할 필요가 없습니다.
 
@@ -475,7 +475,7 @@ result = await Runner.run(
 
 서버 측 압축은 [`OpenAIResponsesCompactionSession`][agents.memory.openai_responses_compaction_session.OpenAIResponsesCompactionSession]과 다릅니다. `context_management=[{"type": "compaction", "compact_threshold": ...}]`은 각 Responses API 요청과 함께 전송되며, 렌더링된 컨텍스트가 임계값을 초과하면 API가 응답의 일부로 압축 항목을 생성할 수 있습니다. `OpenAIResponsesCompactionSession`은 턴 사이에 독립형 `responses.compact` 엔드포인트를 호출하고 로컬 세션 기록을 다시 작성합니다.
 
-### `extra_args` 전달
+### `extra_args` 전달 {#passing-extra_args}
 
 SDK가 아직 최상위 수준에서 직접 제공하지 않는 프로바이더별 필드 또는 최신 요청 필드가 필요할 때 `extra_args`을 사용합니다.
 
@@ -495,7 +495,7 @@ english_agent = Agent(
 )
 ```
 
-## 모델 호출 시간 초과
+## 모델 호출 시간 초과 {#model-call-timeouts}
 
 각 모델 호출 시도의 시간을 제한하려면 [`ModelSettings.timeout`][agents.model_settings.ModelSettings.timeout]을 양수인 초 단위 값으로 설정합니다. 시간 초과는 스트리밍 및 비스트리밍 호출에 적용되며 전송 대기를 포함한 전체 시도를 포괄합니다. 전체 에이전트 실행, 함수 도구 실행 또는 재시도 백오프는 제한하지 않습니다.
 
@@ -510,7 +510,7 @@ agent = Agent(
 
 시도가 제한 시간을 초과하면 SDK는 시도를 취소하고 정리가 완료될 때까지 기다린 후 [`ModelTimeoutError`][agents.exceptions.ModelTimeoutError]를 발생시킵니다. Runner 관리 재시도가 활성화되면 SDK는 `context.normalized.is_timeout`을 `True`으로 설정한 상태로 시간 초과 실패를 재시도 정책에 전달합니다. 예를 들어 `retry_policies.network_error()`은 이 분류와 일치합니다. 허용된 각 재시도에는 새로운 시도별 시간 초과가 적용됩니다. SDK는 재시도 전에 일반적인 [재실행 안전 규칙](#safety-boundaries)을 계속 적용합니다.
 
-## Runner 관리 재시도
+## Runner 관리 재시도 {#runner-managed-retries}
 
 재시도는 런타임 전용이며 명시적으로 활성화해야 합니다. `ModelSettings(retry=...)`을 설정하고 재시도 정책이 재시도를 선택하지 않는 한 SDK는 일반 모델 요청을 재시도하지 않습니다.
 
@@ -582,7 +582,7 @@ SDK는 `retry_policies`에서 즉시 사용할 수 있는 다음 헬퍼를 내�
 
 정책을 조합할 때 `provider_suggested()`은 프로바이더가 거부 및 재실행 안전 승인을 구분할 수 있는 경우 이를 보존하므로 가장 안전한 첫 번째 기본 구성 요소입니다.
 
-##### 안전 경계
+##### 안전 경계 {#safety-boundaries}
 
 일부 실패는 절대 재시도되지 않습니다.
 
@@ -594,7 +594,7 @@ SDK는 `retry_policies`에서 즉시 사용할 수 있는 다음 헬퍼를 내�
 
 `previous_response_id` 또는 `conversation_id`을 사용하는 상태 유지 후속 요청은 재실행 안전 여부를 알 수 없을 때 안전을 위해 실패합니다. 이러한 요청에서는 `network_error()` 또는 `http_status([500])` 같은 프로바이더 외부 조건만으로는 충분하지 않습니다. 일반적으로 `retry_policies.provider_suggested()`을 통해 프로바이더의 재실행 안전 승인을 포함하거나, 위에서 설명한 대로 프로바이더가 안전하지 않다고 표시한 비스트리밍 실패를 명시적으로 승인합니다.
 
-##### Runner와 에이전트의 병합 동작
+##### Runner와 에이전트의 병합 동작 {#runner-and-agent-merge-behavior}
 
 `retry`은 Runner 수준 및 에이전트 수준 `ModelSettings` 간에 깊은 병합 방식으로 결합됩니다.
 
@@ -604,9 +604,9 @@ SDK는 `retry_policies`에서 즉시 사용할 수 있는 다음 헬퍼를 내�
 
 더 자세한 예제는 [`examples/basic/retry.py`](https://github.com/openai/openai-agents-python/tree/main/examples/basic/retry.py) 및 [어댑터 기반 재시도 예제](https://github.com/openai/openai-agents-python/tree/main/examples/basic/retry_litellm.py)를 참조하세요.
 
-## OpenAI 이외의 프로바이더 문제 해결
+## OpenAI 이외의 프로바이더 문제 해결 {#troubleshooting-non-openai-providers}
 
-### 트레이싱 클라이언트 오류 401
+### 트레이싱 클라이언트 오류 401 {#tracing-client-error-401}
 
 트레이싱 관련 오류가 발생하는 이유는 트레이스가 OpenAI 서버에 업로드되지만 OpenAI API 키가 없기 때문입니다. 다음 세 가지 방법으로 해결할 수 있습니다.
 
@@ -614,14 +614,14 @@ SDK는 `retry_policies`에서 즉시 사용할 수 있는 다음 헬퍼를 내�
 2. 트레이싱용 OpenAI 키를 설정합니다: [`set_tracing_export_api_key(...)`][agents.set_tracing_export_api_key]. 이 API 키는 트레이스 업로드에만 사용되며 [platform.openai.com](https://platform.openai.com/)에서 발급된 키여야 합니다.
 3. OpenAI 이외의 트레이스 프로세서를 사용합니다. [트레이싱 문서](../tracing.md#custom-tracing-processors)를 참조하세요.
 
-### Responses API 지원
+### Responses API 지원 {#responses-api-support}
 
 SDK는 기본적으로 Responses API를 사용하지만, 여전히 많은 다른 LLM 프로바이더가 이를 지원하지 않습니다. 그 결과 404 또는 유사한 문제가 발생할 수 있습니다. 다음 두 가지 방법으로 해결할 수 있습니다.
 
 1. [`set_default_openai_api("chat_completions")`][agents.set_default_openai_api]을 호출합니다. 환경 변수를 통해 `OPENAI_API_KEY` 및 `OPENAI_BASE_URL`을 설정하는 경우 사용할 수 있습니다.
 2. [`OpenAIChatCompletionsModel`][agents.models.openai_chatcompletions.OpenAIChatCompletionsModel]을 사용합니다. 예제는 [여기](https://github.com/openai/openai-agents-python/tree/main/examples/model_providers/)에서 확인할 수 있습니다.
 
-### Chat Completions 호환성 옵션
+### Chat Completions 호환성 옵션 {#chat-completions-compatibility-options}
 
 Chat Completions를 통해 라우팅할 때 SDK는 `previous_response_id`, `conversation_id`, Responses API의 `prompt` 필드 또는 텍스트 전용이 아닌 도구 출력처럼 Chat Completions에서 전송할 수 없는 Responses 전용 필드를 별도 알림 없이 삭제하여 호환성을 유지합니다. 개발 중 이러한 불일치가 즉시 실패하도록 하려면 OpenAI 프로바이더에서 엄격한 기능 검증을 활성화합니다.
 
@@ -658,7 +658,7 @@ provider = OpenAIProvider(
 
 [`MultiProvider`][agents.MultiProvider]의 경우 `openai_buffer_streamed_tool_calls=True`을 사용합니다.
 
-### structured outputs 지원
+### structured outputs 지원 {#structured-outputs-support}
 
 일부 모델 프로바이더는 [structured outputs](https://platform.openai.com/docs/guides/structured-outputs)를 지원하지 않습니다. 이 경우 다음과 유사한 오류가 발생할 수 있습니다.
 
@@ -670,7 +670,7 @@ BadRequestError: Error code: 400 - {'error': {'message': "'response_format.type'
 
 이는 일부 모델 프로바이더의 한계입니다. JSON 출력은 지원하지만 출력에 사용할 `json_schema`을 지정할 수 없습니다. 현재 이 문제를 해결하기 위해 작업 중이지만, JSON 스키마 출력을 지원하는 프로바이더를 사용하는 것이 좋습니다. 그렇지 않으면 잘못된 형식의 JSON으로 인해 앱이 자주 중단될 수 있습니다.
 
-## 프로바이더 간 모델 혼합
+## 프로바이더 간 모델 혼합 {#mixing-models-across-providers}
 
 모델 프로바이더 간의 기능 차이를 인지하지 않으면 오류가 발생할 수 있습니다. 예를 들어 OpenAI는 structured outputs, 멀티모달 입력, 호스티드 파일 검색 및 웹 검색을 지원하지만 다른 많은 프로바이더는 이러한 기능을 지원하지 않습니다. 다음 제한 사항에 유의하세요.
 
@@ -678,11 +678,11 @@ BadRequestError: Error code: 400 - {'error': {'message': "'response_format.type'
 -   텍스트 전용 모델을 호출하기 전에 멀티모달 입력을 필터링하세요.
 -   구조화된 JSON 출력을 지원하지 않는 프로바이더는 때때로 유효하지 않은 JSON을 생성한다는 점에 유의하세요.
 
-## 서드 파티 어댑터
+## 서드 파티 어댑터 {#third-party-adapters}
 
 SDK의 기본 제공 프로바이더 통합 지점으로 충분하지 않은 경우에만 서드 파티 어댑터를 사용합니다. 이 SDK에서 OpenAI 모델만 사용한다면 Any-LLM 또는 LiteLLM 대신 기본 제공 [`OpenAIResponsesModel`][agents.models.openai_responses.OpenAIResponsesModel] 경로를 사용하는 것이 좋습니다. 서드 파티 어댑터는 OpenAI 모델과 OpenAI 이외의 프로바이더를 결합하거나, 어댑터에서만 제공하는 프로바이더 지원 범위 또는 라우팅이 필요한 경우를 위한 것입니다. 어댑터는 SDK와 업스트림 모델 프로바이더 사이에 또 하나의 호환성 계층을 추가하므로 기능 지원 및 요청 의미 체계가 프로바이더마다 다를 수 있습니다. 현재 SDK에는 Any-LLM과 LiteLLM이 최선 노력 기반의 베타 어댑터 통합으로 포함되어 있습니다.
 
-### Any-LLM
+### Any-LLM {#any-llm}
 
 Any-LLM 지원은 Any-LLM에서 관리하는 프로바이더 지원 범위 또는 라우팅이 필요한 경우를 위해 최선 노력 기반의 베타 기능으로 포함되어 있습니다.
 
@@ -692,7 +692,7 @@ Any-LLM이 필요한 경우 `openai-agents[any-llm]`을 설치한 다음 [`examp
 
 Any-LLM은 서드 파티 어댑터 계층이므로 프로바이더 종속성과 기능 격차는 SDK가 아니라 Any-LLM 업스트림에서 정의됩니다. 업스트림 프로바이더가 사용량 메트릭을 반환하면 자동으로 전파되지만, 스트리밍 Chat Completions 백엔드는 사용량 청크를 생성하기 전에 `ModelSettings(include_usage=True)`이 필요할 수 있습니다. structured outputs, 도구 호출, 사용량 보고 또는 Responses 관련 동작에 의존한다면 배포하려는 정확한 프로바이더 백엔드를 검증하세요.
 
-### LiteLLM
+### LiteLLM {#litellm}
 
 LiteLLM 지원은 LiteLLM 전용 프로바이더 지원 범위 또는 라우팅이 필요한 경우를 위해 최선 노력 기반의 베타 기능으로 포함되어 있습니다.
 
