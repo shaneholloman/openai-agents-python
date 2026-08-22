@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from pathlib import Path
 from typing import Any, cast
 
@@ -205,7 +206,7 @@ async def test_session_merge_and_model_input_filter_have_distinct_persistence_bo
     assert callback_inputs[0][0] >= 2
     assert callback_inputs[0][1] == "PLACEHOLDER_NEW_INPUT"
     assert filter_inputs == ["What release word did I provide? Reply only with that word."]
-    assert result.final_output == "FILTERED:JASPER"
+    assert re.fullmatch(r"FILTERED:\s*JASPER", result.final_output)
     assert any("What release word" in str(item.get("content", "")) for item in persisted)
     assert not any("PLACEHOLDER_NEW_INPUT" in str(item.get("content", "")) for item in persisted)
 

@@ -158,6 +158,7 @@ async def test_runner_owned_local_sandbox_cannot_inspect_trusted_client_credenti
                 exposed_ports: tuple[int, ...] = (),
                 network_mode: Literal["none"] | None = None,
                 session_id: uuid.UUID | None = None,
+                labels: dict[str, str] | None = None,
             ) -> Any:
                 container = await super()._create_container(
                     image,
@@ -165,6 +166,7 @@ async def test_runner_owned_local_sandbox_cannot_inspect_trusted_client_credenti
                     exposed_ports=exposed_ports,
                     network_mode=network_mode,
                     session_id=session_id,
+                    labels=labels,
                 )
                 container_id = container.id
                 assert container_id is not None
