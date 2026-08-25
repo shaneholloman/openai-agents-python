@@ -15,12 +15,14 @@ from agents import Agent, WebSearchTool, function_tool
 from agents.exceptions import UserError
 from agents.handoffs import handoff
 from agents.realtime import RealtimeAgent, RealtimeSession, RealtimeSessionModelSettings
+from agents.realtime.items import AssistantAudio, AssistantMessageItem
 from agents.realtime.model import RealtimeModelConfig, RealtimePlaybackTracker
 from agents.realtime.model_events import (
     RealtimeModelAudioEvent,
     RealtimeModelAudioInterruptedEvent,
     RealtimeModelConnectionStatusEvent,
     RealtimeModelErrorEvent,
+    RealtimeModelItemUpdatedEvent,
     RealtimeModelOutputTextDeltaEvent,
     RealtimeModelRawServerEvent,
     RealtimeModelToolCallEvent,
@@ -860,6 +862,120 @@ class TestEventHandlingRobustness(TestOpenAIRealtimeWebSocketModel):
 
         emitted = [call.args[0] for call in mock_listener.on_event.call_args_list]
         assert [event.type for event in emitted] == ["raw_server_event", "turn_ended"]
+
+    @pytest.mark.asyncio
+    async def test_retrieved_completed_item_keeps_status(self, model, monkeypatch):
+        """An item the server reports as completed must not flip back to in_progress.
+
+        After assistant audio plays, the SDK retrieves that item when the user's next
+        input transcription completes. The retrieved payload carries the item's real
+        status, and discarding it would regress history entries every turn.
+        """
+        send_raw = AsyncMock()
+        monkeypatch.setattr(model, "_send_raw_message", send_raw)
+        mock_listener = AsyncMock()
+        model.add_listener(mock_listener)
+
+        await model._handle_ws_event(
+            {
+                "type": "response.output_audio.delta",
+                "event_id": "event_1",
+                "response_id": "resp_1",
+                "item_id": "item_1",
+                "output_index": 0,
+                "content_index": 0,
+                "delta": "dGVzdCBhdWRpbw==",
+            }
+        )
+        await model._handle_ws_event(
+            {
+                "type": "conversation.item.input_audio_transcription.completed",
+                "event_id": "event_2",
+                "item_id": "item_user",
+                "content_index": 0,
+                "transcript": "hello",
+                "usage": {
+                    "type": "tokens",
+                    "input_tokens": 1,
+                    "output_tokens": 1,
+                    "total_tokens": 2,
+                },
+            }
+        )
+
+        assert send_raw.await_count == 1
+        retrieve_call = send_raw.await_args
+        assert retrieve_call is not None
+        retrieve_event = retrieve_call.args[0]
+        assert retrieve_event.type == "conversation.item.retrieve"
+        assert retrieve_event.item_id == "item_1"
+
+        await model._handle_ws_event(
+            {
+                "type": "conversation.item.retrieved",
+                "event_id": "event_3",
+                "item": {
+                    "id": "item_1",
+                    "type": "message",
+                    "role": "assistant",
+                    "status": "completed",
+                    "content": [{"type": "output_audio", "transcript": "hi there"}],
+                },
+            }
+        )
+
+        item_updated_events = [
+            call.args[0]
+            for call in mock_listener.on_event.call_args_list
+            if isinstance(call.args[0], RealtimeModelItemUpdatedEvent)
+        ]
+        assert item_updated_events, "a retrieved conversation item should update listeners"
+        assert item_updated_events[-1].item.status == "completed"
+
+    @pytest.mark.asyncio
+    async def test_retrieved_completed_item_keeps_status_in_session_history(
+        self, model, monkeypatch
+    ):
+        """A retrieved item must not regress a known terminal item in session history.
+
+        After assistant audio plays, the SDK retrieves that item when the user's next
+        input transcription completes. The retrieved payload reports the item's real
+        status but may omit the transcript, so the session must reconcile it into
+        history without losing either the terminal status or the stored transcript.
+        """
+        send_raw = AsyncMock()
+        monkeypatch.setattr(model, "_send_raw_message", send_raw)
+        session = RealtimeSession(model, RealtimeAgent(name="agent"), None)
+        model.add_listener(session)
+
+        session._history = [
+            AssistantMessageItem(
+                item_id="item_1",
+                role="assistant",
+                status="completed",
+                content=[AssistantAudio(audio=None, transcript="hi there")],
+            )
+        ]
+
+        await model._handle_ws_event(
+            {
+                "type": "conversation.item.retrieved",
+                "event_id": "event_1",
+                "item": {
+                    "id": "item_1",
+                    "type": "message",
+                    "role": "assistant",
+                    "status": "completed",
+                    "content": [{"type": "output_audio"}],
+                },
+            }
+        )
+
+        assert len(session._history) == 1
+        stored = cast(AssistantMessageItem, session._history[0])
+        assert stored.status == "completed"
+        assert isinstance(stored.content[0], AssistantAudio)
+        assert stored.content[0].transcript == "hi there"
 
     @pytest.mark.asyncio
     async def test_handle_unknown_event_type_ignored(self, model):
