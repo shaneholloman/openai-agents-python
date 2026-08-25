@@ -4,49 +4,59 @@ search:
 ---
 # コンテキスト管理
 
-コンテキストは多義的な用語です。考慮すべきコンテキストには、主に 2 つのカテゴリーがあります。
+コンテキストという用語は複数の意味で使われます。考慮すべきコンテキストは、大きく次の 2 種類に分けられます。
 
-1. コードからローカルに利用できるコンテキスト: ツール関数の実行時、`on_handoff` などのコールバック時、ライフサイクルフック内などで必要となる可能性があるデータや依存関係です。
-2. LLM が利用できるコンテキスト: LLM が応答を生成するときに参照するデータです。
+1. コードがローカルで利用できるコンテキスト：ツール関数の実行時、`on_handoff` などのコールバック内、ライフサイクルフック内などで必要になる可能性があるデータや依存関係です。
+2. LLM が利用できるコンテキスト：レスポンスを生成する際に LLM が参照するデータです。
 
 ## ローカルコンテキスト {#local-context}
 
-これは、[`RunContextWrapper`][agents.run_context.RunContextWrapper] クラスと、そのクラス内の [`context`][agents.run_context.RunContextWrapper.context] プロパティによって表されます。仕組みは次のとおりです。
+これは、[`RunContextWrapper`][agents.run_context.RunContextWrapper] クラスと、その中の [`context`][agents.run_context.RunContextWrapper.context] プロパティで表されます。仕組みは次のとおりです。
 
-1. 任意の Python オブジェクトを作成します。一般的なパターンとして、dataclass または Pydantic オブジェクトを使用します。
-2. そのオブジェクトをさまざまな実行メソッド（例: `Runner.run(..., context=whatever)` ）に渡します。
-3. すべてのツール呼び出しやライフサイクルフックなどには、ラッパーオブジェクト `RunContextWrapper[T]` が渡されます。ここで `T` はコンテキストオブジェクトの型を表し、オブジェクト自体は `wrapper.context` から利用できます。
+1. 任意の Python オブジェクトを作成します。一般的には、データクラスまたは Pydantic オブジェクトを使用します。
+2. そのオブジェクトを各種の実行メソッド（例：`Runner.run(..., context=whatever)`）に渡します。
+3. すべてのツール呼び出しやライフサイクルフックなどには、ラッパーオブジェクト `RunContextWrapper[T]` が渡されます。ここで `T` はコンテキストオブジェクトの型を表し、オブジェクト自体には `wrapper.context` を介してアクセスできます。
 
-一部のランタイム固有のコールバックでは、SDK が `RunContextWrapper[T]` のより特化したサブクラスを渡す場合があります。たとえば、`FunctionTool` インスタンスのライフサイクルフックは通常、`ToolContext` を受け取ります。これにより、`tool_call_id`、`tool_name`、`tool_arguments` などのツール呼び出しメタデータも利用できます。
+ランタイム固有の一部のコールバックでは、SDK が `RunContextWrapper[T]` のより特化したサブクラスを渡す場合があります。たとえば、`FunctionTool` インスタンスのライフサイクルフックは通常、`ToolContext` を受け取ります。これは、`tool_call_id`、`tool_name`、`tool_arguments` などのツール呼び出しメタデータも公開します。
 
-認識しておくべき **最も重要な** 点は、特定のエージェント実行におけるすべてのエージェント、ツール関数、ライフサイクル処理などで、同じ _型_ のコンテキストを使用する必要があることです。
+注意すべき **最も重要な** 点は、特定のエージェント実行に関わるすべてのエージェント、ツール関数、ライフサイクル処理などで、同じ _型_ のコンテキストを使用する必要があることです。
 
 コンテキストは、次のような用途に使用できます。
 
--   実行に関するコンテキストデータ（例: ユーザー名 / uid、またはユーザーに関するその他の情報）
--   依存関係（例: ロガーオブジェクト、データ取得オブジェクトなど）
+-   実行に関するコンテキストデータ（例：ユーザー名、UID、その他のユーザー情報）
+-   依存関係（例：ロガーオブジェクト、データフェッチャーなど）
 -   ヘルパー関数
 
 !!! danger "注記"
 
-    コンテキストオブジェクトが LLM に送信されることは **ありません** 。これは純粋にローカルなオブジェクトであり、データの読み取りや書き込み、メソッドの呼び出しが可能です。
+    コンテキストオブジェクトは、LLM に **送信されない** ローカル専用のオブジェクトです。その値の読み取りや書き込み、メソッドの呼び出しが可能です。
 
-単一の実行内では、派生したラッパーは基盤となるアプリコンテキスト、承認状態、使用量追跡を共有します。ネストされた [`Agent.as_tool()`][agents.agent.Agent.as_tool] の実行では、別の `tool_input` を関連付けることができますが、デフォルトではアプリ状態の独立したコピーは作成されません。
+1 回の実行内では、派生したラッパーが同じ基盤のアプリケーションコンテキスト、承認状態、使用量追跡を共有します。ネストされた [`Agent.as_tool()`][agents.agent.Agent.as_tool] の実行では、異なる `tool_input` が付与される場合がありますが、デフォルトではアプリケーション状態の独立したコピーは作成されません。
 
-### `RunContextWrapper` の公開情報 {#what-runcontextwrapper-exposes}
+### 機能の公開制御におけるローカルコンテキストの使用 {#use-local-context-for-capability-visibility}
 
-[`RunContextWrapper`][agents.run_context.RunContextWrapper] は、アプリで定義したコンテキストオブジェクトのラッパーです。実際には、主に次のものを使用します。
+関数ツール、MCP ツール、ハンドオフが同じリクエストポリシーに依存する場合は、ポリシーの入力値またはヘルパーをアプリケーションコンテキストに保持してください。SDK の各インターフェースは、それぞれのコールバックを介して現在の実行コンテキストを公開します。
 
--   独自の変更可能なアプリ状態と依存関係には、[`wrapper.context`][agents.run_context.RunContextWrapper.context] を使用します。
+-   [`FunctionTool.is_enabled`][agents.tool.FunctionTool.is_enabled] は `RunContextWrapper` を受け取ります。
+-   [`Handoff.is_enabled`][agents.handoffs.Handoff.is_enabled] は `RunContextWrapper` を受け取ります。
+-   MCP の [`tool_filter`](mcp.md#dynamic-tool-filtering) は [`ToolFilterContext`][agents.mcp.ToolFilterContext] を受け取ります。その `run_context` プロパティには、現在の `RunContextWrapper` が含まれます。
+
+個別の機能リストを管理するのではなく、共有アプリケーションポリシーをこれらのコールバックに合わせて適用してください。これらのコールバックは、現在の実行に対して SDK が公開する機能を制御しますが、モデルが生成した引数やリソース選択を認可することはできません。関数ツールでは、ツール実装内で認可に関する判断を適用するか、必要に応じて[ツール入力ガードレール](guardrails.md#tool-guardrails)や[承認](human_in_the_loop.md)を使用してください。MCP サーバーは、自身の保護対象の操作を認可する必要があります。`input_type` を持つハンドオフでは、アプリケーションに副作用が生じる前に、`on_handoff` の冒頭で解析済みの入力を確認し、認可に失敗した場合は値を返さずに例外を送出してください。ツール入力ガードレールは、ハンドオフでは実行されません。コールバックのライフサイクルについては、[ハンドオフ入力](handoffs.md#handoff-inputs)を参照してください。
+
+### `RunContextWrapper` で公開される情報 {#what-runcontextwrapper-exposes}
+
+[`RunContextWrapper`][agents.run_context.RunContextWrapper] は、アプリケーションで定義したコンテキストオブジェクトのラッパーです。実際には、主に次の項目を使用します。
+
+-   独自の変更可能なアプリケーション状態と依存関係には、[`wrapper.context`][agents.run_context.RunContextWrapper.context] を使用します。
 -   現在の実行全体で集計されたリクエストとトークンの使用量には、[`wrapper.usage`][agents.run_context.RunContextWrapper.usage] を使用します。
 -   現在の実行が [`Agent.as_tool()`][agents.agent.Agent.as_tool] 内で行われている場合の構造化入力には、[`wrapper.tool_input`][agents.run_context.RunContextWrapper.tool_input] を使用します。
--   承認状態をプログラムから更新する必要がある場合は、[`wrapper.approve_tool(...)`][agents.run_context.RunContextWrapper.approve_tool] / [`wrapper.reject_tool(...)`][agents.run_context.RunContextWrapper.reject_tool] を使用します。
+-   承認状態をプログラムで更新する必要がある場合は、[`wrapper.approve_tool(...)`][agents.run_context.RunContextWrapper.approve_tool] / [`wrapper.reject_tool(...)`][agents.run_context.RunContextWrapper.reject_tool] を使用します。
 
-アプリで定義するオブジェクトは `wrapper.context` だけです。その他のフィールドは、SDK が管理するランタイムメタデータです。
+アプリケーションで定義したオブジェクトは `wrapper.context` だけです。その他のフィールドは、SDK が管理するランタイムメタデータです。
 
-後でヒューマンインザループまたは永続的なジョブのワークフロー用に [`RunState`][agents.run_state.RunState] をシリアライズすると、そのランタイムメタデータも状態とともに保存されます。シリアライズした状態を永続化または送信する場合は、[`RunContextWrapper.context`][agents.run_context.RunContextWrapper.context] に機密情報を格納しないでください。
+後で Human-in-the-loop または永続ジョブのワークフロー向けに [`RunState`][agents.run_state.RunState] をシリアライズする場合、このランタイムメタデータも状態とともに保存されます。シリアライズした状態を永続化または送信する予定がある場合は、[`RunContextWrapper.context`][agents.run_context.RunContextWrapper.context] にシークレットを格納しないでください。
 
-会話状態は別の考慮事項です。ターンをどのように引き継ぐかに応じて、`result.to_input_list()`、`session`、`conversation_id`、または `previous_response_id` を使用してください。この判断については、[実行結果](results.md)、[エージェントの実行](running_agents.md)、[セッション](sessions/index.md)を参照してください。
+会話状態は別の検討事項です。ターンを引き継ぐ方法に応じて、`result.to_input_list()`、`session`、`conversation_id`、または `previous_response_id` を使用してください。この判断については、[実行結果](results.md)、[エージェントの実行](running_agents.md)、[セッション](sessions/index.md)を参照してください。
 
 ```python
 import asyncio
@@ -86,17 +96,17 @@ if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-1. これはコンテキストオブジェクトです。ここでは dataclass を使用していますが、任意の型を使用できます。
-2. これはツールです。`RunContextWrapper[UserInfo]` を受け取ることが分かります。ツールの実装はコンテキストからデータを読み取ります。
-3. 型チェッカーがエラーを検出できるように、エージェントにジェネリック型 `UserInfo` を指定します（たとえば、異なるコンテキスト型を受け取るツールを渡そうとした場合）。
+1. これはコンテキストオブジェクトです。ここではデータクラスを使用していますが、任意の型を使用できます。
+2. これはツールです。このツールが `RunContextWrapper[UserInfo]` を受け取ることが分かります。ツール実装はコンテキストから値を読み取ります。
+3. エージェントにジェネリック `UserInfo` を指定し、型チェッカーがエラーを検出できるようにします（たとえば、異なるコンテキスト型を受け取るツールを渡そうとした場合）。
 4. コンテキストは `run` 関数に渡されます。
 5. エージェントはツールを正しく呼び出し、年齢を取得します。
 
 ---
 
-### 高度な機能: `ToolContext` {#advanced-toolcontext}
+### 高度な機能： `ToolContext` {#advanced-toolcontext}
 
-場合によっては、実行中のツールについて、その名前、呼び出し ID、raw 引数文字列などの追加メタデータにアクセスしたいことがあります。  
+場合によっては、実行中のツールに関する追加のメタデータ（名前、呼び出し ID、生の引数文字列など）へアクセスする必要があります。  
 その場合は、`RunContextWrapper` を拡張する [`ToolContext`][agents.tool_context.ToolContext] クラスを使用できます。
 
 ```python
@@ -126,25 +136,25 @@ agent = Agent(
 )
 ```
 
-`ToolContext` は、`RunContextWrapper` と同じ `.context` プロパティに加えて、  
-現在のツール呼び出しに固有の次のフィールドを提供します。
+`ToolContext` は、`RunContextWrapper` と同じ `.context` プロパティを提供し、  
+さらに現在のツール呼び出しに固有の次のフィールドも提供します。
 
 - `tool_name` – 呼び出されるツールの名前  
-- `tool_call_id` – このツール呼び出しの一意な識別子  
-- `tool_arguments` – ツールに渡された raw 引数文字列  
-- `tool_namespace` – ツールが `tool_namespace()` または名前空間付きの別のインターフェースを通じて読み込まれた場合の、そのツール呼び出しの Responses 名前空間  
-- `qualified_tool_name` – 名前空間を利用できる場合に、その名前空間で修飾されたツール名  
+- `tool_call_id` – このツール呼び出しの一意の識別子  
+- `tool_arguments` – ツールに渡された生の引数文字列  
+- `tool_namespace` – ツールが `tool_namespace()` または名前空間を持つ別のインターフェースを介して読み込まれた場合の、ツール呼び出し用 Responses 名前空間  
+- `qualified_tool_name` – 名前空間が利用できる場合に、その名前空間で修飾されたツール名  
 
-実行中にツールレベルのメタデータが必要な場合は、`ToolContext` を使用します。  
+実行中にツール単位のメタデータが必要な場合は、`ToolContext` を使用してください。  
 エージェントとツール間で一般的なコンテキストを共有する場合は、引き続き `RunContextWrapper` で十分です。`ToolContext` は `RunContextWrapper` を拡張しているため、ネストされた `Agent.as_tool()` の実行で構造化入力が指定された場合は、`.tool_input` も公開できます。
 
 ---
 
 ## エージェント / LLM コンテキスト {#agentllm-context}
 
-LLM が呼び出されたとき、LLM が参照できるのは会話履歴に含まれるデータ **だけ** です。つまり、新しいデータを LLM から利用可能にするには、その履歴に含まれる形で提供する必要があります。これには、次のような方法があります。
+LLM が呼び出されたとき、LLM が確認できる **唯一の** データは会話履歴に含まれるデータです。つまり、新しいデータを LLM が利用できるようにするには、そのデータを会話履歴に含める必要があります。これには、次のような方法があります。
 
-1. エージェントの `instructions` に追加できます。これは「システムプロンプト」または「開発者メッセージ」とも呼ばれます。システムプロンプトには静的な文字列を使用できるほか、コンテキストを受け取って文字列を出力する動的な関数も使用できます。常に有用な情報（たとえば、ユーザーの名前や現在の日付）に対してよく使用される方法です。
-2. `Runner.run` 関数の呼び出し時に、`input` に追加します。これは `instructions` を使用する方法と似ていますが、[指揮系統](https://cdn.openai.com/spec/model-spec-2024-05-08.html#follow-the-chain-of-command)における優先度がより低いメッセージを使用できます。
-3. `FunctionTool` インスタンスを通じて公開します。これは _オンデマンド_ のコンテキストに便利です。LLM がデータを必要とするタイミングを判断し、ツールを呼び出してそのデータを取得できます。
-4. 情報取得または Web 検索を使用します。これらは、ファイルやデータベースから関連データを取得したり（情報取得）、Web から関連データを取得したり（Web 検索）できる特別なツールです。関連するコンテキストデータに基づいて応答を「グラウンディング」する場合に役立ちます。
+1. エージェントの `instructions` に追加できます。これは「システムプロンプト」または「developer message」とも呼ばれます。システムプロンプトには静的な文字列を指定できるほか、コンテキストを受け取って文字列を出力する動的関数も使用できます。これは、常に有用な情報（たとえば、ユーザー名や現在の日付）に対してよく使われる方法です。
+2. `Runner.run` 関数を呼び出す際に、`input` に追加します。これは `instructions` を使用する方法と似ていますが、[指示の優先順位](https://cdn.openai.com/spec/model-spec-2024-05-08.html#follow-the-chain-of-command)がより低いメッセージを使用できます。
+3. `FunctionTool` インスタンスを介して公開します。これは _オンデマンド_ コンテキストに便利です。LLM がデータを必要とするタイミングを判断し、ツールを呼び出してそのデータを取得できます。
+4. 検索または Web 検索を使用します。これらは、ファイルやデータベースから関連データを取得（検索）したり、Web から取得（Web 検索）したりできる特別なツールです。これは、関連するコンテキストデータに基づいてレスポンスを根拠付ける場合に便利です。
