@@ -1173,6 +1173,102 @@ class UnixLocalSandboxSession(BaseSandboxSession):
         except OSError as e:
             raise WorkspaceArchiveWriteError(path=workspace_path, cause=e) from e
 
+    async def mv(
+        self,
+        source: Path | str,
+        destination: Path | str,
+        *,
+        user: str | User | None = None,
+    ) -> None:
+        # A rename of the entry, descriptor-relative like every other file operation here,
+        # so the paths validated above are the ones acted on. `os.rename` never puts the
+        # source inside an existing directory the way `mv` does; it fails instead.
+        normalized_source = self._normalize_entry_path(source, for_write=True)
+        normalized_destination = self._normalize_entry_path(destination, for_write=True)
+        command = ("mv", "-f", "--", str(normalized_source), str(normalized_destination))
+        if user is not None:
+            try:
+                result = await self._run_file_operation_as_user(
+                    "rename", normalized_source, normalized_destination, user=user
+                )
+            except OSError as e:
+                raise ExecNonZeroError(
+                    ExecResult(stdout=b"", stderr=str(e).encode("utf-8"), exit_code=1),
+                    command=command,
+                    cause=e,
+                ) from e
+            if result.returncode:
+                raise ExecNonZeroError(
+                    ExecResult(
+                        stdout=result.stdout, stderr=result.stderr, exit_code=result.returncode
+                    ),
+                    command=command,
+                )
+            return
+        try:
+            self._files.rename(normalized_source, normalized_destination)
+        except OSError as e:
+            raise ExecNonZeroError(
+                ExecResult(stdout=b"", stderr=str(e).encode("utf-8"), exit_code=1),
+                command=command,
+                cause=e,
+            ) from e
+
+    async def same_file(
+        self,
+        left: Path | str,
+        right: Path | str,
+        *,
+        follow_symlinks: bool = True,
+        user: str | User | None = None,
+    ) -> bool:
+        normalize = self.normalize_path if follow_symlinks else self._normalize_entry_path
+        normalized_left = normalize(left)
+        normalized_right = normalize(right)
+        command = ("test", str(normalized_left), "-ef", str(normalized_right))
+        if user is not None:
+            try:
+                result = await self._run_file_operation_as_user(
+                    "same_file",
+                    normalized_left,
+                    normalized_right,
+                    user=user,
+                    payload=b"1" if follow_symlinks else b"0",
+                )
+            except OSError as e:
+                raise ExecNonZeroError(
+                    ExecResult(stdout=b"", stderr=str(e).encode("utf-8"), exit_code=1),
+                    command=command,
+                    cause=e,
+                ) from e
+            if result.returncode:
+                raise ExecNonZeroError(
+                    ExecResult(
+                        stdout=result.stdout, stderr=result.stderr, exit_code=result.returncode
+                    ),
+                    command=command,
+                )
+            return bool(json.loads(result.stdout))
+        try:
+            return self._files.same_file(
+                normalized_left, normalized_right, follow_symlinks=follow_symlinks
+            )
+        except OSError as e:
+            raise ExecNonZeroError(
+                ExecResult(stdout=b"", stderr=str(e).encode("utf-8"), exit_code=1),
+                command=command,
+                cause=e,
+            ) from e
+
+    def _normalize_entry_path(self, path: Path | str, *, for_write: bool = False) -> Path:
+        # Resolve and authorize the parent without following the leaf that rename/stat owns.
+        self._files.configure(self.state.manifest)
+        lexical = Path(path)
+        if not lexical.is_absolute():
+            lexical = self._workspace_path_policy().absolute_workspace_path(path)
+        resolved = lexical.parent.resolve(strict=False) / lexical.name
+        return self._files.authorize(resolved, for_write=for_write)
+
     async def _write_new_file(
         self,
         path: Path,
@@ -1269,14 +1365,15 @@ class UnixLocalSandboxSession(BaseSandboxSession):
 
     async def _run_file_operation_as_user(
         self,
-        operation: Literal["ls", "write", "write_new"],
+        operation: Literal["ls", "write", "write_new", "rename", "same_file"],
         path: Path,
-        *,
+        *more_paths: Path,
         user: str | User,
         payload: bytes = b"",
     ) -> subprocess.CompletedProcess[bytes]:
         # Authorization is synchronous and captured for this operation before dispatch.
-        path = self._files.authorize(path, for_write=operation != "ls")
+        for_write = operation in ("write", "write_new", "rename")
+        paths = [self._files.authorize(each, for_write=for_write) for each in (path, *more_paths)]
         command = self._prepare_exec_command(
             "python3",
             "-I",
@@ -1284,7 +1381,7 @@ class UnixLocalSandboxSession(BaseSandboxSession):
             "-c",
             _USER_FILE_WORKER_SOURCE,
             operation,
-            str(path),
+            *(str(each) for each in paths),
             shell=False,
             user=user,
         )

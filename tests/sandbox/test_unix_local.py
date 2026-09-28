@@ -1011,6 +1011,85 @@ async def test_hydrate_workspace_cancellation_waits_for_the_extracting_worker(
     assert not buf.closed
 
 
+class TestUnixLocalApplyPatchRename:
+    """apply_patch renames against a real filesystem, not a model of one.
+
+    Every other test of this behaviour drives a session double. A double can only be wrong in
+    the same direction as the code it was written beside. The default macOS volume folds case,
+    so on the macOS runner these exercise the case that loses the file.
+    """
+
+    @pytest.mark.asyncio
+    @pytest.mark.requires_native_macos_sandbox
+    async def test_case_only_move_to_keeps_the_file(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "workspace"
+        client = UnixLocalSandboxClient()
+        manifest = Manifest(root=str(workspace))
+
+        async with await client.create(manifest=manifest, snapshot=None, options=None) as session:
+            await session.write(Path("notes.txt"), io.BytesIO(b"alpha\nbeta\n"))
+
+            source = workspace / "notes.txt"
+            destination = workspace / "Notes.txt"
+            if not await session.same_file(source, destination):
+                pytest.skip("this volume does not fold case, so it cannot exercise the bug")
+
+            await session.apply_patch(
+                ApplyPatchOperation(
+                    type="update_file",
+                    path="notes.txt",
+                    diff="@@\n alpha\n-beta\n+gamma\n",
+                    move_to="Notes.txt",
+                )
+            )
+
+            names = sorted(entry.name for entry in workspace.iterdir())
+            assert names == ["Notes.txt"]
+            assert destination.read_bytes() == b"alpha\ngamma\n"
+
+    @pytest.mark.asyncio
+    @pytest.mark.requires_native_macos_sandbox
+    async def test_move_to_an_existing_directory_keeps_the_source(self, tmp_path: Path) -> None:
+        """A directory destination is refused, and the source is where it was.
+
+        The destination write must fail before the editor removes the source.
+        """
+        workspace = tmp_path / "workspace"
+        client = UnixLocalSandboxClient()
+        manifest = Manifest(root=str(workspace))
+
+        async with await client.create(manifest=manifest, snapshot=None, options=None) as session:
+            await session.write(Path("notes.txt"), io.BytesIO(b"alpha\nbeta\n"))
+            await session.mkdir(Path("docs"))
+
+            with pytest.raises(WorkspaceArchiveWriteError):
+                await session.apply_patch(
+                    ApplyPatchOperation(
+                        type="update_file",
+                        path="notes.txt",
+                        diff="@@\n alpha\n-beta\n+gamma\n",
+                        move_to="docs",
+                    )
+                )
+
+            assert (workspace / "notes.txt").read_bytes() == b"alpha\nbeta\n"
+            assert sorted(entry.name for entry in (workspace / "docs").iterdir()) == []
+
+    @pytest.mark.asyncio
+    @pytest.mark.requires_native_macos_sandbox
+    async def test_same_file_answers_for_real_paths(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "workspace"
+        client = UnixLocalSandboxClient()
+        manifest = Manifest(root=str(workspace))
+
+        async with await client.create(manifest=manifest, snapshot=None, options=None) as session:
+            await session.write(Path("one.txt"), io.BytesIO(b"one\n"))
+            await session.write(Path("two.txt"), io.BytesIO(b"two\n"))
+
+            assert await session.same_file(workspace / "one.txt", workspace / "one.txt") is True
+            assert await session.same_file(workspace / "one.txt", workspace / "two.txt") is False
+
+
 def _exclusive_write_session(root: Path) -> UnixLocalSandboxSession:
     return UnixLocalSandboxSession(
         state=UnixLocalSandboxSessionState(

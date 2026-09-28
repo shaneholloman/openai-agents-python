@@ -1217,6 +1217,100 @@ class BaseSandboxSession(abc.ABC):
         if not result.ok():
             raise ExecNonZeroError(result, command=cmd)
 
+    async def mv(
+        self,
+        source: Path | str,
+        destination: Path | str,
+        *,
+        user: str | User | None = None,
+    ) -> None:
+        """Rename a regular file or symlink, replacing the destination entry if it exists.
+
+        Directory and special-file sources are unsupported and rejected before the move.
+        As with other workspace file APIs, callers must serialize conflicting mutations.
+
+        The exec fallback requires ``mv -T`` (GNU or compatible). A tool without that option
+        fails without moving the source. Do not replace it with a destination precheck: a
+        concurrently created directory could otherwise receive the source as a child.
+
+        This is the shell fallback for backends that only offer `exec`. A backend with
+        direct filesystem access, such as UnixLocal, overrides it with a descriptor-relative
+        `os.rename`, so the path it validated is the entry it renames.
+
+        :param source: Regular file or symlink to move.
+        :param destination: Path to move it to.
+        :param user: Optional sandbox user to move as.
+        :raises ExecNonZeroError: If the destination is an existing directory, or the move
+                fails.
+        """
+        source = await self._validate_path_access(source, for_write=True)
+        destination = await self._validate_path_access(destination, for_write=True)
+        source_arg = sandbox_path_str(source)
+        destination_arg = sandbox_path_str(destination)
+        script = (
+            'if [ ! -L "$1" ] && [ ! -f "$1" ]; then '
+            'printf "%s\\n" "Move source must be a regular file or symlink" >&2; exit 1; fi; '
+            'exec mv -fT -- "$1" "$2"'
+        )
+        cmd = ("sh", "-c", script, "sh", source_arg, destination_arg)
+        result = await self.exec(*cmd, shell=False, user=user)
+        if not result.ok():
+            raise ExecNonZeroError(
+                result, command=("sh", "-c", "<mv>", source_arg, destination_arg)
+            )
+
+    async def same_file(
+        self,
+        left: Path | str,
+        right: Path | str,
+        *,
+        follow_symlinks: bool = True,
+        user: str | User | None = None,
+    ) -> bool:
+        """Return whether two paths name the same file on the sandbox filesystem.
+
+        This asks the filesystem, through `test -ef`, which compares device and inode. Two
+        paths that differ as strings can be one file: a filesystem that folds case stores
+        `notes.txt` and `Notes.txt` as a single entry, and APFS folds Unicode normalization
+        as well, so the NFC and NFD spellings of one accented name are also a single entry.
+        No string comparison can answer this, and neither can the host that is driving the
+        session, which may not be the kind of system the sandbox is running on.
+
+        `test -ef` resolves symlinks. With ``follow_symlinks=False``, return false if either
+        leaf is a symlink, including two paths naming the same symlink. This mode compares
+        only non-symlink entries and is used before removing an apply-patch source.
+
+        This is the shell fallback for backends that only offer `exec`. UnixLocal overrides
+        it with a descriptor-relative `stat` on both entries.
+
+        :param left: First path to compare.
+        :param right: Second path to compare.
+        :param follow_symlinks: If false, return false when either leaf is a symlink.
+        :param user: Optional sandbox user to compare as.
+        :returns: True when both paths resolve to the same file.
+        """
+        left = await self._validate_path_access(left)
+        right = await self._validate_path_access(right)
+
+        left_arg = sandbox_path_str(left)
+        right_arg = sandbox_path_str(right)
+        test = '[ "$1" -ef "$2" ]'
+        if not follow_symlinks:
+            test = '[ ! -L "$1" ] && [ ! -L "$2" ] && ' + test
+        cmd = ("sh", "-lc", test, "sh", left_arg, right_arg)
+        result = await self.exec(*cmd, shell=False, user=user)
+        if result.exit_code == 0:
+            return True
+        # `[` answers "different file" with 1 and reports its own failures with 2, and a
+        # missing shell exits 127. Only 1 is an answer; anything else is the session
+        # failing to tell us, and a caller about to delete a file on the strength of this
+        # must not read that as "different".
+        if result.exit_code == 1:
+            return False
+        raise ExecNonZeroError(
+            result, command=("sh", "-lc", "<same_file_check>", left_arg, right_arg)
+        )
+
     async def mkdir(
         self,
         path: Path | str,

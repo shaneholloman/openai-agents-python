@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import contextlib
 import io
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, Protocol, cast, runtime_checkable
+from uuid import uuid4
 
 from ..apply_diff import ApplyDiffMode, apply_diff
 from ..editor import ApplyPatchOperation, ApplyPatchOperationType, ApplyPatchResult
@@ -111,9 +113,11 @@ class WorkspaceEditor:
 
             moved_relative_path, moved_display_path = self._resolve_path(operation.move_to)
             moved_destination = self._session.normalize_path(moved_relative_path)
-            await self._write_text(moved_destination, updated_text)
-            if moved_destination != destination:
-                await self._session.rm(destination, user=self._user)
+            await self._move_updated_text(
+                source=destination,
+                moved_destination=moved_destination,
+                text=updated_text,
+            )
             return ApplyPatchResult(
                 output=f"Updated {display_path}\nMoved {display_path} to {moved_display_path}"
             )
@@ -230,6 +234,65 @@ class WorkspaceEditor:
             message=f"apply_patch read() returned non-text content: {type(payload).__name__}",
             path=op_path,
         )
+
+    async def _move_updated_text(
+        self,
+        *,
+        source: Path,
+        moved_destination: Path,
+        text: str,
+    ) -> None:
+        """Stage filesystem aliases; retain ordinary destination write semantics otherwise.
+
+        An alias needs a staged replacement because writing and then removing the source
+        would delete the updated file. Distinct files retain the released write/remove path,
+        including an existing destination's metadata and file-level write permissions.
+        If the paths stop identifying the same file after an alias replacement, leave both
+        paths alone and report the incomplete move. This includes distinct hardlink aliases.
+        These operations do not provide a transaction against concurrent workspace writers.
+        """
+        if source.as_posix() == moved_destination.as_posix():
+            # Not a rename, so nothing needs committing elsewhere. Writing in place is what an
+            # update without `move_to` does, and it keeps the inode, the mode and the xattrs.
+            #
+            # The comparison is on the spelling rather than on `Path` equality, which folds case
+            # on a Windows host. Whether two sandbox paths are one file is the sandbox's answer,
+            # not the host's: a Windows host talking to a case-sensitive sandbox would otherwise
+            # take this branch for a case-only rename and never create the new name. Paths that
+            # differ only in case go down the staging path, where `same_file` asks the sandbox.
+            await self._write_text(source, text)
+            return
+
+        if not await self._session.same_file(
+            source, moved_destination, follow_symlinks=False, user=self._user
+        ):
+            await self._write_text(moved_destination, text)
+            await self._session.rm(source, user=self._user)
+            return
+
+        staging = moved_destination.with_name(f".apply_patch-{uuid4().hex}.tmp")
+        try:
+            await self._write_text(staging, text)
+            await self._session.mv(staging, moved_destination, user=self._user)
+        except BaseException:
+            with contextlib.suppress(Exception):
+                await self._session.rm(staging, user=self._user)
+            raise
+        same_entry = await self._session.same_file(
+            source, moved_destination, follow_symlinks=False, user=self._user
+        )
+        if same_entry and source.name != moved_destination.name:
+            # On case-folding APFS, replacing an existing entry through a case-variant path
+            # updates its content but keeps its old spelling. Moving that same entry performs
+            # the requested case-only rename without touching the committed content.
+            await self._session.mv(source, moved_destination, user=self._user)
+        elif not same_entry:
+            raise ApplyPatchDiffError(
+                message=(
+                    "Move destination was updated, but source and destination no longer identify "
+                    "the same file; source was left untouched"
+                ),
+            )
 
     async def _write_text(self, destination: Path, text: str) -> None:
         await self._session.mkdir(destination.parent, parents=True, user=self._user)
