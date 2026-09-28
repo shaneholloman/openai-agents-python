@@ -9,9 +9,13 @@ authority. Other backends and Docker clients without the service retain their
 existing recursive removal and snapshot restoration behavior.
 
 The service requires a trusted image, Docker 26+ with its builtin seccomp profile,
-and the runc runtime. Workspaces and path-only grant roots must exist in the image.
+and the runc runtime. For new client sessions, the service checks container eligibility,
+then creates a missing workspace and its parents using the trusted image's default
+user before binding, as normal session startup does.
+Path-only grant roots must exist at binding time;
+the client does not create unrelated grant directories.
 Read-only host bind mounts are supported outside the private workspace. Writable
-shared mounts, additional capabilities, user namespaces, and missing roots are excluded.
+shared mounts, additional capabilities, user namespaces, and missing grant roots are excluded.
 The application must exclusively own container lifecycle and Docker API access;
 other host administrators are trusted. A service/worker transport failure leaves
 the container paused. Before manually resuming it, stop all service workers.
@@ -269,6 +273,11 @@ class DockerRemovalService:
 
     def bind_new(self, container: Container, manifest: Manifest) -> None:
         """Bind before a newly created session is returned to its trusted application."""
+        self._bind_new(container, manifest, bootstrap_workspace=False)
+
+    def _bind_new(
+        self, container: Container, manifest: Manifest, *, bootstrap_workspace: bool
+    ) -> None:
         with self._lock:
             if self._closed:
                 raise ValueError("Docker removal service is closed")
@@ -287,6 +296,21 @@ class DockerRemovalService:
 
         _validate_docker_path_grants(manifest)
         _assert_existing_container_path_grants_match(container, manifest)
+        if bootstrap_workspace:
+            # Reject unsupported mounts and security settings before an image
+            # symlink could redirect mkdir into a shared host directory.
+            self._state(container)
+            # Only the client requests bootstrap, for fresh containers before
+            # application workloads run. Preserve the image's default user.
+            result = container.exec_run(
+                cmd=["mkdir", "-p", "--", manifest.root],
+                user="",
+                workdir="/",
+                stdout=False,
+                stderr=False,
+            )
+            if result.exit_code != 0:
+                raise RuntimeError("Unable to create Docker workspace before removal binding")
         worker: _Worker | None = None
         with self._paused(
             container, lambda: worker is not None and worker.uncertain

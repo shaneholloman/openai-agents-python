@@ -1639,7 +1639,9 @@ class DockerSandboxClient(BaseSandboxClient[DockerSandboxClientOptions]):
             assert container_id is not None
             service = self._removal_service
             if service is not None:
-                await run_blocking_workspace_io(lambda: service.bind_new(container, manifest))
+                await run_blocking_workspace_io(
+                    lambda: service._bind_new(container, manifest, bootstrap_workspace=True)
+                )
             snapshot_id = str(session_id)
             snapshot_instance = resolve_snapshot(snapshot, snapshot_id)
             state = DockerSandboxSessionState(
@@ -1816,7 +1818,9 @@ class DockerSandboxClient(BaseSandboxClient[DockerSandboxClientOptions]):
                 if service is not None:
                     container.start()
                     await run_blocking_workspace_io(
-                        lambda: service.bind_new(container, state.manifest)
+                        lambda: service._bind_new(
+                            container, state.manifest, bootstrap_workspace=True
+                        )
                     )
 
             inner = DockerSandboxSession(
