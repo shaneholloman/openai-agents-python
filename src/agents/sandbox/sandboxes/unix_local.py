@@ -7,6 +7,7 @@ if sys.platform == "win32":  # pragma: no cover
     )
 
 import asyncio
+import copy
 import errno
 import fcntl
 import inspect
@@ -28,7 +29,7 @@ from collections.abc import Collection, Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field
 from functools import partial
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Literal, cast
 
 from ...logger import log_tool_action_warning
@@ -124,6 +125,97 @@ def _mount_path_diagnostic_extra(mount_path: Path) -> dict[str, object]:
 def _close_fd_quietly(fd: int) -> None:
     with suppress(OSError):
         os.close(fd)
+
+
+# Symlink hops followed while proving that a rebased target stays under the root. Linux
+# gives up after 40 (ELOOP); a workspace that needs more is not worth restoring.
+_MAX_SYMLINK_HOPS = 40
+
+
+def _symlink_target_stays_under(
+    members: Mapping[str, tarfile.TarInfo], *, link_name: str, target: str
+) -> bool:
+    """Whether a rebased, link-relative target provably resolves under the workspace root.
+
+    The rebase keeps the components after the root verbatim, so ``a/link/../tmp`` is only
+    inside the workspace if ``a/link`` resolves inside it: with ``a/link -> ..`` it names
+    ``/tmp`` once restored, while the strict extractor's lexical check accepts the relative
+    form. The walk applies ``..`` to a link's target the way the kernel does and only
+    follows the archive's own relative links, which restore verbatim; a hop through a
+    link whose target is absolute proves nothing about the restored tree (on the live tree
+    it may happen to lead back inside), so it fails the proof, as do leaving the root and
+    exceeding the hop budget.
+
+    Every other component must be established by the snapshot itself: it has to exist in
+    the archive and be a directory unless it is the last one, which must be a regular file
+    or directory. ``hydrate_workspace`` extracts
+    into an existing root, so a component the snapshot does not create may already be a
+    symlink in the destination and send the restored link elsewhere; only snapshot-owned
+    components are protected by the extractor's destination checks. A target that cannot
+    be proven contained keeps its absolute form, which hydrate refuses as it always has.
+    """
+
+    pending = list(reversed((*PurePosixPath(link_name).parent.parts, *PurePosixPath(target).parts)))
+    resolved: list[str] = []
+    hops = 0
+    while pending:
+        part = pending.pop()
+        if part in ("", "."):
+            continue
+        if part == "..":
+            if not resolved:
+                return False
+            resolved.pop()
+            continue
+        rel_name = "/".join([*resolved, part])
+        candidate = members.get(rel_name)
+        if candidate is None:
+            return False
+        if candidate.issym():
+            hops += 1
+            link_target = candidate.linkname
+            if hops > _MAX_SYMLINK_HOPS or link_target.startswith("/"):
+                return False
+            pending.extend(reversed(PurePosixPath(link_target).parts))
+            continue
+        if pending:
+            if not candidate.isdir():
+                return False
+        elif not (candidate.isdir() or candidate.isreg()):
+            return False
+        resolved.append(part)
+    return True
+
+
+def _rebase_symlink_target(linkname: str, *, link_name: str, roots: tuple[Path, ...]) -> str:
+    """Rewrite an absolute symlink target under the workspace root as a link-relative one.
+
+    Only the root prefix is replaced; the remaining components are kept verbatim (no
+    normalization), because ``..`` after a symlink component is resolved by the kernel
+    against the link target, so ``<root>/current/../config`` with ``current -> releases/v1``
+    names ``releases/config`` and must stay ``current/../config``. Absolute targets outside
+    the workspace are returned unchanged. A leading ``//`` is collapsed to ``/`` (Linux
+    treats them alike).
+    """
+
+    target = "/" + linkname.lstrip("/")
+    for candidate_root in roots:
+        prefix = candidate_root.as_posix().rstrip("/")
+        if target == prefix:
+            rest = ""
+        elif target.startswith(prefix + "/"):
+            # Consume the whole separator run at the boundary (`<root>//a.txt`), keeping
+            # every later component, including `..`, untouched.
+            rest = target[len(prefix) :].lstrip("/")
+        else:
+            continue
+        # The link's own directory inside the archive holds no symlink components (the
+        # archive validator rejects members beneath a symlink), so climbing it is exact.
+        climb = "/".join([".."] * len(PurePosixPath(link_name).parent.parts))
+        if rest and climb:
+            return f"{climb}/{rest}"
+        return rest or climb or "."
+    return linkname
 
 
 def _restore_pty_child_signal_defaults() -> None:
@@ -1231,6 +1323,8 @@ class UnixLocalSandboxSession(BaseSandboxSession):
         buf = io.BytesIO()
 
         def _archive_workspace() -> None:
+            roots = (root, root.resolve(strict=False))
+            symlinks: list[tarfile.TarInfo] = []
             with tarfile.open(fileobj=buf, mode="w") as tar:
 
                 def filter_member(member: tarfile.TarInfo) -> tarfile.TarInfo | None:
@@ -1240,9 +1334,33 @@ class UnixLocalSandboxSession(BaseSandboxSession):
                     getattr(tar, "inodes").clear()  # noqa: B009 - Not exposed by typeshed.
                     if should_skip_tar_member(member.name, skip_rel_paths=skip, root_name=None):
                         return None
+                    if member.isfifo() or member.ischr() or member.isblk():
+                        return None
+                    if member.issym():
+                        symlinks.append(member)
+                        return None
                     return member
 
                 tar.add(root, arcname=".", filter=filter_member)
+                # Defer symlink headers until capture is complete. The live tree can change
+                # during tar.add, so only the captured topology can prove containment.
+                members = {
+                    PurePosixPath(member.name).as_posix(): member
+                    for member in [*tar.getmembers(), *symlinks]
+                }
+                for member in symlinks:
+                    # Keep the proof graph unchanged: a hop through an originally absolute
+                    # target must stay unprovable regardless of symlink emission order.
+                    archived_member = copy.copy(member)
+                    if member.linkname.startswith("/"):
+                        rebased = _rebase_symlink_target(
+                            member.linkname, link_name=member.name, roots=roots
+                        )
+                        if rebased != member.linkname and _symlink_target_stays_under(
+                            members, link_name=member.name, target=rebased
+                        ):
+                            archived_member.linkname = rebased
+                    tar.addfile(archived_member)
 
         try:
             await run_blocking_workspace_io(_archive_workspace)
