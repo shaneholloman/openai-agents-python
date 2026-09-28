@@ -71,7 +71,7 @@ def default_should_trigger_compaction(context: dict[str, Any]) -> bool:
 
 def is_openai_model_name(model: str) -> bool:
     """Validate model name follows OpenAI conventions."""
-    trimmed = model.strip()
+    trimmed = model.strip().rsplit("/", 1)[-1]
     if not trimmed:
         return False
 
