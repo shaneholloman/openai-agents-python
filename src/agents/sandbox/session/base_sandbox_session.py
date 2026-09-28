@@ -997,6 +997,23 @@ class BaseSandboxSession(abc.ABC):
         :param user: Optional sandbox user to perform the write as.
         """
 
+    async def _write_new_file(
+        self,
+        path: Path,
+        data: io.IOBase,
+        *,
+        user: str | User | None = None,
+    ) -> None:
+        """Backend hook for apply_patch creation.
+
+        The default retains the provider's existing mkdir/write semantics. UnixLocal
+        overrides this hook to claim the leaf exclusively; other backends need a native
+        primitive before they can offer the same guarantee.
+        """
+        target = self.normalize_path(path)
+        await self.mkdir(target.parent, parents=True, user=user)
+        await self.write(target, data, user=user)
+
     async def _check_read_with_exec(
         self, path: Path | str, *, user: str | User | None = None
     ) -> Path:
