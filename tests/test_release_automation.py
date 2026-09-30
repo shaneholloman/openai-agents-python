@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import html
 import importlib.util
 import json
 import sys
@@ -18,6 +20,53 @@ spec = importlib.util.spec_from_file_location(
 assert spec and spec.loader
 automation = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(automation)
+
+
+def trusted_run() -> dict[str, Any]:
+    return {
+        "id": 123,
+        "created_at": "2026-09-28T01:00:00Z",
+        "path": automation.WORKFLOW,
+        "display_title": "Release Candidate eligible",
+        "head_branch": "main",
+        "head_sha": "b" * 40,
+        "status": "completed",
+        "conclusion": "success",
+        "event": "workflow_run",
+        "run_attempt": 2,
+        "repository": {"full_name": automation.REPO},
+        "head_repository": {"full_name": automation.REPO},
+    }
+
+
+def receipt_jobs(summary: str = "Assessment") -> dict[str, Any]:
+    digest = hashlib.sha256(summary.encode()).hexdigest()
+    return {
+        "jobs": [
+            {
+                "name": f"Release assessment receipt {'a' * 40}/1234/{digest}",
+                "run_id": 123,
+                "head_sha": "b" * 40,
+                "status": "completed",
+                "conclusion": "success",
+            }
+        ]
+    }
+
+
+def identity_jobs(check_id: int = 1234) -> dict[str, Any]:
+    return {
+        "total_count": 1,
+        "jobs": [
+            {
+                "name": f"Release assessment identity {'a' * 40}/{check_id}",
+                "run_id": 123,
+                "head_sha": "b" * 40,
+                "status": "completed",
+                "conclusion": "success",
+            }
+        ],
+    }
 
 
 @pytest.fixture
@@ -72,6 +121,8 @@ def test_contract_commit_is_atomic_and_single_path(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "output"))
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path / "summary"))
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "2")
     monkeypatch.setattr(automation, "current", Mock())
     monkeypatch.setattr(automation, "content", Mock(return_value="old"))
     mutation = Mock(return_value={"data": {"createCommitOnBranch": {"commit": {"oid": "d" * 40}}}})
@@ -90,6 +141,8 @@ def test_unchanged_contract_is_noop(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, context: dict[str, Any]
 ) -> None:
     monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "output"))
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path / "summary"))
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "2")
     monkeypatch.setattr(automation, "current", Mock())
     contract = tmp_path / "contract.json"
     contract.write_text(json.dumps({"baseline": "v0.23.0", "baseline_commit": "a" * 40}))
@@ -216,6 +269,7 @@ def test_discovery_uses_complete_release_manifest(
     monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "output"))
     pr = {
         "number": 1,
+        "created_at": "2026-09-28T00:00:00Z",
         "state": "open",
         "user": {"login": "openai-sdks[bot]"},
         "base": {"ref": "main"},
@@ -237,7 +291,7 @@ def test_discovery_uses_complete_release_manifest(
             }
         )
 
-    def fake_api(path: str) -> Any:
+    def fake_api(path: str, *, missing_ok: bool = False) -> Any:
         if path.startswith("pulls?"):
             return [pr]
         if path == "pulls/1":
@@ -250,14 +304,8 @@ def test_discovery_uses_complete_release_manifest(
             return {"tag_name": context["base_tag"]}
         if path == f"commits/{context['base_tag']}":
             return {"sha": context["base"]}
-        if "/check-runs?" in path:
-            return {
-                "check_runs": [
-                    {"name": automation.CHECK, "app": {"id": 15368}, "conclusion": "success"}
-                ]
-                if scenario == "foreign-check"
-                else []
-            }
+        if path.startswith("actions/workflows/"):
+            return {"total_count": 0, "workflow_runs": []}
         raise AssertionError(path)
 
     monkeypatch.setattr(automation, "repo_api", fake_api)
@@ -312,6 +360,7 @@ def test_publication_requires_trusted_completed_run(
             return_value=[
                 {
                     "number": 1,
+                    "created_at": "2026-09-28T00:00:00Z",
                     "merged_at": "2026-09-28",
                     "merge_commit_sha": "b" * 40,
                     "base": {"ref": "main"},
@@ -325,29 +374,29 @@ def test_publication_requires_trusted_completed_run(
         ),
     )
     monkeypatch.setattr(automation, "human_approved", Mock(return_value=True))
-    run = {
-        "path": automation.WORKFLOW,
-        "head_branch": "main",
-        "conclusion": "success",
-        "event": "workflow_run",
-    }
+    run = trusted_run()
 
-    def fake_api(path: str) -> Any:
+    def fake_api(path: str, *, missing_ok: bool = False) -> Any:
         if path.startswith("git/commits/"):
             return {"tree": {"sha": "c" * 40}}
-        if "/check-runs?" in path:
+        if path.startswith("actions/workflows/"):
+            return {"total_count": 1, "workflow_runs": [trusted_run()]}
+        if path == "actions/runs/123/jobs?filter=all&per_page=100&page=1":
+            return identity_jobs()
+        if path == "check-runs/1234":
             return {
-                "check_runs": [
-                    {
-                        "id": 1234,
-                        "name": automation.CHECK,
-                        "conclusion": "success",
-                        "app": {"id": issuer, "slug": "openai-sdks"},
-                        "external_id": "123",
-                        "output": {"summary": "Reviewed notes"},
-                    }
-                ]
+                "id": 1234,
+                "head_sha": "a" * 40,
+                "name": automation.CHECK,
+                "conclusion": "success",
+                "app": {"id": issuer, "slug": "github-actions"},
+                "external_id": "123",
+                "output": {"summary": "Reviewed notes"},
             }
+        if path == "actions/runs/123/attempts/3/jobs?per_page=100":
+            return {"jobs": []}  # A prior attempt's receipt cannot authorize the rerun.
+        if path == "actions/runs/123/attempts/2/jobs?per_page=100":
+            return receipt_jobs("Reviewed notes")
         if path == "actions/runs/123":
             return run
         raise AssertionError(path)
@@ -359,6 +408,10 @@ def test_publication_requires_trusted_completed_run(
         automation.human_approved.assert_not_called()
         return
     assert automation.published_review("v0.23.0", "b" * 40) == "Reviewed notes"
+    run["run_attempt"] = 3
+    with pytest.raises(ValueError, match="No successful trusted"):
+        automation.published_review("v0.23.0", "b" * 40)
+    run["run_attempt"] = 2
     automation.human_approved.return_value = False
     with pytest.raises(ValueError, match="No successful trusted"):
         automation.published_review("v0.23.0", "b" * 40)
@@ -474,6 +527,16 @@ def test_malformed_model_output_finishes_check(
     [
         "approved",
         "foreign-check",
+        "forged-check",
+        "tampered-summary",
+        "wrong-candidate-receipt",
+        "wrong-check-receipt",
+        "failed-receipt",
+        "previous-attempt",
+        "untrusted-event",
+        "untrusted-branch",
+        "fork-run",
+        "failed-run",
         "admin",
         "maintain",
         "custom-write",
@@ -499,6 +562,7 @@ def test_readiness_requires_explicit_current_human_approval(
             {
                 "pull_request": {
                     "number": 1,
+                    "created_at": "2026-09-28T00:00:00Z",
                     "head": {
                         "ref": automation.BRANCH,
                         "sha": "a" * 40,
@@ -533,25 +597,50 @@ def test_readiness_requires_explicit_current_human_approval(
     elif scenario == "changes-requested":
         reviews.append({**review, "id": 91, "state": "CHANGES_REQUESTED"})
 
-    def fake_api(path: str) -> Any:
-        if "/check-runs?" in path:
+    def fake_api(path: str, *, missing_ok: bool = False) -> Any:
+        if path.startswith("actions/workflows/"):
+            return {"total_count": 1, "workflow_runs": [trusted_run()]}
+        if path == "actions/runs/123/jobs?filter=all&per_page=100&page=1":
+            return identity_jobs()
+        if path == "check-runs/1234":
             return {
-                "check_runs": [
-                    {
-                        "id": 1234,
-                        "name": automation.CHECK,
-                        "app": {
-                            "id": 15368 if scenario == "foreign-check" else automation.CHECK_APP_ID,
-                            "slug": "openai-sdks",
-                        },
-                        "status": "completed",
-                        "conclusion": "success",
-                        "external_id": "123",
-                    }
-                ]
+                "id": 1234,
+                "head_sha": "a" * 40,
+                "name": automation.CHECK,
+                "app": {
+                    "id": 3705508 if scenario == "foreign-check" else automation.CHECK_APP_ID,
+                    "slug": "github-actions",
+                },
+                "status": "completed",
+                "conclusion": "success",
+                "external_id": "123",
+                "output": {"summary": "Assessment"},
             }
+        if path == "actions/runs/123/attempts/2/jobs?per_page=100":
+            jobs = receipt_jobs()
+            job = jobs["jobs"][0]
+            if scenario in {"forged-check", "previous-attempt"}:
+                jobs["jobs"] = []
+            elif scenario == "tampered-summary":
+                jobs = receipt_jobs("Original report before another workflow changed the check")
+            elif scenario == "wrong-candidate-receipt":
+                job["name"] = job["name"].replace("a" * 40, "d" * 40)
+            elif scenario == "wrong-check-receipt":
+                job["name"] = job["name"].replace("/1234/", "/1233/")
+            elif scenario == "failed-receipt":
+                job["conclusion"] = "failure"
+            return jobs
         if path == "actions/runs/123":
-            return {"path": automation.WORKFLOW, "head_branch": "main", "conclusion": "success"}
+            run = trusted_run()
+            if scenario == "untrusted-event":
+                run["event"] = "pull_request"
+            elif scenario == "untrusted-branch":
+                run["head_branch"] = "feature/forged-review"
+            elif scenario == "fork-run":
+                run["head_repository"] = {"full_name": "contributor/fork"}
+            elif scenario == "failed-run":
+                run["conclusion"] = "failure"
+            return run
         if path.startswith("pulls/1/reviews?"):
             return reviews
         if path.endswith("/permission"):
@@ -619,11 +708,12 @@ def test_publisher_rechecks_revoked_approval_after_environment_wait(
         "user": {"login": "maintainer", "type": "User"},
     }
 
-    def fake_api(path: str) -> Any:
+    def fake_api(path: str, *, missing_ok: bool = False) -> Any:
         if path.startswith("commits/") and "/pulls?" in path:
             return [
                 {
                     "number": 1,
+                    "created_at": "2026-09-28T00:00:00Z",
                     "merged_at": "2026-09-28",
                     "merge_commit_sha": "b" * 40,
                     "base": {"ref": "main"},
@@ -636,26 +726,24 @@ def test_publisher_rechecks_revoked_approval_after_environment_wait(
             ]
         if path.startswith("git/commits/"):
             return {"tree": {"sha": "c" * 40}}
-        if "/check-runs?" in path:
+        if path.startswith("actions/workflows/"):
+            return {"total_count": 1, "workflow_runs": [trusted_run()]}
+        if path == "actions/runs/123/jobs?filter=all&per_page=100&page=1":
+            return identity_jobs()
+        if path == "check-runs/1234":
             return {
-                "check_runs": [
-                    {
-                        "id": 1234,
-                        "name": automation.CHECK,
-                        "conclusion": "success",
-                        "app": {"id": automation.CHECK_APP_ID, "slug": "openai-sdks"},
-                        "external_id": "123",
-                        "output": {"summary": "Assessment"},
-                    }
-                ]
-            }
-        if path == "actions/runs/123":
-            return {
-                "path": automation.WORKFLOW,
-                "head_branch": "main",
+                "id": 1234,
+                "head_sha": "a" * 40,
+                "name": automation.CHECK,
                 "conclusion": "success",
-                "event": "workflow_run",
+                "app": {"id": automation.CHECK_APP_ID, "slug": "github-actions"},
+                "external_id": "123",
+                "output": {"summary": "Assessment"},
             }
+        if path == "actions/runs/123/attempts/2/jobs?per_page=100":
+            return receipt_jobs()
+        if path == "actions/runs/123":
+            return trusted_run()
         if path.startswith("pulls/1/reviews?"):
             return [review]
         if path.endswith("/permission"):
@@ -673,35 +761,38 @@ def test_publisher_rechecks_revoked_approval_after_environment_wait(
         automation.main()  # Final publishing step must fail after approval is revoked.
 
 
-def test_assessment_writers_use_protected_scoped_app_tokens() -> None:
+def test_assessment_writers_use_scoped_temporary_tokens() -> None:
     workflow = yaml.load(
         (ROOT / ".github/workflows/release-candidate.yml").read_text(), Loader=yaml.BaseLoader
     )
     for name in ("evidence", "readiness"):
         job = workflow["jobs"][name]
-        assert job["environment"] == "release"
-        assert job["permissions"] == {"contents": "read"}
-        app = next(step for step in job["steps"] if step.get("id") == "app")
-        assert app["uses"].startswith("actions/create-github-app-token@")
-        assert app["with"] == {
-            "app-id": "${{ vars.OPENAI_SDKS_APP_CLIENT_ID }}",
-            "private-key": "${{ secrets.OPENAI_SDKS_APP_PRIVATE_KEY }}",
-            "owner": "openai",
-            "repositories": "openai-agents-python",
-            "permission-contents": "read",
-            "permission-pull-requests": "read",
-            "permission-checks": "write",
+        assert "environment" not in job
+        assert job["permissions"] == {
+            "contents": "read",
+            "pull-requests": "read",
+            "checks": "write",
+            **({"actions": "read"} if name == "evidence" else {}),
         }
+        assert "secrets." not in json.dumps(job)
+        assert "create-github-app-token" not in json.dumps(job)
         writer = next(step for step in job["steps"] if "run" in step)
-        assert writer["env"]["GH_TOKEN"] == "${{ steps.app.outputs.token }}"
+        assert writer["env"]["GH_TOKEN"] == "${{ github.token }}"
         checkout = next(
             step for step in job["steps"] if step.get("uses", "").startswith("actions/checkout@")
         )
         assert checkout["with"]["ref"] == "${{ github.sha }}"
         assert checkout["with"]["persist-credentials"] == "false"
-    assert all(
-        job.get("permissions", {}).get("checks") != "write" for job in workflow["jobs"].values()
-    )
+    receipt = workflow["jobs"]["receipt"]
+    assert receipt["needs"] == "readiness"
+    assert receipt["name"] == "Release assessment receipt ${{ needs.readiness.outputs.receipt }}"
+    assert receipt["permissions"] == {}
+    assert receipt["steps"] == [{"run": ":"}]
+    assert "if" not in receipt  # Default success dependency, never always().
+    assert workflow["jobs"]["readiness"]["outputs"] == {
+        "receipt": "${{ steps.report.outputs.receipt }}"
+    }
+    assert "permission-checks" not in json.dumps(workflow)
 
 
 def test_report_cannot_finalize_another_apps_check(
@@ -713,10 +804,428 @@ def test_report_cannot_finalize_another_apps_check(
         return_value={
             "head_sha": context["head"],
             "external_id": "123",
-            "app": {"id": 15368},
+            "app": {"id": 3705508},
         }
     )
     monkeypatch.setattr(automation, "repo_api", api)
     with pytest.raises(ValueError, match="Check identity mismatch"):
         automation.report_result(context, report, 10)
     api.assert_called_once_with("check-runs/10")
+
+
+def test_green_report_emits_exact_payload_receipt(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, context: dict[str, Any], report: dict[str, Any]
+) -> None:
+    monkeypatch.setenv("GITHUB_RUN_ID", "123")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "output"))
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path / "summary"))
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "2")
+    monkeypatch.setattr(automation, "current", Mock())
+    api = Mock(
+        side_effect=[
+            {
+                "head_sha": context["head"],
+                "external_id": "123",
+                "app": {"id": 15368},
+            },
+            None,
+        ]
+    )
+    monkeypatch.setattr(automation, "repo_api", api)
+    automation.report_result(context, report, 10)
+    sent = api.call_args.args[1]
+    assert sent["conclusion"] == "success"
+    summary = sent["output"]["summary"]
+    assert "Approve release assessment 10" not in summary
+    canonical = (tmp_path / "summary").read_text()
+    assert "Approve release assessment 10" in canonical
+    assert f"Candidate: `{context['head']}`; check: `10`; run: `123`; attempt: `2`" in canonical
+    assert html.escape(summary) in canonical
+    # A Checks-write caller can swap then restore the display, but neither write
+    # reaches the uploaded summary the maintainer is instructed to read.
+    original = summary
+    sent["output"]["summary"] = "Misleading replacement; approve check 10"
+    assert (tmp_path / "summary").read_text() == canonical
+    assert "Misleading replacement" not in canonical
+    sent["output"]["summary"] = original
+    assert (tmp_path / "summary").read_text() == canonical
+    assert report["key_changes"] in summary and report["report"] in summary
+    digest = hashlib.sha256(summary.encode()).hexdigest()
+    assert (tmp_path / "output").read_text() == f"receipt={context['head']}/10/{digest}\n"
+
+
+@pytest.mark.parametrize("consumer", ["gate", "publish"])
+@pytest.mark.parametrize(
+    "scenario",
+    [
+        "approved",
+        "unapproved",
+        "summary",
+        "external-id",
+        "renamed",
+        "missing",
+        "rerun",
+        "failed",
+        "forged",
+    ],
+)
+def test_newest_native_assessment_cannot_fall_back(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, consumer: str, scenario: str
+) -> None:
+    pr = {
+        "number": 1,
+        "created_at": "2026-09-28T00:00:00Z",
+        "merged_at": "2026-09-29",
+        "merge_commit_sha": "b" * 40,
+        "base": {"ref": "main"},
+        "head": {"ref": automation.BRANCH, "sha": "a" * 40, "repo": {"full_name": automation.REPO}},
+    }
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps({"pull_request": pr}))
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
+    monkeypatch.setattr(automation.time, "sleep", lambda _: None)
+    old = {
+        "id": 1234,
+        "name": automation.CHECK,
+        "head_sha": "a" * 40,
+        "app": {"id": 15368},
+        "conclusion": "success",
+        "external_id": "123",
+        "output": {"summary": "Older approved assessment"},
+    }
+    new = {**old, "id": 1235, "output": {"summary": "New assessment"}}
+    native = identity_jobs()
+    if scenario != "forged":
+        native["jobs"] += identity_jobs(1235)["jobs"]
+        native["total_count"] = 2
+    # The native identity is retained even when mutable check fields disappear.
+    if scenario == "summary":
+        new["output"] = {"summary": "Altered report"}
+    elif scenario == "external-id":
+        new["external_id"] = None
+    elif scenario == "renamed":
+        new["name"] = "Unrelated check"
+    receipts = receipt_jobs("Older approved assessment")
+    if scenario not in {"rerun", "failed", "forged"}:
+        job = receipt_jobs("New assessment")["jobs"][0]
+        job["name"] = job["name"].replace("/1234/", "/1235/")
+        receipts["jobs"].append(job)
+    visited = []
+
+    def fake_api(path: str, *, missing_ok: bool = False) -> Any:
+        visited.append(path)
+        if path.startswith("actions/workflows/"):
+            assert "created=%3E%3D2026-09-28T00%3A00%3A00Z" in path
+            return {"total_count": 1, "workflow_runs": [trusted_run()]}
+        if path == "actions/runs/123/jobs?filter=all&per_page=100&page=1":
+            return native
+        if path == "check-runs/1234":
+            return old
+        if path == "check-runs/1235":
+            return None if scenario == "missing" else new
+        if path == "actions/runs/123":
+            run = trusted_run()
+            if scenario == "failed":
+                run["conclusion"] = "failure"
+            return run
+        if path == "actions/runs/123/attempts/2/jobs?per_page=100":
+            return receipts
+        if path.startswith("commits/") and "/pulls?" in path:
+            return [pr]
+        if path.startswith("git/commits/"):
+            return {"tree": {"sha": "c" * 40}}
+        raise AssertionError(path)
+
+    monkeypatch.setattr(automation, "repo_api", fake_api)
+    approve = Mock(
+        side_effect=lambda pr, head, check_id: check_id == 1234 or scenario == "approved"
+    )
+    monkeypatch.setattr(automation, "human_approved", approve)
+
+    def consume() -> Any:
+        return (
+            automation.gate()
+            if consumer == "gate"
+            else automation.published_review("v0.23.0", "b" * 40)
+        )
+
+    if scenario in {"approved", "forged"}:
+        result = consume()
+        if consumer == "publish":
+            assert result == (
+                "New assessment" if scenario == "approved" else "Older approved assessment"
+            )
+    else:
+        with pytest.raises(ValueError):
+            consume()
+        assert "check-runs/1234" not in visited
+        assert all(call.args[2] == 1235 for call in approve.call_args_list)
+
+
+@pytest.mark.parametrize("key,limit", [("workflow_runs", 1000), ("jobs", 10000)])
+def test_native_history_cannot_silently_truncate(
+    monkeypatch: pytest.MonkeyPatch, key: str, limit: int
+) -> None:
+    monkeypatch.setattr(automation, "repo_api", Mock(return_value={"total_count": limit, key: []}))
+    with pytest.raises(ValueError, match="history limit"):
+        automation.action_rows("actions/runs?filter=all", key, limit)
+
+
+@pytest.mark.parametrize("status", [401, 403, 429, 500])
+def test_native_history_errors_are_fatal_and_sanitized(
+    monkeypatch: pytest.MonkeyPatch, status: int
+) -> None:
+    monkeypatch.setattr(
+        automation.subprocess,
+        "run",
+        Mock(
+            return_value=automation.subprocess.CompletedProcess(
+                [], 1, f"HTTP/2.0 {status} Error\n\n{{}}", "synthetic private detail"
+            )
+        ),
+    )
+    with pytest.raises(RuntimeError, match="GitHub API operation failed") as error:
+        automation.action_rows("actions/runs?filter=all", "jobs", 10000)
+    assert "synthetic private" not in str(error.value)
+
+
+def test_collect_rejects_run_older_than_pr(
+    monkeypatch: pytest.MonkeyPatch, context: dict[str, Any]
+) -> None:
+    monkeypatch.setattr(
+        automation, "current", Mock(return_value={"created_at": "2026-09-29T00:00:00Z"})
+    )
+    monkeypatch.setenv("GITHUB_RUN_ID", "123")
+    api = Mock(return_value=trusted_run())
+    monkeypatch.setattr(automation, "repo_api", api)
+    with pytest.raises(ValueError, match="predates"):
+        automation.collect(context)
+    assert api.call_count == 1
+
+
+@pytest.mark.parametrize("change", ["unchanged", "new-attempt", "active"])
+def test_gate_reuses_only_completed_attempt_history(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, change: str
+) -> None:
+    pr = {
+        "number": 1,
+        "created_at": "2026-09-28T00:00:00Z",
+        "head": {"ref": automation.BRANCH, "sha": "a" * 40, "repo": {"full_name": automation.REPO}},
+    }
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps({"pull_request": pr}))
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
+    monkeypatch.setattr(automation.time, "sleep", lambda _: None)
+    counts = {"polls": 0, "jobs": 0}
+    approved_ids = []
+
+    def fake_api(path: str, *, missing_ok: bool = False) -> Any:
+        if path.startswith("actions/workflows/"):
+            counts["polls"] += 1
+            run = trusted_run()
+            if change == "new-attempt" and counts["polls"] > 1:
+                run["run_attempt"] = 3
+            if change == "active":
+                run["status"] = "in_progress"
+            return {
+                "total_count": 12,
+                "workflow_runs": [run] + [{**trusted_run(), "id": i} for i in range(124, 135)],
+            }
+        if "/jobs?filter=all" in path:
+            counts["jobs"] += 1
+            if "/123/" not in path:
+                return {"total_count": 0, "jobs": []}
+            return identity_jobs(1235 if change != "unchanged" and counts["polls"] > 1 else 1234)
+        if path.startswith("check-runs/"):
+            return {"id": int(path.split("/")[1]), "external_id": "123"}
+        raise AssertionError(path)
+
+    def approval(pr: int, head: str, check_id: int) -> bool:
+        approved_ids.append(check_id)
+        # The old assessment is approved only after the second poll.
+        return counts["polls"] > 1 and check_id == 1234
+
+    monkeypatch.setattr(automation, "repo_api", fake_api)
+    monkeypatch.setattr(automation, "trusted_assessment", Mock(return_value=True))
+    monkeypatch.setattr(automation, "human_approved", approval)
+    if change == "unchanged":
+        automation.gate()
+        assert counts == {"polls": 2, "jobs": 12}
+        assert approved_ids == [1234, 1234]
+    else:
+        with pytest.raises(ValueError, match="human approval is missing"):
+            automation.gate()
+        assert approved_ids == [1234] + [1235] * 84
+        assert counts["jobs"] == (13 if change == "new-attempt" else 96)
+
+
+@pytest.mark.parametrize("consumer", ["gate", "publish"])
+@pytest.mark.parametrize("within_cap", [True, False])
+def test_assessment_lookup_request_cap_rejects_partial_history(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, consumer: str, within_cap: bool
+) -> None:
+    pr = {
+        "number": 1,
+        "created_at": "2026-09-28T00:00:00Z",
+        "merged_at": "2026-09-29",
+        "merge_commit_sha": "b" * 40,
+        "base": {"ref": "main"},
+        "head": {"ref": automation.BRANCH, "sha": "a" * 40, "repo": {"full_name": automation.REPO}},
+    }
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps({"pull_request": pr}))
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
+    # One listing plus 96 job reads plus 3 authentication reads fits exactly.
+    runs = [{**trusted_run(), "id": i} for i in range(123, 219 if within_cap else 220)]
+    counts = {"lookup": 0, "jobs": 0}
+    check = {
+        "id": 1234,
+        "name": automation.CHECK,
+        "head_sha": "a" * 40,
+        "app": {"id": 15368},
+        "conclusion": "success",
+        "external_id": "123",
+        "output": {"summary": "Assessment"},
+    }
+
+    def fake_api(path: str, *, missing_ok: bool = False) -> Any:
+        if path.startswith("git/commits/"):
+            return {"tree": {"sha": "c" * 40}}
+        if path.startswith("commits/") and "/pulls?" in path:
+            return [pr]
+        counts["lookup"] += 1
+        if path.startswith("actions/workflows/"):
+            return {"total_count": len(runs), "workflow_runs": runs}
+        if "/jobs?filter=all" in path:
+            counts["jobs"] += 1
+            # A valid older identity is visible immediately, but cannot bypass the cap.
+            return identity_jobs() if "/123/" in path else {"total_count": 0, "jobs": []}
+        if path == "check-runs/1234":
+            return check
+        if path == "actions/runs/123":
+            return trusted_run()
+        if path == "actions/runs/123/attempts/2/jobs?per_page=100":
+            return receipt_jobs()
+        raise AssertionError(path)
+
+    monkeypatch.setattr(automation, "repo_api", fake_api)
+    approval = Mock(return_value=True)
+    monkeypatch.setattr(automation, "human_approved", approval)
+
+    def consume() -> Any:
+        return (
+            automation.gate()
+            if consumer == "gate"
+            else automation.published_review("v0.23.0", "b" * 40)
+        )
+
+    if within_cap:
+        consume()
+        assert counts == {"lookup": 100, "jobs": 96}
+        approval.assert_called_once_with(1, "a" * 40, 1234)
+    else:
+        with pytest.raises(ValueError, match="request cap reached.*fresh release PR"):
+            consume()
+        assert counts == {"lookup": 97, "jobs": 96}
+        approval.assert_not_called()
+
+
+def test_history_pagination_consumes_shared_request_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    api = Mock(return_value={"total_count": 250, "jobs": [{}] * 100})
+    monkeypatch.setattr(automation, "repo_api", api)
+    with pytest.raises(ValueError, match="request cap reached"):
+        automation.action_rows("actions/runs/123/jobs?filter=all", "jobs", 10000, request_limit=2)
+    assert api.call_count == 2
+
+
+def test_eligibility_marker_uses_only_trigger_identity() -> None:
+    workflow = yaml.load(
+        (ROOT / ".github/workflows/release-candidate.yml").read_text(), Loader=yaml.BaseLoader
+    )
+    assert " ".join(workflow["run-name"].split()) == (
+        "${{ github.event.workflow_run.head_repository.full_name == github.repository && "
+        "(github.event.workflow_run.name == 'Release Please' || "
+        "(github.event.workflow_run.name == 'Tests' && "
+        "github.event.workflow_run.head_branch == 'release-please--branches--main')) && "
+        "'Release Candidate eligible' || 'Release Candidate unrelated' }}"
+    )
+
+
+@pytest.mark.parametrize("consumer", ["gate", "publish"])
+@pytest.mark.parametrize("tampered", [False, True])
+def test_unrelated_runs_do_not_spend_candidate_history_budget(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, consumer: str, tampered: bool
+) -> None:
+    pr = {
+        "number": 1,
+        "created_at": "2026-09-28T00:00:00Z",
+        "merged_at": "2026-09-29",
+        "merge_commit_sha": "b" * 40,
+        "base": {"ref": "main"},
+        "head": {"ref": automation.BRANCH, "sha": "a" * 40, "repo": {"full_name": automation.REPO}},
+    }
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps({"pull_request": pr}))
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
+    monkeypatch.setattr(automation.time, "sleep", lambda _: None)
+    genuine = trusted_run()
+    unrelated = [
+        {**genuine, "id": i, "display_title": "Release Candidate unrelated"}
+        for i in range(200, 297)
+    ]
+    # Metadata without a trusted eligibility marker cannot produce new authority.
+    legacy = {k: v for k, v in genuine.items() if k != "display_title"}
+    legacy["id"] = 400
+    jobs_read = []
+
+    def fake_api(path: str, *, missing_ok: bool = False) -> Any:
+        if path.startswith("commits/") and "/pulls?" in path:
+            return [pr]
+        if path.startswith("git/commits/"):
+            return {"tree": {"sha": "c" * 40}}
+        if path.startswith("actions/workflows/"):
+            return {"total_count": 99, "workflow_runs": unrelated + [legacy, genuine]}
+        if "/jobs?filter=all" in path:
+            jobs_read.append(path)
+            assert path == "actions/runs/123/jobs?filter=all&per_page=100&page=1"
+            jobs = identity_jobs()
+            jobs["jobs"] += identity_jobs(1235)["jobs"]
+            jobs["total_count"] = 2
+            return jobs
+        if path == "check-runs/1235":
+            return {
+                "id": 1235,
+                "name": automation.CHECK,
+                "head_sha": "a" * 40,
+                "app": {"id": 15368},
+                "conclusion": "success",
+                "external_id": "123",
+                "output": {"summary": "Altered" if tampered else "Assessment"},
+            }
+        if path == "actions/runs/123":
+            return genuine
+        if path == "actions/runs/123/attempts/2/jobs?per_page=100":
+            jobs = receipt_jobs()
+            jobs["jobs"][0]["name"] = jobs["jobs"][0]["name"].replace("/1234/", "/1235/")
+            return jobs
+        raise AssertionError(path)
+
+    monkeypatch.setattr(automation, "repo_api", fake_api)
+    approved = Mock(return_value=True)
+    monkeypatch.setattr(automation, "human_approved", approved)
+
+    def consume() -> Any:
+        return (
+            automation.gate()
+            if consumer == "gate"
+            else automation.published_review("v0.23.0", "b" * 40)
+        )
+
+    if tampered:
+        with pytest.raises(ValueError):
+            consume()
+        approved.assert_not_called()
+    else:
+        consume()
+        approved.assert_called_once_with(1, "a" * 40, 1235)
+    assert len(jobs_read) == 1

@@ -1,4 +1,11 @@
 name: Release Candidate
+# Record trigger eligibility in native run metadata, before any jobs execute.
+run-name: >-
+  ${{ github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.name == 'Release Please' ||
+       (github.event.workflow_run.name == 'Tests' &&
+        github.event.workflow_run.head_branch == 'release-please--branches--main')) &&
+      'Release Candidate eligible' || 'Release Candidate unrelated' }}
 
 on:
   workflow_run:
@@ -20,6 +27,7 @@ jobs:
       contents: read
       pull-requests: read
       checks: read
+      actions: read
     outputs:
       candidate: ${{ steps.candidate.outputs.candidate }}
       commit_sha: ${{ steps.candidate.outputs.head }}
@@ -117,9 +125,11 @@ jobs:
   evidence:
     needs: update
     runs-on: ubuntu-latest
-    environment: release
     permissions:
       contents: read
+      pull-requests: read
+      checks: write
+      actions: read
     outputs:
       check: ${{ steps.collect.outputs.check }}
     steps:
@@ -130,19 +140,9 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: candidate-final-${{ github.run_attempt }}
-      - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
-        id: app
-        with:
-          app-id: ${{ vars.OPENAI_SDKS_APP_CLIENT_ID }}
-          private-key: ${{ secrets.OPENAI_SDKS_APP_PRIVATE_KEY }}
-          owner: openai
-          repositories: openai-agents-python
-          permission-contents: read
-          permission-pull-requests: read
-          permission-checks: write
       - id: collect
         env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
         run: python .github/scripts/release_automation.py collect
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -151,6 +151,7 @@ jobs:
           retention-days: 1
 
   review:
+    name: Release assessment identity ${{ needs.update.outputs.commit_sha }}/${{ needs.evidence.outputs.check }}
     needs: [update, evidence]
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -199,9 +200,12 @@ jobs:
     needs: [update, evidence, review]
     if: always() && needs.evidence.outputs.check != ''
     runs-on: ubuntu-latest
-    environment: release
     permissions:
       contents: read
+      pull-requests: read
+      checks: write
+    outputs:
+      receipt: ${{ steps.report.outputs.receipt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -210,19 +214,20 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: candidate-final-${{ github.run_attempt }}
-      - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
-        id: app
-        with:
-          app-id: ${{ vars.OPENAI_SDKS_APP_CLIENT_ID }}
-          private-key: ${{ secrets.OPENAI_SDKS_APP_PRIVATE_KEY }}
-          owner: openai
-          repositories: openai-agents-python
-          permission-contents: read
-          permission-pull-requests: read
-          permission-checks: write
       - name: Record the exact candidate verdict
+        id: report
         env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
           REVIEW_RESULT: ${{ needs.review.outputs.result }}
           REVIEW_CHECK_ID: ${{ needs.evidence.outputs.check }}
         run: python .github/scripts/release_automation.py report
+
+  receipt:
+    needs: readiness
+    name: Release assessment receipt ${{ needs.readiness.outputs.receipt }}
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      # Native job metadata binds the exact check payload to this successful attempt.
+      # No candidate, model, artifact, or checkout executes in this job.
+      - run: ':'
