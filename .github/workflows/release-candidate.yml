@@ -194,7 +194,7 @@ jobs:
           allow-bot-users: openai-sdks[bot],github-actions[bot]
           prompt-file: control/.github/release/review.md
           output-schema-file: control/.github/release/review.schema.json
-          effort: high
+          effort: medium
 
   readiness:
     needs: [update, evidence, review]
